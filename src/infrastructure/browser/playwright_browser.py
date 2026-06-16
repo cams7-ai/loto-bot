@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from secrets import token_hex
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from application.ports import BrowserAutomationPort
 from domain import AutomationError, AutomationSession
@@ -139,18 +140,19 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
         self._fill(self._selectors.cpf_field, self._settings.cpf)
         self._click(self._selectors.cpf_next_button)
+        self._sync_auth_session_from_current_url(session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
-        self._goto(self._settings.authentication_url(session.tab_id))
+        self._raise_if_forbidden("Solicita o código de acesso")
         self._click(self._selectors.receive_code_button)
 
     def _submit_validation_code(self, session: AutomationSession, code: str) -> None:
-        self._goto(self._settings.authentication_url(session.tab_id))
+        self._raise_if_forbidden("Informa o código recebido")
         self._fill(self._selectors.code_field, code)
         self._click(self._selectors.code_send_button)
 
     def _submit_password(self, session: AutomationSession) -> None:
-        self._goto(self._settings.authentication_url(session.tab_id))
+        self._raise_if_forbidden("Informa a senha")
         self._fill(self._selectors.password_field, self._settings.senha)
         self._click(self._selectors.password_enter_button)
 
@@ -220,6 +222,40 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         else:
             element.fill(value)
 
+    def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
+        page = self._require_page()
+        try:
+            page.wait_for_url(re.compile(r".*/login-actions/authenticate.*"), timeout=self._timeout_ms)
+        except Exception:
+            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA")
+
+        params = parse_qs(urlparse(page.url).query)
+        execution = self._first_query_param(params, "execution")
+        tab_id = self._first_query_param(params, "tab_id")
+        if execution:
+            session.execution = execution
+        if tab_id:
+            session.tab_id = tab_id
+
+    def _authentication_url(self, session: AutomationSession, operation: str) -> str:
+        execution = session.execution or self._settings.execution
+        if not execution or execution.startswith("<"):
+            raise AutomationError(
+                "Não foi possível identificar o execution dinâmico da sessão do Login CAIXA.",
+                operation=operation,
+            )
+        return self._settings.authentication_url(session.tab_id, execution)
+
+    def _raise_if_forbidden(self, operation: str) -> None:
+        page = self._require_page()
+        title = page.locator("h1.error-header__title")
+        if title.count() and title.first.inner_text().strip().lower() == "forbidden":
+            raise AutomationError(
+                "Login CAIXA retornou Forbidden ao continuar a autenticação. "
+                "A sessão atual foi bloqueada pelo serviço; reinicie o navegador/perfil e tente novamente.",
+                operation=operation,
+            )
+
     def _require_page(self) -> Any:
         if self._page is None:
             raise AutomationError("A sessão de navegador está fechada.", operation="Sessão de navegador")
@@ -229,6 +265,11 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _tracking_code_from_url(url: str) -> str:
         match = re.search(r"/acompanhamento/(\d+)", url)
         return match.group(1) if match else ""
+
+    @staticmethod
+    def _first_query_param(params: dict[str, list[str]], name: str) -> str:
+        values = params.get(name) or []
+        return values[0] if values else ""
 
     @property
     def _timeout_ms(self) -> int:

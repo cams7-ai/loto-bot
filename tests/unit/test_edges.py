@@ -4,6 +4,7 @@ import logging
 import asyncio
 import sys
 import types
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,7 +13,7 @@ from pydantic import ValidationError
 from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
 from api.dependencies import get_container
 from api.server import app
-from domain import AutomationSession, ExternalServiceError
+from domain import AutomationError, AutomationSession, ExternalServiceError
 from domain.value_objects import PaymentAuthorization
 from infrastructure.browser import PlaywrightBrowserAutomation
 from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
@@ -190,6 +191,7 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
 def test_settings_selectors_and_logging(monkeypatch):
     settings = Settings(URL_HOME="http://home", URL_LOGIN_CAIXA="http://login", EXECUTION="exec")
     assert "tab" in settings.authentication_url("tab")
+    assert "execution=dynamic" in settings.authentication_url("tab", "dynamic")
     assert "state" in settings.cpf_url("state", "nonce")
     assert Selectors().modality_button("mega-sena")
     assert Selectors().card_selector("1234")
@@ -217,7 +219,8 @@ def test_lotobot_browser_settings_parse_like_whatsapp_notify(tmp_path, monkeypat
 
     assert settings.browser_headless is True
     assert settings.browser_timeout_seconds == 45
-    assert settings.browser_profile_dir == (tmp_path / "perfil-local").resolve()
+    project_root = Path(__file__).resolve().parents[2]
+    assert settings.browser_profile_dir == (project_root / "perfil-local").resolve()
     assert Settings(LOTTOBOT_BROWSER_HEADLESS="").browser_headless is False
 
 
@@ -321,3 +324,62 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
     assert "navigator" in captured["script"]
     assert captured["closed"] is True
     assert captured["stopped"] is True
+
+
+def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
+    settings = Settings(URL_LOGIN_CAIXA="http://login", EXECUTION="<EXECUTION_ID_DA_SESSAO>")
+    browser = PlaywrightBrowserAutomation(settings)
+
+    class FakePage:
+        url = (
+            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
+            "?session_code=abc&execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
+        )
+
+        def wait_for_url(self, pattern, timeout):
+            self.pattern = pattern
+            self.timeout = timeout
+
+    session = AutomationSession()
+    browser._page = FakePage()
+
+    browser._sync_auth_session_from_current_url(session)
+
+    assert session.execution == "exec-real"
+    assert session.tab_id == "tab-real"
+    assert browser._authentication_url(session, "Teste").endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
+
+
+def test_playwright_browser_rejects_placeholder_execution():
+    settings = Settings(EXECUTION="<EXECUTION_ID_DA_SESSAO>")
+    browser = PlaywrightBrowserAutomation(settings)
+
+    try:
+        browser._authentication_url(AutomationSession(tab_id="tab"), "Solicita o código de acesso")
+    except AutomationError as exc:
+        assert "execution dinâmico" in str(exc)
+    else:
+        raise AssertionError("Erro esperado")
+
+
+def test_playwright_browser_continues_login_without_direct_authenticate_goto():
+    settings = Settings()
+    browser = PlaywrightBrowserAutomation(settings)
+    actions = []
+
+    def fail_goto(url):
+        raise AssertionError(f"Nao deveria navegar diretamente para {url}")
+
+    browser._goto = fail_goto
+    browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
+    browser._click = lambda selector: actions.append(("click", selector))
+    browser._fill = lambda selector, value: actions.append(("fill", selector, value))
+
+    session = AutomationSession(tab_id="tab", execution="exec")
+    browser._request_validation_code(session)
+    browser._submit_validation_code(session, "123456")
+    browser._submit_password(session)
+
+    assert ("click", browser._selectors.receive_code_button) in actions
+    assert ("fill", browser._selectors.code_field, "123456") in actions
+    assert ("fill", browser._selectors.password_field, settings.senha) in actions

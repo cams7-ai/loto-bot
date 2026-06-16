@@ -26,6 +26,37 @@ def test_gmail_reader_client_reads_code():
     assert client.get_validation_code() == "123456"
 
 
+def test_gmail_reader_client_sends_wait_timeout_and_read_timeout():
+    seen = {}
+
+    def handler(request):
+        seen["url"] = str(request.url)
+        seen["timeout"] = request.extensions["timeout"]
+        return response(200, {"code": "123456"})
+
+    settings = Settings(URL_GMAIL_READER="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=45)
+    client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+
+    assert client.get_validation_code() == "123456"
+    assert "waitTimeoutSeconds=45" in seen["url"]
+    assert seen["timeout"]["read"] == 50
+
+
+def test_gmail_reader_client_maps_http_timeout():
+    def handler(request):
+        raise httpx.ReadTimeout("timeout", request=request)
+
+    settings = Settings(URL_GMAIL_READER="http://gmail.local")
+    client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+
+    try:
+        client.get_validation_code()
+    except ExternalServiceError as exc:
+        assert "Tempo esgotado" in str(exc)
+    else:
+        raise AssertionError("Erro externo esperado")
+
+
 def test_gmail_reader_client_rejects_error():
     settings = Settings(URL_GMAIL_READER="http://gmail.local")
     transport = httpx.MockTransport(lambda request: response(500, {"error": {"message": "erro"}}))

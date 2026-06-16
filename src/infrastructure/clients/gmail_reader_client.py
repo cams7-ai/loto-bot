@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import httpx
 
 from application.ports import ValidationCodePort
 from domain import ExternalServiceError
 from infrastructure.config import Settings
 from shared import mask_sensitive_value
+
+
+logger = logging.getLogger(__name__)
 
 
 class GmailReaderClient(ValidationCodePort):
@@ -17,10 +22,21 @@ class GmailReaderClient(ValidationCodePort):
 
     def get_validation_code(self) -> str:
         url = f"{self._settings.url_gmail_reader}/api/v1/validation-code"
-        response = self._client.get(
-            url,
-            params={"waitTimeoutSeconds": self._settings.validation_code_wait_timeout_seconds},
+        logger.info(
+            "Chamando API Gmail Reader para buscar código de validação",
+            extra={"executed_operation": "Solicita o código de acesso"},
         )
+        try:
+            response = self._client.get(
+                url,
+                params={"waitTimeoutSeconds": self._settings.validation_code_wait_timeout_seconds},
+                timeout=self._settings.validation_code_wait_timeout_seconds + 5,
+            )
+        except httpx.TimeoutException as exc:
+            raise ExternalServiceError(
+                "Tempo esgotado ao buscar o código de validação.",
+                operation="Solicita o código de acesso",
+            ) from exc
         if response.status_code >= 400:
             raise ExternalServiceError("Não foi possível buscar o código de validação.", operation="Solicita o código de acesso")
         payload = response.json()

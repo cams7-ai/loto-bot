@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 import httpx
 
 from domain import ExternalServiceError
 from infrastructure.config import Settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class MailSenderClient:
@@ -14,6 +19,7 @@ class MailSenderClient:
         self._client = client or httpx.Client(timeout=10)
 
     def send(self, subject: str, body: str) -> None:
+        logger.info("Chamando API Mail Sender para enviar e-mail", extra={"executed_operation": "Envia e-mail"})
         response = self._client.post(
             f"{self._settings.url_mail_sender}/api/v1/mail/send",
             json={

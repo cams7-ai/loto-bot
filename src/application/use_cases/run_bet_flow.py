@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import Future, ThreadPoolExecutor
+from threading import Event
+from time import sleep
 
 from application.dto import AutomationRunResult
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
@@ -11,6 +14,7 @@ from domain import AutomationError, AutomationSession
 from domain.value_objects import PaymentAuthorization
 
 logger = logging.getLogger(__name__)
+VALIDATION_CODE_LOOKUP_LEAD_SECONDS = 1
 
 
 class RunBetFlowUseCase:
@@ -39,12 +43,18 @@ class RunBetFlowUseCase:
             self._execute("Aceita os termos de uso", self._browser.accept_terms)
             self._execute("Home", self._browser.access_home)
             self._execute("Informa o CPF", self._browser.submit_cpf)
-            self._execute("Solicita o código de acesso", self._browser.request_validation_code)
 
-            self._session.valid_code = self._validation_codes.get_validation_code()
+            with ThreadPoolExecutor(max_workers=1, thread_name_prefix="lotobot-validation-code") as executor:
+                validation_code_request_started = Event()
+                validation_code = self._request_validation_code_async(executor, validation_code_request_started)
+                validation_code_request_started.wait()
+                sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
+                self._execute("Solicita o código de acesso", self._browser.request_validation_code)
+                self._session.valid_code = validation_code.result()
             self._execute_with_code("Informa o código recebido")
 
             self._execute("Informa a senha", self._browser.submit_password)
+
             self._execute("Seleciona uma modalidade", self._browser.select_lottery_modality)
             self._execute("Escolhe os números da aposta", self._browser.choose_random_numbers)
             self._execute("Adiciona a aposta ao carrinho", self._browser.add_bet_to_cart)
@@ -84,6 +94,13 @@ class RunBetFlowUseCase:
         self._session.mark_running(operation)
         self._browser.submit_validation_code(self._session, self._session.valid_code or "")
         logger.info("Operação concluída", extra={"executed_operation": operation})
+
+    def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event) -> Future[str]:
+        return executor.submit(self._get_validation_code, request_started)
+
+    def _get_validation_code(self, request_started: Event) -> str:
+        request_started.set()
+        return self._validation_codes.get_validation_code()
 
     def _handle_failure(self, exc: AutomationError) -> AutomationRunResult:
         operation = exc.operation or self._session.executed_operation or "Operação não identificada"

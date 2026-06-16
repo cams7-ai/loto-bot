@@ -9,8 +9,12 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+ENV_FILE = PROJECT_ROOT / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     cpf: str = Field(default="<CPF_DO_APOSTADOR>", alias="CPF")
     senha: str = Field(default="<SENHA_DO_APOSTADOR>", alias="SENHA")
@@ -70,17 +74,15 @@ class Settings(BaseSettings):
     def resolve_browser_profile_dir(self) -> "Settings":
         profile_dir = self.browser_profile_dir
         if not profile_dir.is_absolute():
-            base_dir = Path.cwd()
-            env_path = base_dir / ".env"
-            if env_path.exists():
-                base_dir = env_path.parent
+            base_dir = ENV_FILE.parent if ENV_FILE.exists() else Path.cwd()
             self.browser_profile_dir = (base_dir / profile_dir).resolve()
         return self
 
-    def authentication_url(self, tab_id: str) -> str:
+    def authentication_url(self, tab_id: str, execution: str | None = None) -> str:
+        execution_id = execution or self.execution
         return (
             f"{self.url_login_caixa}/auth/realms/internet/login-actions/authenticate"
-            f"?execution={self.execution}&client_id={self.client_id}&tab_id={tab_id}"
+            f"?execution={execution_id}&client_id={self.client_id}&tab_id={tab_id}"
         )
 
     def cpf_url(self, state: str, nonce: str) -> str:
