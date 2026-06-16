@@ -36,7 +36,6 @@ class RunBetFlowUseCase:
                 self._session_control.start()
 
             self._execute("Acessa o site Loterias Online CAIXA", self._browser.access_lottery_portal)
-            self._execute("Aceita o termo de privacidade", self._browser.accept_privacy)
             self._execute("Aceita os termos de uso", self._browser.accept_terms)
             self._execute("Home", self._browser.access_home)
             self._execute("Informa o CPF", self._browser.submit_cpf)

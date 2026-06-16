@@ -17,9 +17,6 @@ class BrowserAutomationPort(Protocol):
     def access_lottery_portal(self, session: AutomationSession) -> None:
         """Acessa o portal Loterias Online CAIXA."""
 
-    def accept_privacy(self, session: AutomationSession) -> None:
-        """Aceita os termos de uso."""
-
     def accept_terms(self, session: AutomationSession) -> None:
         """Aceita os termos de uso."""
 

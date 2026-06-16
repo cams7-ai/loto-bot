@@ -84,10 +84,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def access_lottery_portal(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._access_lottery_portal, session)
 
-    def accept_privacy(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._accept_privacy, session)
-    
-    def accept_terms(self, session: AutomationSession) -> None:        
+    def accept_terms(self, session: AutomationSession) -> None:       
         self._run_on_browser_thread(self._accept_terms, session)
 
     def access_home(self, session: AutomationSession) -> None:
@@ -129,12 +126,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _access_lottery_portal(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_loterias_online)
 
-    def _accept_privacy(self, session: AutomationSession) -> None:
-        self._goto(self._settings.url_termo_de_uso)
-        self._click(self._selectors.privacy_yes_button)
-
     def _accept_terms(self, session: AutomationSession) -> None:
-#        self._goto(self._settings.url_termo_de_uso)
+        self._goto(self._settings.url_termo_de_uso)
+        self._click_if_exists(self._selectors.privacy_yes_button, True)
         self._click(self._selectors.terms_yes_button)
 
     def _access_home(self, session: AutomationSession) -> None:
@@ -205,10 +199,26 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._require_page().goto(url, wait_until="domcontentloaded", timeout=self._timeout_ms)
 
     def _click(self, selector: str) -> None:
-        self._require_page().locator(selector).click()
+        self._click_if_exists(selector, False)
+
+    def _click_if_exists(self, selector: str, check_selector: bool) -> None:
+        element = self._require_page().locator(selector)
+        if check_selector:
+            if element.count():
+                element.click()
+        else:
+            element.click()
 
     def _fill(self, selector: str, value: str) -> None:
-        self._require_page().locator(selector).fill(value)
+        self._fill_if_exists(selector, value, False)
+
+    def _fill_if_exists(self, selector: str, value: str, check_selector: bool) -> None:
+        element = self._require_page().locator(selector)
+        if check_selector:
+            if element.count():
+                element.fill(value)
+        else:
+            element.fill(value)
 
     def _require_page(self) -> Any:
         if self._page is None:
