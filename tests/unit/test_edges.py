@@ -1,0 +1,323 @@
+from __future__ import annotations
+
+import logging
+import asyncio
+import sys
+import types
+
+import httpx
+import pytest
+from pydantic import ValidationError
+
+from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
+from api.dependencies import get_container
+from api.server import app
+from domain import AutomationSession, ExternalServiceError
+from domain.value_objects import PaymentAuthorization
+from infrastructure.browser import PlaywrightBrowserAutomation
+from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
+from infrastructure.config import Settings
+from infrastructure.logging import configure_logging
+from infrastructure.selectors import Selectors
+
+
+class NoopNotifier:
+    def start_whatsapp_session(self, session):
+        pass
+
+    def stop_whatsapp_session(self, session):
+        pass
+
+    def notify_failure(self, session, message):
+        self.message = message
+
+
+class BrokenBrowser:
+    def start(self, session):
+        return "tab"
+
+    def stop(self):
+        self.stopped = True
+
+    def access_lottery_portal(self, session):
+        raise ValueError("quebrou")
+
+
+class CodeReader:
+    def get_validation_code(self):
+        return "123456"
+
+
+def response(status_code: int, payload: dict | None = None) -> httpx.Response:
+    return httpx.Response(status_code=status_code, json=payload or {}, request=httpx.Request("GET", "http://test"))
+
+
+def test_run_bet_flow_handles_unexpected_exception():
+    session = AutomationSession()
+    browser = BrokenBrowser()
+    notifier = NoopNotifier()
+    control = SessionControlUseCase(session, browser, notifier)
+    use_case = RunBetFlowUseCase(session, browser, CodeReader(), notifier, control, PaymentAuthorization(True))
+
+    result = use_case.run()
+
+    assert result.status == "failed"
+    assert "inesperado" in result.message
+    assert browser.stopped is True
+
+
+def test_clients_error_edges():
+    settings = Settings(URL_GMAIL_READER="http://gmail", URL_MAIL_SENDER="http://mail")
+    empty_gmail = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(200, {"code": ""}))))
+    failing_mail = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}}))))
+
+    try:
+        empty_gmail.get_validation_code()
+    except ExternalServiceError as exc:
+        assert "não retornou" in str(exc)
+    else:
+        raise AssertionError("Erro esperado")
+
+    try:
+        failing_mail.send("Assunto", "Body")
+    except ExternalServiceError as exc:
+        assert "e-mail" in str(exc)
+    else:
+        raise AssertionError("Erro esperado")
+
+
+def test_whatsapp_send_error_with_invalid_json():
+    settings = Settings(URL_WHATSAPP_NOTIFY="http://whatsapp")
+    raw = httpx.Response(500, content=b"erro", request=httpx.Request("POST", "http://test"))
+    client = WhatsAppNotifyClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: raw)))
+
+    try:
+        client.send_message("Olá")
+    except ExternalServiceError as exc:
+        assert "indisponível" in str(exc)
+    else:
+        raise AssertionError("Erro esperado")
+
+
+def test_whatsapp_start_and_stop_error_branches():
+    settings = Settings(URL_WHATSAPP_NOTIFY="http://whatsapp")
+    client = WhatsAppNotifyClient(
+        settings,
+        httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {"message": "falhou"}}))),
+    )
+
+    for action in (client.start_session, client.stop_session):
+        try:
+            action()
+        except ExternalServiceError as exc:
+            assert "falhou" in str(exc)
+        else:
+            raise AssertionError("Erro externo esperado")
+
+
+def test_notification_gateway_success_and_stop_warning():
+    class WhatsApp:
+        def start_session(self):
+            return "SESSAO_ABERTA"
+
+        def stop_session(self):
+            raise RuntimeError("falha")
+
+        def status(self):
+            return "SESSAO_ABERTA"
+
+        def send_message(self, message):
+            return "enviado"
+
+    class Mail:
+        def send(self, subject, body):
+            raise AssertionError("Não deveria enviar e-mail")
+
+    session = AutomationSession()
+    session.executed_operation = "Teste"
+    gateway = NotificationGateway(WhatsApp(), Mail())
+
+    gateway.start_whatsapp_session(session)
+    gateway.notify_failure(session, "ok")
+    gateway.stop_whatsapp_session(session)
+
+    assert session.whatsapp_enabled is False
+
+
+def test_notification_gateway_stop_success_and_disabled_return():
+    class WhatsApp:
+        def __init__(self):
+            self.stopped = False
+
+        def stop_session(self):
+            self.stopped = True
+            return "SESSAO_FECHADA"
+
+    class Mail:
+        def send(self, subject, body):
+            pass
+
+    session = AutomationSession()
+    whatsapp = WhatsApp()
+    gateway = NotificationGateway(whatsapp, Mail())
+
+    gateway.stop_whatsapp_session(session)
+    assert whatsapp.stopped is False
+
+    session.whatsapp_enabled = True
+    gateway.stop_whatsapp_session(session)
+    assert whatsapp.stopped is True
+    assert session.whatsapp_enabled is False
+
+
+def test_notification_gateway_whatsapp_exception_and_mail_error():
+    class WhatsApp:
+        def status(self):
+            raise RuntimeError("sem status")
+
+    class Mail:
+        def send(self, subject, body):
+            raise RuntimeError("sem e-mail")
+
+    session = AutomationSession()
+    session.whatsapp_enabled = True
+    session.executed_operation = "Teste"
+    gateway = NotificationGateway(WhatsApp(), Mail())
+
+    gateway.notify_failure(session, "Falha")
+
+
+def test_settings_selectors_and_logging(monkeypatch):
+    settings = Settings(URL_HOME="http://home", URL_LOGIN_CAIXA="http://login", EXECUTION="exec")
+    assert "tab" in settings.authentication_url("tab")
+    assert "state" in settings.cpf_url("state", "nonce")
+    assert Selectors().modality_button("mega-sena")
+    assert Selectors().card_selector("1234")
+
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    configure_logging()
+    logging.getLogger("teste").info("mensagem")
+
+
+def test_get_container_and_cached_openapi():
+    assert get_container() is not None
+    first = app.openapi()
+    second = app.openapi()
+    assert first is second
+
+
+def test_lotobot_browser_settings_parse_like_whatsapp_notify(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    settings = Settings(
+        LOTTOBOT_BROWSER_PROFILE_DIR="perfil-local",
+        LOTTOBOT_BROWSER_HEADLESS="sim",
+        LOTTOBOT_BROWSER_TIMEOUT_SECONDS=45,
+    )
+
+    assert settings.browser_headless is True
+    assert settings.browser_timeout_seconds == 45
+    assert settings.browser_profile_dir == (tmp_path / "perfil-local").resolve()
+    assert Settings(LOTTOBOT_BROWSER_HEADLESS="").browser_headless is False
+
+
+def test_lotobot_browser_settings_reject_invalid_values():
+    with pytest.raises(ValidationError):
+        Settings(LOTTOBOT_BROWSER_HEADLESS="talvez")
+
+    with pytest.raises(ValidationError):
+        Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=0)
+
+
+def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch):
+    captured: dict[str, object] = {}
+
+    class FakePage:
+        url = "http://local/acompanhamento/123"
+
+    class FakeContext:
+        pages: list[FakePage] = []
+
+        def __init__(self, kwargs):
+            self.kwargs = kwargs
+            self.timeout = None
+            self.script = None
+            self.closed = False
+
+        def set_default_timeout(self, timeout):
+            self.timeout = timeout
+            captured["timeout"] = timeout
+
+        def add_init_script(self, script):
+            self.script = script
+            captured["script"] = script
+
+        def new_page(self):
+            page = FakePage()
+            self.pages.append(page)
+            return page
+
+        def close(self):
+            self.closed = True
+            captured["closed"] = True
+
+    class FakeChromium:
+        def launch_persistent_context(self, **kwargs):
+            captured["kwargs"] = kwargs
+            context = FakeContext(kwargs)
+            captured["context"] = context
+            return context
+
+    class FakePlaywright:
+        def __init__(self):
+            self.chromium = FakeChromium()
+            self.stopped = False
+
+        def stop(self):
+            self.stopped = True
+            captured["stopped"] = True
+
+    class FakeSyncPlaywright:
+        def start(self):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("sync_playwright started inside an asyncio loop")
+
+            playwright = FakePlaywright()
+            captured["playwright"] = playwright
+            return playwright
+
+    fake_sync_api = types.ModuleType("playwright.sync_api")
+    fake_sync_api.sync_playwright = lambda: FakeSyncPlaywright()
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_sync_api)
+
+    settings = Settings(
+        LOTTOBOT_BROWSER_PROFILE_DIR=tmp_path / "lotobot-profile",
+        LOTTOBOT_BROWSER_HEADLESS=True,
+        LOTTOBOT_BROWSER_TIMEOUT_SECONDS=12,
+    )
+    browser = PlaywrightBrowserAutomation(settings)
+
+    async def start_inside_asyncio_loop():
+        return browser.start(AutomationSession())
+
+    tab_id = asyncio.run(start_inside_asyncio_loop())
+    browser.stop()
+
+    kwargs = captured["kwargs"]
+    assert tab_id
+    assert settings.browser_profile_dir.exists()
+    assert kwargs["user_data_dir"] == str(settings.browser_profile_dir)
+    assert kwargs["headless"] is True
+    assert kwargs["viewport"] == {"width": 1280, "height": 900}
+    assert "--window-size=1280,900" in kwargs["args"]
+    assert kwargs["locale"] == "pt-BR"
+    assert "Chrome/122.0.0.0" in kwargs["user_agent"]
+    assert captured["timeout"] == 12000
+    assert "navigator" in captured["script"]
+    assert captured["closed"] is True
+    assert captured["stopped"] is True

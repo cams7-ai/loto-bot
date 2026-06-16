@@ -871,9 +871,9 @@ Adapte os nomes e módulos conforme necessário, desde que a separação de resp
 Implemente endpoints mínimos para controle da automação:
 
 - `GET /health`: verificar disponibilidade da API.
-- `POST /api/v1/bets/run`: iniciar o fluxo completo de aposta.
-- `POST /api/v1/sessions/start`: iniciar sessão de navegador.
-- `POST /api/v1/sessions/stop`: encerrar sessão de navegador.
+- `GET /api/v1/bets/run`: iniciar o fluxo completo de aposta.
+- `GET /api/v1/sessions/start`: iniciar sessão de navegador.
+- `GET /api/v1/sessions/stop`: encerrar sessão de navegador.
 - `GET /api/v1/sessions/status`: consultar estado da sessão.
 
 Os schemas de entrada e saída devem ser tipados com Pydantic.
