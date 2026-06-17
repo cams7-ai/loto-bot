@@ -125,6 +125,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         return self._run_on_browser_thread(self._finish_bet, session)
 
     def is_authenticated(self, session: AutomationSession) -> bool:
+        return self._run_on_browser_thread(self._is_authenticated, session)
+
+    def _is_authenticated(self, session: AutomationSession) -> bool:
         return self._element_exists(self._selectors.account_button)
 
     def _access_lottery_portal(self, session: AutomationSession) -> None:
