@@ -193,7 +193,7 @@ def test_settings_selectors_and_logging(monkeypatch):
     assert "tab" in settings.authentication_url("tab")
     assert "execution=dynamic" in settings.authentication_url("tab", "dynamic")
     assert "state" in settings.cpf_url("state", "nonce")
-    assert Selectors().modality_button("mega-sena")
+    assert "not(@tabindex='-1')" in Selectors().modality_button("mega-sena")
     assert Selectors().card_selector("1234")
 
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -379,6 +379,16 @@ def test_playwright_browser_checks_authentication_on_browser_thread():
 
     assert browser.is_authenticated(AutomationSession()) is True
     assert calls[0][0] == "fake_is_authenticated"
+
+
+def test_playwright_browser_authentication_check_uses_home_marker():
+    browser = PlaywrightBrowserAutomation(Settings())
+    actions = []
+
+    browser._element_exists = lambda selector: actions.append(("exists", selector)) or True
+
+    assert browser._is_authenticated(AutomationSession()) is True
+    assert actions == [("exists", browser._selectors.account_button)]
 
 
 def test_playwright_browser_continues_login_without_direct_authenticate_goto():

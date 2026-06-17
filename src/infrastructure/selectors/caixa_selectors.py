@@ -30,7 +30,10 @@ class Selectors:
     logout_button: str = "//*[@id='sair']"
 
     def modality_button(self, modality: str) -> str:
-        return f"//div[contains(@class,'new-card-modalidades')][.//h2[normalize-space()='{modality}']]//button[.//p[normalize-space()='Aposte']]"
+        return (
+            f"//div[contains(@class,'new-card-modalidades')][.//h2[normalize-space()='{modality}']]"
+            "//button[not(@tabindex='-1') and .//p[normalize-space()='Aposte']]"
+        )
 
     def card_selector(self, last_digits: str) -> str:
         return f"//h4[.//img[@alt='Mercado Pago'] and contains(normalize-space(.),'{last_digits}')]"
