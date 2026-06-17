@@ -28,11 +28,10 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     mail = MailSenderClient(resolved_settings)
     whatsapp = WhatsAppNotifyClient(resolved_settings)
     notifier = NotificationGateway(whatsapp=whatsapp, mail=mail)
-    session_control = SessionControlUseCase(session=session, browser=browser, notifier=notifier)
+    session_control = SessionControlUseCase(session=session, browser=browser, validation_codes=gmail, notifier=notifier)
     run_bet_flow = RunBetFlowUseCase(
         session=session,
         browser=browser,
-        validation_codes=gmail,
         notifier=notifier,
         session_control=session_control,
         payment_authorization=PaymentAuthorization(resolved_settings.confirma_pagamento),

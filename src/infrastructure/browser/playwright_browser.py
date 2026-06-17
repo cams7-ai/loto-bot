@@ -124,6 +124,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def finish_bet(self, session: AutomationSession) -> str:
         return self._run_on_browser_thread(self._finish_bet, session)
 
+    def is_authenticated(self, session: AutomationSession) -> bool:
+        return self._element_exists(self._selectors.account_button)
+
     def _access_lottery_portal(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_loterias_online)
 
@@ -158,9 +161,11 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _select_lottery_modality(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_home)
-        popup = self._page.locator(self._selectors.notification_popup_close)
-        if popup.count() and popup.first.is_visible():
-            popup.first.click()
+        self._click_if_exists(self._selectors.privacy_yes_button, True)
+        self._click_if_exists(self._selectors.notification_popup_close, True)
+        #popup = self._page.locator(self._selectors.notification_popup_close)
+        #if popup.count() and popup.first.is_visible():
+        #    popup.first.click()
         self._click(self._selectors.modality_button(self._settings.modalidade_selecionada))
 
     def _choose_random_numbers(self, session: AutomationSession) -> None:
@@ -210,6 +215,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 element.click()
         else:
             element.click()
+
+    def _element_exists(self, selector: str) -> bool:
+        locator = self._require_page().locator(selector)
+        return locator.count() > 0
 
     def _fill(self, selector: str, value: str) -> None:
         self._fill_if_exists(selector, value, False)

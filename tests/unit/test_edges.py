@@ -57,8 +57,8 @@ def test_run_bet_flow_handles_unexpected_exception():
     session = AutomationSession()
     browser = BrokenBrowser()
     notifier = NoopNotifier()
-    control = SessionControlUseCase(session, browser, notifier)
-    use_case = RunBetFlowUseCase(session, browser, CodeReader(), notifier, control, PaymentAuthorization(True))
+    control = SessionControlUseCase(session, browser, CodeReader(), notifier)
+    use_case = RunBetFlowUseCase(session, browser, notifier, control, PaymentAuthorization(True))
 
     result = use_case.run()
 
@@ -360,6 +360,25 @@ def test_playwright_browser_rejects_placeholder_execution():
         assert "execution dinâmico" in str(exc)
     else:
         raise AssertionError("Erro esperado")
+
+
+def test_playwright_browser_checks_authentication_on_browser_thread():
+    settings = Settings()
+    browser = PlaywrightBrowserAutomation(settings)
+    calls = []
+
+    def run_on_browser_thread(action, *args):
+        calls.append((action.__name__, args))
+        return action(*args)
+
+    browser._run_on_browser_thread = run_on_browser_thread
+    def fake_is_authenticated(session):
+        return True
+
+    browser._is_authenticated = fake_is_authenticated
+
+    assert browser.is_authenticated(AutomationSession()) is True
+    assert calls[0][0] == "fake_is_authenticated"
 
 
 def test_playwright_browser_continues_login_without_direct_authenticate_goto():

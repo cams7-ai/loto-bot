@@ -55,3 +55,6 @@ class BrowserAutomationPort(Protocol):
 
     def finish_bet(self, session: AutomationSession) -> str:
         """Finaliza a aposta e retorna o código de acompanhamento."""
+
+    def is_authenticated(self, session: AutomationSession) -> bool:
+        """Verifica se a sessão está autenticada no portal."""
