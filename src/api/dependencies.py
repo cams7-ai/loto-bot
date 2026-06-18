@@ -27,7 +27,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     gmail = GmailReaderClient(resolved_settings)
     mail = MailSenderClient(resolved_settings)
     whatsapp = WhatsAppNotifyClient(resolved_settings)
-    notifier = NotificationGateway(whatsapp=whatsapp, mail=mail)
+    notifier = NotificationGateway(whatsapp=whatsapp, mail=mail, whatsapp_enabled=resolved_settings.whatsapp_enabled)
     session_control = SessionControlUseCase(session=session, browser=browser, validation_codes=gmail, notifier=notifier)
     run_bet_flow = RunBetFlowUseCase(
         session=session,

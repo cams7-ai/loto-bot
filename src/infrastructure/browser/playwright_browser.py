@@ -128,7 +128,14 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         return self._run_on_browser_thread(self._is_authenticated, session)
 
     def _is_authenticated(self, session: AutomationSession) -> bool:
-        return self._element_exists(self._selectors.account_button)
+        try:
+            self._require_page().locator(self._selectors.account_button).first.wait_for(
+                state="visible",
+                timeout=self._settings.authentication_check_timeout_seconds * 1000,
+            )
+            return True
+        except Exception:
+            return False
 
     def _access_lottery_portal(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_loterias_online)
@@ -180,7 +187,23 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _confirm_purchase(self, session: AutomationSession) -> None:
         self._click(self._selectors.go_to_payment_button)
-        self._click(self._selectors.confirm_purchase_button)
+        try:
+            self._click(self._selectors.confirm_purchase_button)
+        except Exception:
+            page = self._require_page()
+            screenshot_path = self._settings.browser_profile_dir.parent / "artefatos" / "confirm-purchase-error.png"
+            try:
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(screenshot_path), full_page=True)
+            except Exception:
+                logger.exception("Não foi possível capturar screenshot da falha na confirmação da compra")
+            logger.error(
+                "Falha ao confirmar compra; url=%s screenshot=%s",
+                page.url,
+                screenshot_path,
+                extra={"executed_operation": "Confirma a compra"},
+            )
+            raise
 
     def _select_payment_method(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_seleciona_pix_ou_cartao)

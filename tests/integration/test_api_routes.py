@@ -94,7 +94,7 @@ async def test_run_bet_route_returns_failed_flow_without_real_network():
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/v1/bets/run")
 
-    assert response.status_code == 200
+    assert response.status_code == 422
     assert response.json()["status"] == "failed"
     assert response.json()["executedOperation"] == "Confirma o pagamento"
 
@@ -119,7 +119,7 @@ async def test_session_routes_map_automation_errors():
         start = await client.get("/api/v1/sessions/start")
         stop = await client.get("/api/v1/sessions/stop")
 
-    assert start.status_code == 400
+    assert start.status_code == 409
     assert start.json()["error"]["code"] == "SESSAO_JA_ABERTA"
-    assert stop.status_code == 400
+    assert stop.status_code == 409
     assert stop.json()["error"]["code"] == "SESSAO_FECHADA"

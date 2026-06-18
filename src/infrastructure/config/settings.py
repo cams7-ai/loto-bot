@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     validation_code_wait_timeout_seconds: int = Field(default=30, alias="VALIDATION_CODE_WAIT_TIMEOUT_SECONDS")
     whatsapp_headless: bool = Field(default=True, alias="WHATSAPP_HEADLESS")
+    whatsapp_enabled: bool = Field(default=True, alias="WHATSAPP_ENABLED")
     whatsapp_timeout_seconds: int = Field(default=60, alias="WHATSAPP_TIMEOUT_SECONDS")
     whatsapp_contact: str = Field(default="Notificação via App", alias="WHATSAPP_CONTACT")
     mail_to: str = Field(default="<EMAIL_DESTINATARIO>", alias="MAIL_TO")
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="LOTTOBOT_BROWSER_PROFILE_DIR")
     browser_headless: bool = Field(default=False, alias="LOTTOBOT_BROWSER_HEADLESS")
     browser_timeout_seconds: int = Field(default=30, alias="LOTTOBOT_BROWSER_TIMEOUT_SECONDS")
+    authentication_check_timeout_seconds: int = Field(default=10, alias="LOTTOBOT_AUTH_CHECK_TIMEOUT_SECONDS")
 
     @field_validator("browser_headless", mode="before")
     @classmethod
@@ -63,7 +65,7 @@ class Settings(BaseSettings):
             return False
         raise ValueError("Valor inválido para LOTTOBOT_BROWSER_HEADLESS: use true/false, yes/no, sim/não ou 1/0")
 
-    @field_validator("browser_timeout_seconds")
+    @field_validator("browser_timeout_seconds", "authentication_check_timeout_seconds")
     @classmethod
     def validate_browser_timeout_seconds(cls, value: int) -> int:
         if value <= 0:

@@ -20,12 +20,18 @@ class NotificationGateway(NotificationPort):
         whatsapp: WhatsAppNotifyClient,
         mail: MailSenderClient,
         timezone_name: str = "America/Sao_Paulo",
+        whatsapp_enabled: bool = True,
     ) -> None:
         self._whatsapp = whatsapp
         self._mail = mail
         self._timezone_name = timezone_name
+        self._whatsapp_enabled = whatsapp_enabled
 
     def start_whatsapp_session(self, session: AutomationSession) -> None:
+        if not self._whatsapp_enabled:
+            session.whatsapp_enabled = False
+            logger.info("Integração com WhatsApp desabilitada", extra={"executed_operation": "Inicia sessão do WhatsApp Web"})
+            return
         try:
             status = self._whatsapp.start_session()
             session.whatsapp_enabled = True

@@ -171,6 +171,20 @@ def test_notification_gateway_stop_success_and_disabled_return():
     assert session.whatsapp_enabled is False
 
 
+def test_notification_gateway_does_not_call_disabled_whatsapp():
+    class WhatsApp:
+        def start_session(self):
+            raise AssertionError("WhatsApp não deveria ser chamado")
+
+    class Mail:
+        pass
+
+    session = AutomationSession()
+    NotificationGateway(WhatsApp(), Mail(), whatsapp_enabled=False).start_whatsapp_session(session)
+
+    assert session.whatsapp_enabled is False
+
+
 def test_notification_gateway_whatsapp_exception_and_mail_error():
     class WhatsApp:
         def status(self):
@@ -385,10 +399,45 @@ def test_playwright_browser_authentication_check_uses_home_marker():
     browser = PlaywrightBrowserAutomation(Settings())
     actions = []
 
-    browser._element_exists = lambda selector: actions.append(("exists", selector)) or True
+    class Locator:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def wait_for(self, *, state, timeout):
+            actions.append((state, timeout))
+
+    class Page:
+        def locator(self, selector):
+            actions.append(selector)
+            return Locator()
+
+    browser._page = Page()
 
     assert browser._is_authenticated(AutomationSession()) is True
-    assert actions == [("exists", browser._selectors.account_button)]
+    assert actions == [browser._selectors.account_button, ("visible", 10000)]
+
+
+def test_playwright_browser_authentication_check_returns_false_after_timeout():
+    browser = PlaywrightBrowserAutomation(Settings())
+
+    class Locator:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def wait_for(self, **kwargs):
+            raise TimeoutError
+
+    class Page:
+        def locator(self, selector):
+            return Locator()
+
+    browser._page = Page()
+
+    assert browser._is_authenticated(AutomationSession()) is False
 
 
 def test_playwright_browser_continues_login_without_direct_authenticate_goto():
