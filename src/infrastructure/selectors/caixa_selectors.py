@@ -21,7 +21,7 @@ class Selectors:
     complete_game_button: str = "//*[@id='completeojogo']"
     add_to_cart_button: str = "//*[@id='colocarnocarrinho']"
     go_to_payment_button: str = "//*[@id='irparapagamento']"
-    confirm_purchase_button: str = "//span[contains(.,'O Valor total da sua compra é de') and contains(.,'Confirma?')]/ancestor::div[contains(@class,'modal-content')]//button[@id='confirma']"
+    confirm_purchase_button: str = "//div[contains(@class,'modal-content')]//button[@id='confirma']"
     continue_payment_button: str = "//label[normalize-space()='Informe os dados do seu cartão de crédito:']/ancestor::div[contains(@class,'jumbotron')]//button[@id='pay']"
     security_code_field: str = "//p[contains(normalize-space(.),'Digite o código de Segurança do seu cartão')]/ancestor::div[contains(@class,'modal-content')]//input[@id='securityCode']"
     confirm_payment_button: str = "//p[contains(normalize-space(.),'Digite o código de Segurança do seu cartão')]/ancestor::div[contains(@class,'modal-content')]//button[@id='confirmarModalConfirmacao']"

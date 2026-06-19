@@ -48,6 +48,7 @@ class SessionControlUseCase:
             raise AutomationError("Erro inesperado ao autenticar a sessão.", operation=operation) from exc
 
         self._session.mark_open(self._session.tab_id)
+        logger.info("Sessão de navegador autenticada", extra={"executed_operation": "Autenticação"})
         return self.status()
 
     def _authenticate(self) -> None:

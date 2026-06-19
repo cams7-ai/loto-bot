@@ -461,3 +461,51 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     assert ("click", browser._selectors.receive_code_button) in actions
     assert ("fill", browser._selectors.code_field, "123456") in actions
     assert ("fill", browser._selectors.password_field, settings.senha) in actions
+
+
+def test_playwright_browser_retries_payment_until_confirmation_modal_is_visible():
+    browser = PlaywrightBrowserAutomation(Settings())
+    clicks = []
+
+    class PaymentButton:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def click(self, **kwargs):
+            clicks.append(kwargs)
+
+    class ConfirmationButton:
+        first = None
+
+        def __init__(self):
+            self.first = self
+            self.waits = 0
+
+        def wait_for(self, **kwargs):
+            self.waits += 1
+            if self.waits == 1:
+                raise TimeoutError
+
+        def click(self):
+            clicks.append("confirmed")
+
+    payment = PaymentButton()
+    confirmation = ConfirmationButton()
+
+    class Page:
+        url = "http://lottery/#/mega-sena"
+
+        def locator(self, selector):
+            return payment if selector == browser._selectors.go_to_payment_button else confirmation
+
+        def wait_for_timeout(self, timeout):
+            clicks.append(("pause", timeout))
+
+    browser._page = Page()
+
+    browser._confirm_purchase(AutomationSession())
+
+    assert clicks.count({"no_wait_after": True}) == 2
+    assert clicks[-1] == "confirmed"

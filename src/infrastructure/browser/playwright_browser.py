@@ -186,9 +186,22 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._click(self._selectors.add_to_cart_button)
 
     def _confirm_purchase(self, session: AutomationSession) -> None:
-        self._click(self._selectors.go_to_payment_button)
         try:
-            self._click(self._selectors.confirm_purchase_button)
+            page = self._require_page()
+            payment_button = page.locator(self._selectors.go_to_payment_button).first
+            confirmation_button = page.locator(self._selectors.confirm_purchase_button).first
+            modal_timeout_ms = min(self._timeout_ms, 5000)
+
+            for attempt in range(2):
+                payment_button.click(no_wait_after=True)
+                try:
+                    confirmation_button.wait_for(state="visible", timeout=modal_timeout_ms)
+                    confirmation_button.click()
+                    return
+                except Exception:
+                    if attempt == 1:
+                        raise
+                    page.wait_for_timeout(500)
         except Exception:
             page = self._require_page()
             screenshot_path = self._settings.browser_profile_dir.parent / "artefatos" / "confirm-purchase-error.png"
