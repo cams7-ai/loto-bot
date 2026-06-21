@@ -11,8 +11,12 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from application.ports import BrowserAutomationPort
-from domain import AutomationError, AutomationSession
-from infrastructure import Settings, Operation, Selectors
+from domain import (
+    Operation, 
+    AutomationSession, 
+    AutomationError,
+)
+from infrastructure import Settings, Selectors
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +244,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                     "Falha ao confirmar compra; url=%s screenshot=%s",
                     page.url,
                     screenshot_path,
-                    extra={"executed_operation": "Confirma a compra"},
+                    extra=Operation.executed_operation(Operation.CONFIRM_PURCHASE),
                 )
             raise
 
@@ -331,14 +335,14 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         if tab_id:
             session.tab_id = tab_id
 
-    def _authentication_url(self, session: AutomationSession, operation: str) -> str:
-        execution = session.execution or self._settings.execution
-        if not execution or execution == "<EXECUTION_ID_DA_SESSAO>":
-            raise AutomationError(
-                "Não foi possível continuar o login sem o execution dinâmico da sessão.",
-                operation=operation,
-            )
-        return self._settings.authentication_url(session.tab_id, execution)
+#    def _authentication_url(self, session: AutomationSession, operation: Operation) -> str:
+#        execution = session.execution or self._settings.execution
+#        if not execution or execution == "<EXECUTION_ID_DA_SESSAO>":
+#            raise AutomationError(
+#                "Não foi possível continuar o login sem o execution dinâmico da sessão.",
+#                operation=operation,
+#            )
+#        return self._settings.authentication_url(session.tab_id, execution)
 
     def _raise_if_forbidden(self, operation: Operation) -> None:
         page = self._require_page()

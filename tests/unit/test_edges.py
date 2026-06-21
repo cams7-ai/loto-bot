@@ -13,13 +13,23 @@ from pydantic import ValidationError
 from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
 from api.dependencies import get_container
 from api.server import app
-from domain import AutomationError, AutomationSession, ExternalServiceError
-from domain.value_objects import PaymentAuthorization
-from infrastructure.browser import PlaywrightBrowserAutomation
-from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
-from infrastructure.config import Settings
-from infrastructure.logging import configure_logging
-from infrastructure.selectors import Selectors
+from domain import (
+    Operation,
+    AutomationError, 
+    AutomationSession, 
+    ExternalServiceError, 
+    PaymentAuthorization,
+)
+from infrastructure import (
+    Settings, 
+    configure_logging, 
+    GmailReaderClient, 
+    MailSenderClient, 
+    NotificationGateway, 
+    WhatsAppNotifyClient, 
+    PlaywrightBrowserAutomation, 
+    Selectors,
+)
 
 
 class NoopNotifier:
@@ -45,7 +55,7 @@ class BrokenBrowser:
 
 
 class CodeReader:
-    def get_validation_code(self):
+    def get_validation_code(self, operation):
         return "123456"
 
 
@@ -73,14 +83,14 @@ def test_clients_error_edges():
     failing_mail = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}}))))
 
     try:
-        empty_gmail.get_validation_code()
+        empty_gmail.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
     except ExternalServiceError as exc:
         assert "não retornou" in str(exc)
     else:
         raise AssertionError("Erro esperado")
 
     try:
-        failing_mail.send("Assunto", "Body")
+        failing_mail.send(Operation.UNKNOWN_OPERATION, "Assunto", "Body")
     except ExternalServiceError as exc:
         assert "e-mail" in str(exc)
     else:
@@ -93,7 +103,7 @@ def test_whatsapp_send_error_with_invalid_json():
     client = WhatsAppNotifyClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: raw)))
 
     try:
-        client.send_message("Olá")
+        client.send_message(Operation.UNKNOWN_OPERATION, "Ola")
     except ExternalServiceError as exc:
         assert "indisponível" in str(exc)
     else:
@@ -109,7 +119,7 @@ def test_whatsapp_start_and_stop_error_branches():
 
     for action in (client.start_session, client.stop_session):
         try:
-            action()
+            action(Operation.UNKNOWN_OPERATION)
         except ExternalServiceError as exc:
             assert "falhou" in str(exc)
         else:
@@ -118,13 +128,13 @@ def test_whatsapp_start_and_stop_error_branches():
 
 def test_notification_gateway_success_and_stop_warning():
     class WhatsApp:
-        def start_session(self):
+        def start_session(self, operation):
             return "SESSAO_ABERTA"
 
-        def stop_session(self):
+        def stop_session(self, operation):
             raise RuntimeError("falha")
 
-        def status(self):
+        def status(self, operation):
             return "SESSAO_ABERTA"
 
         def send_message(self, message):
@@ -135,7 +145,7 @@ def test_notification_gateway_success_and_stop_warning():
             raise AssertionError("Não deveria enviar e-mail")
 
     session = AutomationSession()
-    session.executed_operation = "Teste"
+    session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
     gateway.start_whatsapp_session(session)
@@ -150,12 +160,12 @@ def test_notification_gateway_stop_success_and_disabled_return():
         def __init__(self):
             self.stopped = False
 
-        def stop_session(self):
+        def stop_session(self, operation):
             self.stopped = True
             return "SESSAO_FECHADA"
 
     class Mail:
-        def send(self, subject, body):
+        def send(self, operation, subject, body):
             pass
 
     session = AutomationSession()
@@ -173,7 +183,7 @@ def test_notification_gateway_stop_success_and_disabled_return():
 
 def test_notification_gateway_does_not_call_disabled_whatsapp():
     class WhatsApp:
-        def start_session(self):
+        def start_session(self, operation):
             raise AssertionError("WhatsApp não deveria ser chamado")
 
     class Mail:
@@ -187,16 +197,16 @@ def test_notification_gateway_does_not_call_disabled_whatsapp():
 
 def test_notification_gateway_whatsapp_exception_and_mail_error():
     class WhatsApp:
-        def status(self):
+        def status(self, operation):
             raise RuntimeError("sem status")
 
     class Mail:
-        def send(self, subject, body):
+        def send(self, operation, subject, body):
             raise RuntimeError("sem e-mail")
 
     session = AutomationSession()
     session.whatsapp_enabled = True
-    session.executed_operation = "Teste"
+    session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
     gateway.notify_failure(session, "Falha")
@@ -361,19 +371,25 @@ def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
 
     assert session.execution == "exec-real"
     assert session.tab_id == "tab-real"
-    assert browser._authentication_url(session, "Teste").endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
+    assert settings.authentication_url(session.tab_id, session.execution).endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
 
 
-def test_playwright_browser_rejects_placeholder_execution():
-    settings = Settings(EXECUTION="<EXECUTION_ID_DA_SESSAO>")
-    browser = PlaywrightBrowserAutomation(settings)
+def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
+    browser = PlaywrightBrowserAutomation(Settings())
 
-    try:
-        browser._authentication_url(AutomationSession(tab_id="tab"), "Solicita o código de acesso")
-    except AutomationError as exc:
-        assert "execution dinâmico" in str(exc)
-    else:
-        raise AssertionError("Erro esperado")
+    class FakePage:
+        url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
+
+        def wait_for_url(self, pattern, timeout):
+            pass
+
+    session = AutomationSession(tab_id="tab-original", execution="exec-original")
+    browser._page = FakePage()
+
+    browser._sync_auth_session_from_current_url(session)
+
+    assert session.execution == "exec-original"
+    assert session.tab_id == "tab-original"
 
 
 def test_playwright_browser_checks_authentication_on_browser_thread():

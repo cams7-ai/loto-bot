@@ -6,7 +6,7 @@ import logging
 
 import httpx
 
-from domain import ExternalServiceError
+from domain import Operation, ExternalServiceError
 from infrastructure import Settings
 
 
@@ -18,8 +18,8 @@ class MailSenderClient:
         self._settings = settings
         self._client = client or httpx.Client(timeout=10)
 
-    def send(self, subject: str, body: str) -> None:
-        logger.info("Chamando API Mail Sender para enviar e-mail", extra={"executed_operation": "Envia e-mail"})
+    def send(self, operation: Operation, subject: str, body: str) -> None:
+        logger.info("Chamando API Mail Sender para enviar e-mail", extra=Operation.executed_operation(operation))
         response = self._client.post(
             f"{self._settings.url_mail_sender}/api/v1/mail/send",
             json={
@@ -30,4 +30,4 @@ class MailSenderClient:
             },
         )
         if response.status_code >= 400:
-            raise ExternalServiceError("Não foi possível enviar o e-mail de fallback.", operation="Envia e-mail")
+            raise ExternalServiceError("Não foi possível enviar o e-mail de fallback.", operation=operation)

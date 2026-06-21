@@ -48,7 +48,7 @@ async def session_status(container: AppContainer = Depends(get_container)) -> Se
     return SessionStatusResponse(
         sessionId=str(result.session_id),
         status=result.status,
-        executedOperation=result.executed_operation,
+        executedOperation=result.executed_operation.value,
         isOpen=result.is_open,
     )
 
@@ -57,7 +57,7 @@ def _control_response(result, message: str) -> SessionControlResponse:
     return SessionControlResponse(
         sessionId=str(result.session_id),
         status=result.status,
-        executedOperation=result.executed_operation,
+        executedOperation=result.executed_operation.value,
         isOpen=result.is_open,
         message=message,
     )

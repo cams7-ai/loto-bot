@@ -1,14 +1,13 @@
 """Exceções HTTP da API."""
 
-from __future__ import annotations
-
+from domain import ErrorCode
 
 class ApiError(Exception):
     def __init__(
         self,
         *,
         status_code: int,
-        code: str,
+        code: ErrorCode,
         message: str,
         fields: list[str] | None = None,
     ) -> None:

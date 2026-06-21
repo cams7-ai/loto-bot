@@ -2,9 +2,18 @@ from __future__ import annotations
 
 import httpx
 
-from domain import AutomationSession, ExternalServiceError
-from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
-from infrastructure.config import Settings
+from domain import (
+    Operation,
+    AutomationSession, 
+    ExternalServiceError,
+)
+from infrastructure import (
+    Settings, 
+    GmailReaderClient, 
+    MailSenderClient, 
+    NotificationGateway, 
+    WhatsAppNotifyClient,
+)
 from shared import mask_sensitive_value
 
 
@@ -23,7 +32,7 @@ def test_gmail_reader_client_reads_code():
     transport = httpx.MockTransport(lambda request: response(200, {"code": "123456"}))
     client = GmailReaderClient(settings, httpx.Client(transport=transport))
 
-    assert client.get_validation_code() == "123456"
+    assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "123456"
 
 
 def test_gmail_reader_client_sends_wait_timeout_and_read_timeout():
@@ -37,7 +46,7 @@ def test_gmail_reader_client_sends_wait_timeout_and_read_timeout():
     settings = Settings(URL_GMAIL_READER="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=45)
     client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
-    assert client.get_validation_code() == "123456"
+    assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "123456"
     assert "waitTimeoutSeconds=45" in seen["url"]
     assert seen["timeout"]["read"] == 50
 
@@ -50,7 +59,7 @@ def test_gmail_reader_client_maps_http_timeout():
     client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
     try:
-        client.get_validation_code()
+        client.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
     except ExternalServiceError as exc:
         assert "Tempo esgotado" in str(exc)
     else:
@@ -63,7 +72,7 @@ def test_gmail_reader_client_rejects_error():
     client = GmailReaderClient(settings, httpx.Client(transport=transport))
 
     try:
-        client.get_validation_code()
+        client.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
     except ExternalServiceError as exc:
         assert "código" in str(exc)
     else:
@@ -80,7 +89,7 @@ def test_mail_sender_client_posts_payload():
     settings = Settings(URL_MAIL_SENDER="http://mail.local", MAIL_TO="destino@example.com")
     client = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
-    client.send("Assunto", "<p>Body</p>")
+    client.send(Operation.UNKNOWN_OPERATION, "Assunto", "<p>Body</p>")
     assert b"destino@example.com" in seen["payload"]
 
 
@@ -89,17 +98,17 @@ def test_whatsapp_notify_client_maps_success_and_error():
     transport = httpx.MockTransport(lambda request: response(200, {"status": "SESSAO_ABERTA"}))
     client = WhatsAppNotifyClient(settings, httpx.Client(transport=transport))
 
-    assert client.status() == "SESSAO_ABERTA"
-    assert client.start_session() == "SESSAO_ABERTA"
-    assert client.stop_session() == "SESSAO_ABERTA"
-    assert client.send_message("Olá") == "SESSAO_ABERTA"
+    assert client.status(Operation.UNKNOWN_OPERATION) == "SESSAO_ABERTA"
+    assert client.start_session(Operation.UNKNOWN_OPERATION) == "SESSAO_ABERTA"
+    assert client.stop_session(Operation.UNKNOWN_OPERATION) == "SESSAO_ABERTA"
+    assert client.send_message(Operation.UNKNOWN_OPERATION, "Ola") == "SESSAO_ABERTA"
 
     error_client = WhatsAppNotifyClient(
         settings,
         httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {"message": "falhou"}}))),
     )
     try:
-        error_client.status()
+        error_client.status(Operation.UNKNOWN_OPERATION)
     except ExternalServiceError as exc:
         assert "falhou" in str(exc)
     else:
@@ -108,13 +117,13 @@ def test_whatsapp_notify_client_maps_success_and_error():
 
 def test_notification_gateway_uses_email_fallback():
     class WhatsApp:
-        def start_session(self):
+        def start_session(self, operation):
             raise RuntimeError("sem sessão")
 
-        def stop_session(self):
+        def stop_session(self, operation):
             raise RuntimeError("fechado")
 
-        def status(self):
+        def status(self, operation):
             return "SESSAO_FECHADA"
 
         def send_message(self, message):
@@ -124,11 +133,11 @@ def test_notification_gateway_uses_email_fallback():
         def __init__(self):
             self.sent = []
 
-        def send(self, subject, body):
-            self.sent.append((subject, body))
+        def send(self, operation, subject, body):
+            self.sent.append((operation, subject, body))
 
     session = AutomationSession()
-    session.executed_operation = "Teste"
+    session.executed_operation = Operation.UNKNOWN_OPERATION
     mail = Mail()
     gateway = NotificationGateway(WhatsApp(), mail)
 

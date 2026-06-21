@@ -8,12 +8,12 @@ from application.dto import AutomationRunResult
 from application.ports import BrowserAutomationPort, NotificationPort
 from application.use_cases.session_control import SessionControlUseCase
 from domain import (
+    Operation,
+    AutomationSession,
     AutomationError, 
-    BrowserSessionClosedError, 
-    AutomationSession, 
+    BrowserSessionClosedError,      
     PaymentAuthorization,
 )
-from infrastructure.logging import Operation
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +44,12 @@ class RunBetFlowUseCase:
             self._execute(Operation.CONFIRM_PURCHASE, self._browser.confirm_purchase)
             self._execute(Operation.SELECT_PAYMENT_METHOD, self._browser.select_payment_method)
 
-            self._session.mark_running(Operation.CONFIRM_PAYMENT.value)
+            self._session.mark_running(Operation.CONFIRM_PAYMENT)
             self._payment_authorization.require_confirmation()
             self._browser.confirm_payment(self._session)
-            logger.info("Operação concluída", extra=Operation.executed_operation_value(self._session.executed_operation))
+            logger.info("Operação concluída", extra=Operation.executed_operation(self._session.executed_operation))
 
-            self._session.mark_running(Operation.COMPLETE_BET.value)
+            self._session.mark_running(Operation.COMPLETE_BET)
             tracking_code = self._browser.finish_bet(self._session)
             self._session.mark_finished(tracking_code)
             self._session_control.close_if_open()
@@ -57,7 +57,7 @@ class RunBetFlowUseCase:
                 session_id=self._session.id,
                 status="finished",
                 message="Aposta finalizada com sucesso.",
-                executed_operation=Operation.COMPLETE_BET.value,
+                executed_operation=Operation.COMPLETE_BET,
                 tracking_code=tracking_code,
             )
         except AutomationError as exc:
@@ -65,19 +65,19 @@ class RunBetFlowUseCase:
         except Exception as exc:
             logger.exception("Erro inesperado no fluxo de aposta")
             return self._handle_failure(
-                AutomationError("Erro inesperado ao executar o fluxo de aposta.", operation=Operation.from_value(self._session.executed_operation))
+                AutomationError("Erro inesperado ao executar o fluxo de aposta.", operation=self._session.executed_operation)
             )
 
     def _execute(self, operation: Operation, action) -> None:
-        self._session.mark_running(operation.value)
+        self._session.mark_running(operation)
         action(self._session)
         logger.info("Operação concluída", extra=Operation.executed_operation(operation))
 
     def _handle_failure(self, exc: AutomationError) -> AutomationRunResult:
-        operation = exc.operation or self._session.executed_operation or Operation.UNKNOWN_OPERATION.value
+        operation = exc.operation or self._session.executed_operation or Operation.UNKNOWN_OPERATION
         self._session.mark_failed(operation)
-        message = f"Falha na automação LotoBot durante '{operation}': {exc}"
-        logger.error(message, extra=Operation.executed_operation_value(operation))
+        message = f"Falha na automação LotoBot durante '{operation.value}': {exc}"
+        logger.error(message, extra=Operation.executed_operation(operation))
         self._notifier.notify_failure(self._session, message)
         self._session_control.close_if_open()
         return AutomationRunResult(

@@ -4,14 +4,21 @@ from threading import Event
 
 import application.use_cases.session_control as session_control_module
 from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
-from domain import AutomationError, AutomationSession, BrowserSessionClosedError, BrowserSessionOpenError
-from domain.value_objects import PaymentAuthorization
+from domain import (
+    Operation, 
+    AutomationSession, 
+    AutomationError, 
+    BrowserSessionClosedError, 
+    BrowserSessionOpenError, 
+    PaymentAuthorization,
+)
 
 
 class FakeBrowser:
     def __init__(self) -> None:
         self.calls: list[str] = []
         self.open = False
+        self.authenticated = False
 
     def start(self, session):
         self.open = True
@@ -25,11 +32,17 @@ class FakeBrowser:
     def __getattr__(self, name):
         def method(*args):
             self.calls.append(name)
+            if name == "submit_password":
+                self.authenticated = True
             if name == "finish_bet":
                 return "123456"
             return None
 
         return method
+
+    def is_authenticated(self, click_login_button):
+        self.calls.append("is_authenticated")
+        return self.authenticated
 
 
 class FakeNotifier:
@@ -51,7 +64,7 @@ class FakeNotifier:
 
 
 class FakeValidationCodes:
-    def get_validation_code(self):
+    def get_validation_code(self, operation):
         return "654321"
 
 
@@ -60,7 +73,7 @@ class WaitingValidationCodes:
         self._calls = calls
         self._code_requested = code_requested
 
-    def get_validation_code(self):
+    def get_validation_code(self, operation):
         self._calls.append("get_validation_code")
         if not self._code_requested.wait(timeout=1):
             raise TimeoutError("Código não foi solicitado")
@@ -134,7 +147,7 @@ def test_session_control_skips_authentication_steps_when_already_authenticated(m
 
 def test_session_control_closes_session_when_authentication_fails_with_automation_error(monkeypatch):
     session = AutomationSession()
-    browser = AuthenticationErrorBrowser(AutomationError("falha", operation="Acessa o site Loterias Online CAIXA"))
+    browser = AuthenticationErrorBrowser(AutomationError("falha", operation=Operation.ACCESS_LOTTERY_PORTAL))
     notifier = FakeNotifier()
     monkeypatch.setattr(session_control_module, "sleep", lambda seconds: browser.calls.append(f"sleep:{seconds}"))
     use_case = SessionControlUseCase(session, browser, FakeValidationCodes(), notifier)
@@ -163,7 +176,7 @@ def test_session_control_closes_session_when_authentication_fails_unexpectedly(m
         use_case.start()
     except AutomationError as exc:
         assert "Erro inesperado" in str(exc)
-        assert exc.operation == "Acessa o site Loterias Online CAIXA"
+        assert exc.operation == Operation.END_SESSION
     else:
         raise AssertionError("Erro esperado")
 
@@ -258,7 +271,7 @@ def test_run_bet_flow_blocks_payment_without_authorization():
     result = use_case.run()
 
     assert result.status == "failed"
-    assert result.executed_operation == "Confirma o pagamento"
+    assert result.executed_operation == Operation.CONFIRM_PAYMENT
     assert "desabilitada" in result.message
     assert notifier.messages
     assert "confirm_payment" not in browser.calls

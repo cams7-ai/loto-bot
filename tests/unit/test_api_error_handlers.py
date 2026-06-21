@@ -12,6 +12,7 @@ from api.exception_handlers import (
     unhandled_exception_handler,
 )
 from api.exceptions import ApiError
+from domain import ErrorCode
 
 
 class Model(BaseModel):
@@ -27,7 +28,7 @@ def make_validation_error() -> RequestValidationError:
 
 
 async def test_api_error_handler(anyio_backend):
-    response = await api_error_handler(None, ApiError(status_code=400, code="CODIGO", message="Mensagem", fields=["name"]))
+    response = await api_error_handler(None, ApiError(status_code=400, code=ErrorCode.BAD_REQUEST, message="Mensagem", fields=["name"]))
     assert response.status_code == 400
     assert response.body.decode("utf-8")
 

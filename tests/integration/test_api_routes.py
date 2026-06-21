@@ -6,7 +6,7 @@ import pytest
 from api.dependencies import get_container
 from api.server import app
 from application.dto import AutomationRunResult, SessionStatusResult
-from domain import BrowserSessionClosedError, BrowserSessionOpenError
+from domain import Operation, BrowserSessionClosedError, BrowserSessionOpenError
 
 
 class FakeSessionControl:
@@ -16,14 +16,14 @@ class FakeSessionControl:
 
     def start(self):
         self.started = True
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "open", "Inicia sessão", True)
+        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "open", Operation.START_SESSION, True)
 
     def stop(self):
         self.stopped = True
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", "Fecha sessão", False)
+        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", Operation.END_SESSION, False)
 
     def status(self):
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", "", False)
+        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", Operation.UNKNOWN_OPERATION, False)
 
 
 class FakeRunBetFlow:
@@ -32,7 +32,7 @@ class FakeRunBetFlow:
             session_id="00000000-0000-0000-0000-000000000001",
             status="failed",
             message="A confirmação de pagamento real está desabilitada.",
-            executed_operation="Confirma o pagamento",
+            executed_operation=Operation.CONFIRM_PAYMENT,
         )
 
 

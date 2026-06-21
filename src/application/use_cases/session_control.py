@@ -10,12 +10,12 @@ from time import sleep
 from application.dto import SessionStatusResult
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
 from domain import (
+    Operation,
+    AutomationSession,
     AutomationError, 
     BrowserSessionClosedError, 
-    BrowserSessionOpenError, 
-    AutomationSession,
+    BrowserSessionOpenError,     
 )
-from infrastructure.logging import Operation
 
 logger = logging.getLogger(__name__)
 VALIDATION_CODE_LOOKUP_LEAD_SECONDS = 1
@@ -41,7 +41,7 @@ class SessionControlUseCase:
         tab_id = self._browser.start(self._session)
         self._session.mark_open(tab_id)
         self._notifier.start_whatsapp_session(self._session)
-        logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(Operation.START_SESSION))
+        logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation))
         try:
             if self._authenticate():
                 self._disable_notification(Operation.ACCESS_HOME)
@@ -53,7 +53,7 @@ class SessionControlUseCase:
             error_message = "Erro inesperado ao autenticar a sessão"
             logger.exception(error_message)
             self.close_if_open()
-            raise AutomationError(error_message, operation=Operation.from_value(self._session.executed_operation)) from exc
+            raise AutomationError(error_message, operation=self._session.executed_operation) from exc
 
         self._session.mark_open(self._session.tab_id)
         return self.status()
@@ -69,7 +69,7 @@ class SessionControlUseCase:
 
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="lotobot-validation-code") as executor:
             validation_code_request_started = Event()
-            validation_code = self._request_validation_code_async(executor, validation_code_request_started)
+            validation_code = self._request_validation_code_async(executor, validation_code_request_started, Operation.REQUEST_VALIDATION_CODE)
             validation_code_request_started.wait()
             sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
             self._execute(Operation.REQUEST_VALIDATION_CODE, self._browser.request_validation_code)
@@ -88,31 +88,32 @@ class SessionControlUseCase:
         self._browser.disable_notification()
 
     def _execute(self, operation: Operation, action) -> None:
-        self._session.mark_running(operation.value)
+        self._session.mark_running(operation)
         action(self._session)
         logger.info("Operação concluída", extra=Operation.executed_operation(operation))
 
-    def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event) -> Future[str]:
-        return executor.submit(self._get_validation_code, request_started)
+    def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation) -> Future[str]:
+        return executor.submit(self._get_validation_code, request_started, operation)
 
-    def _get_validation_code(self, request_started: Event) -> str:
+    def _get_validation_code(self, request_started: Event, operation: Operation) -> str:
         request_started.set()
-        return self._validation_codes.get_validation_code()
+        return self._validation_codes.get_validation_code(operation)
 
     def stop(self) -> SessionStatusResult:
         if not self._session.is_open:
             raise BrowserSessionClosedError("A sessão de navegador já está fechada")
 
         self._browser.stop()
-        self._notifier.stop_whatsapp_session(self._session)
         self._session.mark_closed()
-        logger.info("Sessão de navegador encerrada", extra=Operation.executed_operation(Operation.END_SESSION))
+        self._notifier.stop_whatsapp_session(self._session)
+        logger.info("Sessão de navegador encerrada", extra=Operation.executed_operation(self._session.executed_operation))
         return self.status()
 
     def close_if_open(self) -> None:
         if self._session.status.value != "closed":
             self._browser.stop()
             self._notifier.stop_whatsapp_session(self._session)
+            logger.debug("Fechando sessão de navegador aberta", extra=Operation.executed_operation(self._session.executed_operation))
         self._session.mark_closed()
 
     def status(self) -> SessionStatusResult:

@@ -1,6 +1,10 @@
-from domain.entities import AutomationSession, AutomationStatus
-from domain.exceptions import (
+from domain.entities import (
+    Operation,
     ErrorCode,
+    AutomationSession,
+    AutomationStatus,
+)
+from domain.exceptions import (
     AutomationError,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
@@ -10,9 +14,10 @@ from domain.exceptions import (
 from domain.value_objects import PaymentAuthorization
 
 __all__ = [
+    "Operation",
+    "ErrorCode",
     "AutomationSession",
     "AutomationStatus",
-    "ErrorCode",
     "AutomationError",
     "BrowserSessionClosedError",
     "BrowserSessionOpenError",

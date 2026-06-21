@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from domain.entities import Operation
 from domain.exceptions import PaymentConfirmationDisabledError
-
 
 @dataclass(frozen=True)
 class PaymentAuthorization:
@@ -15,5 +15,5 @@ class PaymentAuthorization:
         if not self.confirmed:
             raise PaymentConfirmationDisabledError(
                 "A confirmação de pagamento real está desabilitada. Configure CONFIRMA_PAGAMENTO=true apenas quando desejar executar o pagamento.",
-                operation="Confirma o pagamento",
+                operation=Operation.CONFIRM_PAYMENT,
             )
