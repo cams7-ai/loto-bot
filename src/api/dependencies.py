@@ -5,11 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
-from domain import AutomationSession
-from domain.value_objects import PaymentAuthorization
-from infrastructure.browser import PlaywrightBrowserAutomation
-from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
-from infrastructure.config import Settings, get_settings
+from domain import AutomationSession, PaymentAuthorization
+from infrastructure import (
+    PlaywrightBrowserAutomation, 
+    GmailReaderClient, 
+    MailSenderClient, 
+    NotificationGateway, 
+    WhatsAppNotifyClient, 
+    Settings, 
+    get_settings,
+)
 
 
 @dataclass

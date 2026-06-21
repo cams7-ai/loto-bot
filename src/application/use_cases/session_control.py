@@ -9,7 +9,13 @@ from time import sleep
 
 from application.dto import SessionStatusResult
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
-from domain import AutomationError, AutomationSession, BrowserSessionClosedError, BrowserSessionOpenError
+from domain import (
+    AutomationError, 
+    BrowserSessionClosedError, 
+    BrowserSessionOpenError, 
+    AutomationSession,
+)
+from infrastructure.logging import Operation
 
 logger = logging.getLogger(__name__)
 VALIDATION_CODE_LOOKUP_LEAD_SECONDS = 1
@@ -30,62 +36,61 @@ class SessionControlUseCase:
 
     def start(self) -> SessionStatusResult:
         if self._session.is_open:
-            raise BrowserSessionOpenError("Já existe uma sessão de navegador aberta.")
+            raise BrowserSessionOpenError("Já existe uma sessão de navegador aberta")
 
         tab_id = self._browser.start(self._session)
         self._session.mark_open(tab_id)
         self._notifier.start_whatsapp_session(self._session)
-        logger.info("Sessão de navegador iniciada", extra={"executed_operation": "Inicia sessão"})
+        logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(Operation.START_SESSION))
         try:
-            self._authenticate()
+            if self._authenticate():
+                self._disable_notification(Operation.ACCESS_HOME)
+                logger.info("Sessão de navegador autenticada", extra=Operation.executed_operation(Operation.ACCESS_HOME))
         except AutomationError:
             self.close_if_open()
             raise
         except Exception as exc:
-            logger.exception("Erro inesperado no processo de autenticação")
-            operation = self._session.executed_operation or "Autenticação"
+            error_message = "Erro inesperado ao autenticar a sessão"
+            logger.exception(error_message)
             self.close_if_open()
-            raise AutomationError("Erro inesperado ao autenticar a sessão.", operation=operation) from exc
+            raise AutomationError(error_message, operation=Operation.from_value(self._session.executed_operation)) from exc
 
         self._session.mark_open(self._session.tab_id)
-        logger.info("Sessão de navegador autenticada", extra={"executed_operation": "Autenticação"})
         return self.status()
 
-    def _authenticate(self) -> None:
-        self._execute("Acessa o site Loterias Online CAIXA", self._browser.access_lottery_portal)
-        if self._is_authenticated():
-            return
-        self._execute("Aceita os termos de uso", self._browser.accept_terms)
-        self._execute("Home", self._browser.access_home)
-        self._execute("Informa o CPF", self._browser.submit_cpf)
+    def _authenticate(self) -> bool:
+        self._execute(Operation.ACCESS_LOTTERY_PORTAL, self._browser.access_lottery_portal)
+        if self._browser.is_authenticated(False):
+            return True
+
+        self._execute(Operation.ACCEPT_TERMS, self._browser.accept_terms)
+        self._execute(Operation.ACCESS_HOME, self._browser.access_home)
+        self._execute(Operation.SUBMIT_CPF, self._browser.submit_cpf)
 
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="lotobot-validation-code") as executor:
             validation_code_request_started = Event()
             validation_code = self._request_validation_code_async(executor, validation_code_request_started)
             validation_code_request_started.wait()
             sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
-            self._execute("Solicita o código de acesso", self._browser.request_validation_code)
+            self._execute(Operation.REQUEST_VALIDATION_CODE, self._browser.request_validation_code)
             self._session.valid_code = validation_code.result()
-        self._execute_with_code("Informa o código recebido")
 
-        self._execute("Informa a senha", self._browser.submit_password)
+        self._execute(Operation.SUBMIT_VALIDATION_CODE, self._submit_validation_code)
+        self._execute(Operation.SUBMIT_PASSWORD, self._browser.submit_password)
 
-    def _execute(self, operation: str, action) -> None:
+        return self._browser.is_authenticated(True)
+
+    def _submit_validation_code(self, session: AutomationSession) -> None:
+        self._browser.submit_validation_code(session, self._session.valid_code or "")
+
+    def _disable_notification(self, operation: Operation) -> None:
         self._session.mark_running(operation)
+        self._browser.disable_notification()
+
+    def _execute(self, operation: Operation, action) -> None:
+        self._session.mark_running(operation.value)
         action(self._session)
-        logger.info("Operação concluída", extra={"executed_operation": operation})
-
-    def _is_authenticated(self) -> bool:
-        operation = "Verifica se a sessão está autenticada"
-        self._session.mark_running(operation)
-        authenticated = self._browser.is_authenticated(self._session)
-        logger.info("Operação concluída", extra={"executed_operation": operation})
-        return authenticated
-
-    def _execute_with_code(self, operation: str) -> None:
-        self._session.mark_running(operation)
-        self._browser.submit_validation_code(self._session, self._session.valid_code or "")
-        logger.info("Operação concluída", extra={"executed_operation": operation})
+        logger.info("Operação concluída", extra=Operation.executed_operation(operation))
 
     def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event) -> Future[str]:
         return executor.submit(self._get_validation_code, request_started)
@@ -96,12 +101,12 @@ class SessionControlUseCase:
 
     def stop(self) -> SessionStatusResult:
         if not self._session.is_open:
-            raise BrowserSessionClosedError("A sessão de navegador já está fechada.")
+            raise BrowserSessionClosedError("A sessão de navegador já está fechada")
 
         self._browser.stop()
         self._notifier.stop_whatsapp_session(self._session)
         self._session.mark_closed()
-        logger.info("Sessão de navegador encerrada", extra={"executed_operation": "Fecha sessão"})
+        logger.info("Sessão de navegador encerrada", extra=Operation.executed_operation(Operation.END_SESSION))
         return self.status()
 
     def close_if_open(self) -> None:

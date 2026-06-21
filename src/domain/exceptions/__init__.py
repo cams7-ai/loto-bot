@@ -1,3 +1,4 @@
+from domain.exceptions.error_code import ErrorCode
 from domain.exceptions.automation_errors import (
     AutomationError,
     BrowserSessionClosedError,
@@ -7,6 +8,7 @@ from domain.exceptions.automation_errors import (
 )
 
 __all__ = [
+    "ErrorCode",
     "AutomationError",
     "BrowserSessionClosedError",
     "BrowserSessionOpenError",

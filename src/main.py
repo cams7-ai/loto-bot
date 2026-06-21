@@ -8,7 +8,7 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 
-from infrastructure.logging.logging_config import configure_logging
+from infrastructure import configure_logging
 
 
 def main() -> None:

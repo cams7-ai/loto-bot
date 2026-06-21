@@ -28,26 +28,28 @@ class NotificationGateway(NotificationPort):
         self._whatsapp_enabled = whatsapp_enabled
 
     def start_whatsapp_session(self, session: AutomationSession) -> None:
+        operation = "Inicia sessão do WhatsApp Web"
         if not self._whatsapp_enabled:
             session.whatsapp_enabled = False
-            logger.info("Integração com WhatsApp desabilitada", extra={"executed_operation": "Inicia sessão do WhatsApp Web"})
+            logger.info("Integração com WhatsApp desabilitada", extra={"executed_operation": operation})
             return
         try:
             status = self._whatsapp.start_session()
             session.whatsapp_enabled = True
-            logger.info("Sessão do WhatsApp Web iniciada: %s", status, extra={"executed_operation": "Inicia sessão do WhatsApp Web"})
+            logger.info("Sessão do WhatsApp Web iniciada: %s", status, extra={"executed_operation": operation})
         except Exception as exc:
             session.whatsapp_enabled = False
-            logger.warning("Sessão do WhatsApp Web não inicializada: %s", exc, extra={"executed_operation": "Inicia sessão do WhatsApp Web"})
+            logger.warning("Sessão do WhatsApp Web não inicializada: %s", exc, extra={"executed_operation": operation})
 
     def stop_whatsapp_session(self, session: AutomationSession) -> None:
+        operation = "Encerra sessão do WhatsApp Web"
         if not session.whatsapp_enabled:
             return
         try:
             self._whatsapp.stop_session()
-            logger.info("Sessão do WhatsApp Web encerrada", extra={"executed_operation": "Encerra sessão do WhatsApp Web"})
+            logger.info("Sessão do WhatsApp Web encerrada", extra={"executed_operation": operation})
         except Exception as exc:
-            logger.warning("Sessão do WhatsApp Web não encerrada: %s", exc, extra={"executed_operation": "Encerra sessão do WhatsApp Web"})
+            logger.warning("Sessão do WhatsApp Web não encerrada: %s", exc, extra={"executed_operation": operation})
         finally:
             session.whatsapp_enabled = False
 

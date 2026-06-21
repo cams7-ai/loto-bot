@@ -8,14 +8,14 @@ import os
 
 LOG_FORMAT = (
     "%(asctime)s %(levelname)s [%(name)s] "
-    "process=%(process)d thread=%(thread)d operation=%(executed_operation)s %(message)s"
+    "process=%(process)d thread=%(thread)d operation=[%(executed_operation)s] %(message)s"
 )
 
 
 class OperationFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         if not hasattr(record, "executed_operation"):
-            record.executed_operation = "-"
+            record.executed_operation = "*"
         return True
 
 

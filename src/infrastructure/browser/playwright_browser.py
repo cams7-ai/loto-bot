@@ -12,11 +12,9 @@ from urllib.parse import parse_qs, urlparse
 
 from application.ports import BrowserAutomationPort
 from domain import AutomationError, AutomationSession
-from infrastructure.config import Settings
-from infrastructure.selectors import Selectors
+from infrastructure import Settings, Operation, Selectors
 
 logger = logging.getLogger(__name__)
-
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def __init__(self, settings: Settings, selectors: Selectors | None = None) -> None:
@@ -60,7 +58,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             return token_hex(4)
         except Exception as exc:
             self._stop()
-            raise AutomationError("Não foi possível iniciar a sessão de navegador.", operation="Inicia sessão") from exc
+            raise AutomationError("Não foi possível iniciar a sessão de navegador.", operation=Operation.START_SESSION) from exc
 
     def stop(self) -> None:
         if self._executor is None:
@@ -82,14 +80,17 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._page = None
         self._playwright = None
 
+    def access_home(self, session: AutomationSession) -> None:
+        self._run_on_browser_thread(self._access_home, session)
+
     def access_lottery_portal(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._access_lottery_portal, session)
+        self.access_home(session)
+
+    def is_authenticated(self, click_login_button: bool | AutomationSession) -> bool:
+        return self._run_on_browser_thread(self._is_authenticated, click_login_button)
 
     def accept_terms(self, session: AutomationSession) -> None:       
         self._run_on_browser_thread(self._accept_terms, session)
-
-    def access_home(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._access_home, session)
 
     def submit_cpf(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._submit_cpf, session)
@@ -102,6 +103,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def submit_password(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._submit_password, session)
+
+    def disable_notification(self) -> None:
+        self._run_on_browser_thread(self._disable_notification)
 
     def select_lottery_modality(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._select_lottery_modality, session)
@@ -124,30 +128,49 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def finish_bet(self, session: AutomationSession) -> str:
         return self._run_on_browser_thread(self._finish_bet, session)
 
-    def is_authenticated(self, session: AutomationSession) -> bool:
-        return self._run_on_browser_thread(self._is_authenticated, session)
+    def _access_home(self, session: AutomationSession) -> None:
+        self._access_home_page(session)
+        self._click_if_exists(self._selectors.logged_off_login_button, True)
 
-    def _is_authenticated(self, session: AutomationSession) -> bool:
+    def _access_home_page(self, session: AutomationSession) -> None:
+        self._goto(self._settings.url_home)
+
+    def _is_authenticated(self, click_login_button: bool | AutomationSession) -> bool:
+        if isinstance(click_login_button, AutomationSession):
+            return self._is_authenticated_from_home()
+
+        if not click_login_button or self._click_if_exists(self._selectors.logged_off_login_button, True):
+            timeout_ms = self._timeout_ms
+            try:
+                self._require_page().locator(self._selectors.logged_in_login_button).first.wait_for(state="visible", timeout=timeout_ms)
+                return True
+            except Exception:
+                logger.debug(
+                    "A sessão não está autenticada ou o elemento de login autenticado não ficou visível dentro do tempo limite de %d ms: %s",
+                    timeout_ms,
+                    self._selectors.logged_in_login_button,
+                )
+        return False
+
+    def _is_authenticated_from_home(self) -> bool:
+        timeout_ms = self._timeout_ms
         try:
-            self._require_page().locator(self._selectors.account_button).first.wait_for(
+            self._require_page().locator(self._selectors.close_notification_button).first.wait_for(state="visible", timeout=timeout_ms)
+            self._require_page().locator(self._selectors.logged_in_user_notifications_link).first.wait_for(
                 state="visible",
-                timeout=self._settings.authentication_check_timeout_seconds * 1000,
+                timeout=timeout_ms,
             )
             return True
         except Exception:
             return False
 
-    def _access_lottery_portal(self, session: AutomationSession) -> None:
-        self._goto(self._settings.url_loterias_online)
-
     def _accept_terms(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_termo_de_uso)
-        self._click_if_exists(self._selectors.privacy_yes_button, True)
+        self._accept_privacy()
         self._click(self._selectors.terms_yes_button)
 
-    def _access_home(self, session: AutomationSession) -> None:
-        self._goto(self._settings.url_home)
-        self._click(self._selectors.home_access_button)
+    def _accept_privacy(self) -> None:
+        self._click_if_exists(self._selectors.privacy_yes_button, True)
 
     def _submit_cpf(self, session: AutomationSession) -> None:
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
@@ -156,27 +179,30 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._sync_auth_session_from_current_url(session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
-        self._raise_if_forbidden("Solicita o código de acesso")
+        self._raise_if_forbidden(Operation.REQUEST_VALIDATION_CODE)
         self._click(self._selectors.receive_code_button)
 
     def _submit_validation_code(self, session: AutomationSession, code: str) -> None:
-        self._raise_if_forbidden("Informa o código recebido")
+        self._raise_if_forbidden(Operation.SUBMIT_VALIDATION_CODE)
         self._fill(self._selectors.code_field, code)
         self._click(self._selectors.code_send_button)
 
     def _submit_password(self, session: AutomationSession) -> None:
-        self._raise_if_forbidden("Informa a senha")
+        self._raise_if_forbidden(Operation.SUBMIT_PASSWORD)
         self._fill(self._selectors.password_field, self._settings.senha)
         self._click(self._selectors.password_enter_button)
 
+    def _disable_notification(self) -> None:
+        if self._click_if_exists(self._selectors.do_not_show_notification_checkbox, True):
+            self._click_if_exists(self._selectors.close_notification_button, True)
+
     def _select_lottery_modality(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_home)
-        self._click_if_exists(self._selectors.privacy_yes_button, True)
-        self._click_if_exists(self._selectors.notification_popup_close, True)
-        #popup = self._page.locator(self._selectors.notification_popup_close)
-        #if popup.count() and popup.first.is_visible():
-        #    popup.first.click()
+        self._accept_privacy()
+        #self._click_if_exists(self._selectors.notification_popup_close, True)
         self._click(self._selectors.modality_button(self._settings.modalidade_selecionada))
+        if self._click_if_exists(self._selectors.close_bet_registration_alert_button, True):
+            logger.debug("Alerta de registro de apostas individuais fechado")
 
     def _choose_random_numbers(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_escolhe_numeros_aposta)
@@ -190,12 +216,12 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             page = self._require_page()
             payment_button = page.locator(self._selectors.go_to_payment_button).first
             confirmation_button = page.locator(self._selectors.confirm_purchase_button).first
-            modal_timeout_ms = min(self._timeout_ms, 5000)
+            timeout_ms = self._timeout_ms
 
             for attempt in range(2):
                 payment_button.click(no_wait_after=True)
                 try:
-                    confirmation_button.wait_for(state="visible", timeout=modal_timeout_ms)
+                    confirmation_button.wait_for(state="visible", timeout=timeout_ms)
                     confirmation_button.click()
                     return
                 except Exception:
@@ -210,12 +236,12 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 page.screenshot(path=str(screenshot_path), full_page=True)
             except Exception:
                 logger.exception("Não foi possível capturar screenshot da falha na confirmação da compra")
-            logger.error(
-                "Falha ao confirmar compra; url=%s screenshot=%s",
-                page.url,
-                screenshot_path,
-                extra={"executed_operation": "Confirma a compra"},
-            )
+                logger.error(
+                    "Falha ao confirmar compra; url=%s screenshot=%s",
+                    page.url,
+                    screenshot_path,
+                    extra={"executed_operation": "Confirma a compra"},
+                )
             raise
 
     def _select_payment_method(self, session: AutomationSession) -> None:
@@ -231,7 +257,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._goto(self._settings.url_finaliza_a_aposta_processando)
         self._page.wait_for_selector(self._selectors.finished_order_text)
         tracking_code = self._tracking_code_from_url(self._page.url)
-        self._click(self._selectors.account_button)
+        self._click(self._selectors.logged_in_login_button)
         self._click(self._selectors.logout_button)
         return tracking_code
 
@@ -244,31 +270,51 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _goto(self, url: str) -> None:
         self._require_page().goto(url, wait_until="domcontentloaded", timeout=self._timeout_ms)
 
-    def _click(self, selector: str) -> None:
-        self._click_if_exists(selector, False)
+    def _click(self, selector: str) -> bool:
+        return self._click_if_exists(selector, False)
 
-    def _click_if_exists(self, selector: str, check_selector: bool) -> None:
+    def _click_if_exists(self, selector: str, check_selector: bool) -> bool:
         element = self._require_page().locator(selector)
         if check_selector:
-            if element.count():
+            timeout_ms = self._timeout_ms
+            try:
+                element.wait_for(state="visible", timeout=timeout_ms)
                 element.click()
-        else:
-            element.click()
+                return True
+            except Exception:
+                logger.debug(
+                    "Clique ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
+                    timeout_ms,
+                    selector,
+                )
+            return False
 
-    def _element_exists(self, selector: str) -> bool:
-        locator = self._require_page().locator(selector)
-        return locator.count() > 0
+        element.click()
+        return True
 
-    def _fill(self, selector: str, value: str) -> None:
-        self._fill_if_exists(selector, value, False)
 
-    def _fill_if_exists(self, selector: str, value: str, check_selector: bool) -> None:
+
+    def _fill(self, selector: str, value: str) -> bool:
+        return self._fill_if_exists(selector, value, False)
+
+    def _fill_if_exists(self, selector: str, value: str, check_selector: bool) -> bool:
         element = self._require_page().locator(selector)
         if check_selector:
-            if element.count():
+            timeout_ms = self._timeout_ms
+            try:
+                element.wait_for(state="visible", timeout=timeout_ms)
                 element.fill(value)
-        else:
-            element.fill(value)
+                return True
+            except Exception:
+                logger.debug(
+                    "Preenchimento ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
+                    timeout_ms,
+                    selector,
+                )
+            return False
+
+        element.fill(value)
+        return True
 
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
@@ -287,17 +333,17 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _authentication_url(self, session: AutomationSession, operation: str) -> str:
         execution = session.execution or self._settings.execution
-        if not execution or execution.startswith("<"):
+        if not execution or execution == "<EXECUTION_ID_DA_SESSAO>":
             raise AutomationError(
-                "Não foi possível identificar o execution dinâmico da sessão do Login CAIXA.",
+                "Não foi possível continuar o login sem o execution dinâmico da sessão.",
                 operation=operation,
             )
         return self._settings.authentication_url(session.tab_id, execution)
 
-    def _raise_if_forbidden(self, operation: str) -> None:
+    def _raise_if_forbidden(self, operation: Operation) -> None:
         page = self._require_page()
         title = page.locator("h1.error-header__title")
-        if title.count() and title.first.inner_text().strip().lower() == "forbidden":
+        if title.count() > 0 and title.first.inner_text().strip().lower() == "forbidden":
             raise AutomationError(
                 "Login CAIXA retornou Forbidden ao continuar a autenticação. "
                 "A sessão atual foi bloqueada pelo serviço; reinicie o navegador/perfil e tente novamente.",
@@ -306,7 +352,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _require_page(self) -> Any:
         if self._page is None:
-            raise AutomationError("A sessão de navegador está fechada.", operation="Sessão de navegador")
+            raise AutomationError("A sessão de navegador está fechada.", operation=Operation.END_SESSION)
         return self._page
 
     @staticmethod

@@ -416,7 +416,12 @@ def test_playwright_browser_authentication_check_uses_home_marker():
     browser._page = Page()
 
     assert browser._is_authenticated(AutomationSession()) is True
-    assert actions == [browser._selectors.account_button, ("visible", 10000)]
+    assert actions == [
+        browser._selectors.close_notification_button,
+        ("visible", 5000),
+        browser._selectors.logged_in_user_notifications_link,
+        ("visible", 5000),
+    ]
 
 
 def test_playwright_browser_authentication_check_returns_false_after_timeout():

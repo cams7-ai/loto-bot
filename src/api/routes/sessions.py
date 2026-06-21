@@ -4,8 +4,17 @@ from fastapi import APIRouter, Depends, status
 
 from api.dependencies import AppContainer, get_container
 from api.exceptions import ApiError
-from api.schemas import ErrorResponse, SessionControlResponse, SessionStatusResponse
-from domain import AutomationError, BrowserSessionClosedError, BrowserSessionOpenError, ExternalServiceError
+from api.schemas import (
+    ErrorResponse,
+    SessionControlResponse,
+    SessionStatusResponse,
+)
+from domain import (
+    AutomationError,
+    BrowserSessionClosedError,
+    BrowserSessionOpenError,
+    ExternalServiceError,
+)
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 
@@ -55,8 +64,13 @@ def _control_response(result, message: str) -> SessionControlResponse:
 
 
 def _status_for_error(exc: AutomationError) -> int:
-    if isinstance(exc, ExternalServiceError):
+    if isinstance(exc, ExternalServiceError): 
+        #Quando o serviço externo está indisponível, retornamos 503 Service Unavailable
         return status.HTTP_503_SERVICE_UNAVAILABLE
-    if isinstance(exc, (BrowserSessionOpenError, BrowserSessionClosedError)):
+
+    if isinstance(exc, (BrowserSessionOpenError, BrowserSessionClosedError)): 
+        #Quando a sessão já está aberta ou fechada, retornamos 409 Conflict
         return status.HTTP_409_CONFLICT
-    return status.HTTP_500_INTERNAL_SERVER_ERROR
+    
+    #Para outros erros de automação, retornamos 500 Internal Server Error
+    return status.HTTP_500_INTERNAL_SERVER_ERROR 

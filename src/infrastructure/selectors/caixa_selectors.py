@@ -7,17 +7,22 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Selectors:
-    privacy_yes_button: str = "//h3[normalize-space()='Aviso de privacidade']/ancestor::div[contains(@class,'adopt-c-bXGRNs')]//button[normalize-space()='Aceitar']"
-    terms_yes_button: str = "//*[@id='botaosim']"
-    home_access_button: str = "//*[@id='btnLogin']/span"
-    cpf_field: str = "//*[@id='username']"
-    cpf_next_button: str = "//*[@id='button-submit']"
-    receive_code_button: str = "//*[@id='form-login']//button[text()='Receber código']"
-    code_field: str = "//*[@id='codigo']"
-    code_send_button: str = "//*[@id='form-login']//button[text()='Enviar']"
+    privacy_yes_button: str = "//button[@id='adopt-accept-all-button']"
+    terms_yes_button: str = "//a[@id='botaosim']"
+    logged_off_login_button: str ="//div[@id='LoginHeaderView.html']//a[@id='btnLogin']"
+    cpf_field: str = "//input[@id='username']"
+    cpf_next_button: str = "//button[@id='button-submit']"
+    receive_code_button: str = "//*[@id='form-login']//button[@name='login']"
+    code_field: str = "//input[@id='codigo']"
+    code_send_button: str = "//*[@id='form-login']//button[@name='login']"
     password_field: str = "//*[@id='password']"
     password_enter_button: str = "//*[@id='template-section']//button[text()='Entrar']"
-    notification_popup_close: str = "//*[@id='HeaderView.html']//button[text()='Fechar']"
+    logged_in_login_button: str ="//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
+    logged_in_user_notifications_link: str ="//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
+    do_not_show_notification_checkbox: str ="//div[contains(@class,'modal-notificacao')]//input[@type='checkbox' and contains(@aria-label,'Não mostrar mais')]"
+    close_notification_button: str ="//div[contains(@class,'modal-notificacao')]//button[contains(@class,'btn-fechar-notificacao')]"
+    
+    #notification_popup_close: str = "//*[@id='HeaderView.html']//button[text()='Fechar']"
     complete_game_button: str = "//*[@id='completeojogo']"
     add_to_cart_button: str = "//*[@id='colocarnocarrinho']"
     go_to_payment_button: str = "//*[@id='irparapagamento']"
@@ -26,8 +31,9 @@ class Selectors:
     security_code_field: str = "//p[contains(normalize-space(.),'Digite o código de Segurança do seu cartão')]/ancestor::div[contains(@class,'modal-content')]//input[@id='securityCode']"
     confirm_payment_button: str = "//p[contains(normalize-space(.),'Digite o código de Segurança do seu cartão')]/ancestor::div[contains(@class,'modal-content')]//button[@id='confirmarModalConfirmacao']"
     finished_order_text: str = "//div[@id='containerProcessamento']//h3[contains(.,'Seu pedido foi realizado')]"
-    account_button: str = "//a[@id='suaconta']//span[normalize-space()='Minha Conta']"
     logout_button: str = "//*[@id='sair']"
+
+    close_bet_registration_alert_button: str = "//div[contains(@class,'modal-content')][.//p[contains(., 'O registro de apostas individuais para o concurso') and contains(., 'foi encerrado')]]//button[@id='fecharModalAlerta']"
 
     def modality_button(self, modality: str) -> str:
         return (

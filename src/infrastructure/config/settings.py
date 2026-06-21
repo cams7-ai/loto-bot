@@ -31,8 +31,8 @@ class Settings(BaseSettings):
 
     validation_code_wait_timeout_seconds: int = Field(default=30, alias="VALIDATION_CODE_WAIT_TIMEOUT_SECONDS")
     whatsapp_headless: bool = Field(default=True, alias="WHATSAPP_HEADLESS")
-    whatsapp_enabled: bool = Field(default=True, alias="WHATSAPP_ENABLED")
-    whatsapp_timeout_seconds: int = Field(default=60, alias="WHATSAPP_TIMEOUT_SECONDS")
+    whatsapp_enabled: bool = Field(default=False, alias="WHATSAPP_ENABLED")
+    whatsapp_timeout_seconds: int = Field(default=10, alias="WHATSAPP_TIMEOUT_SECONDS")
     whatsapp_contact: str = Field(default="Notificação via App", alias="WHATSAPP_CONTACT")
     mail_to: str = Field(default="<EMAIL_DESTINATARIO>", alias="MAIL_TO")
     mail_type: str = Field(default="HTML", alias="MAIL_TYPE")
@@ -46,11 +46,10 @@ class Settings(BaseSettings):
     url_finaliza_a_aposta_processando: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/carrinho/processamento", alias="URL_FINALIZA_A_APOSTA_PROCESSANDO")
 
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="LOTTOBOT_BROWSER_PROFILE_DIR")
-    browser_headless: bool = Field(default=False, alias="LOTTOBOT_BROWSER_HEADLESS")
-    browser_timeout_seconds: int = Field(default=30, alias="LOTTOBOT_BROWSER_TIMEOUT_SECONDS")
-    authentication_check_timeout_seconds: int = Field(default=10, alias="LOTTOBOT_AUTH_CHECK_TIMEOUT_SECONDS")
+    browser_headless: bool = Field(default=True, alias="LOTTOBOT_BROWSER_HEADLESS")
+    browser_timeout_seconds: int = Field(default=5, alias="LOTTOBOT_BROWSER_TIMEOUT_SECONDS")
 
-    @field_validator("browser_headless", mode="before")
+    @field_validator("whatsapp_headless", "whatsapp_enabled", "confirma_pagamento", "browser_headless", mode="before")
     @classmethod
     def parse_browser_headless(cls, value: object) -> object:
         if not isinstance(value, str):
@@ -63,13 +62,13 @@ class Settings(BaseSettings):
             return True
         if normalized in {"0", "false", "no", "n", "nao", "não"}:
             return False
-        raise ValueError("Valor inválido para LOTTOBOT_BROWSER_HEADLESS: use true/false, yes/no, sim/não ou 1/0")
+        raise ValueError("Valor booleano inválido. Use um dos seguintes: 1, 0, true, false, yes, no, y, n, sim, nao.")
 
-    @field_validator("browser_timeout_seconds", "authentication_check_timeout_seconds")
+    @field_validator("validation_code_wait_timeout_seconds", "whatsapp_timeout_seconds", "browser_timeout_seconds")
     @classmethod
     def validate_browser_timeout_seconds(cls, value: int) -> int:
         if value <= 0:
-            raise ValueError("Valor inválido para LOTTOBOT_BROWSER_TIMEOUT_SECONDS: informe um número maior que zero")
+            raise ValueError("O valor deve ser um inteiro positivo.")
         return value
 
     @model_validator(mode="after")

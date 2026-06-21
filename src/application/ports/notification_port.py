@@ -6,7 +6,6 @@ from typing import Protocol
 
 from domain import AutomationSession
 
-
 class NotificationPort(Protocol):
     def start_whatsapp_session(self, session: AutomationSession) -> None:
         """Inicializa o WhatsApp Web quando disponível."""

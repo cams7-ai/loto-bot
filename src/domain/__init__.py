@@ -1,18 +1,22 @@
-from domain.entities.automation_session import AutomationSession, AutomationStatus
-from domain.exceptions.automation_errors import (
+from domain.entities import AutomationSession, AutomationStatus
+from domain.exceptions import (
+    ErrorCode,
     AutomationError,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
     ExternalServiceError,
     PaymentConfirmationDisabledError,
 )
+from domain.value_objects import PaymentAuthorization
 
 __all__ = [
-    "AutomationError",
     "AutomationSession",
     "AutomationStatus",
+    "ErrorCode",
+    "AutomationError",
     "BrowserSessionClosedError",
     "BrowserSessionOpenError",
     "ExternalServiceError",
     "PaymentConfirmationDisabledError",
+    "PaymentAuthorization",
 ]

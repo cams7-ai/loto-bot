@@ -7,7 +7,7 @@ import logging
 import httpx
 
 from domain import ExternalServiceError
-from infrastructure.config import Settings
+from infrastructure import Settings
 
 
 logger = logging.getLogger(__name__)

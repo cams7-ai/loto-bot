@@ -8,7 +8,7 @@ import httpx
 
 from application.ports import ValidationCodePort
 from domain import ExternalServiceError
-from infrastructure.config import Settings
+from infrastructure import Settings
 from shared import mask_sensitive_value
 
 
