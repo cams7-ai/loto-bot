@@ -22,16 +22,5 @@ class Operation(StrEnum):
     COMPLETE_BET = "Finaliza a aposta"
 
     @staticmethod
-    def from_value(operation_value: str) -> Operation:
-        try:
-            return Operation(operation_value)
-        except ValueError:
-            return Operation.UNKNOWN_OPERATION
-
-    @staticmethod
     def executed_operation(operation: Operation) -> dict[str, str]:
-        return Operation.executed_operation_value(operation.value)
-
-    @staticmethod
-    def executed_operation_value(operation_value: str) -> dict[str, str]:
-        return {"executed_operation": operation_value}
+        return {"executed_operation": operation.value}

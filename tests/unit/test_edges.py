@@ -15,19 +15,18 @@ from api.dependencies import get_container
 from api.server import app
 from domain import (
     Operation,
-    AutomationError, 
     AutomationSession, 
     ExternalServiceError, 
     PaymentAuthorization,
 )
 from infrastructure import (
-    Settings, 
-    configure_logging, 
-    GmailReaderClient, 
-    MailSenderClient, 
-    NotificationGateway, 
-    WhatsAppNotifyClient, 
-    PlaywrightBrowserAutomation, 
+    Settings,
+    configure_logging,
+    GmailReaderClient,
+    MailSenderClient,
+    NotificationGateway,
+    WhatsAppNotifyClient,
+    PlaywrightBrowserAutomation,
     Selectors,
 )
 
@@ -217,8 +216,8 @@ def test_settings_selectors_and_logging(monkeypatch):
     assert "tab" in settings.authentication_url("tab")
     assert "execution=dynamic" in settings.authentication_url("tab", "dynamic")
     assert "state" in settings.cpf_url("state", "nonce")
-    assert "not(@tabindex='-1')" in Selectors().modality_button("mega-sena")
-    assert Selectors().card_selector("1234")
+    assert "not(@tabindex='-1')" in Selectors.modality_button("mega-sena")
+    assert Selectors.card_selector("1234")
 
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     configure_logging()
@@ -411,7 +410,7 @@ def test_playwright_browser_checks_authentication_on_browser_thread():
     assert calls[0][0] == "fake_is_authenticated"
 
 
-def test_playwright_browser_authentication_check_uses_home_marker():
+def test_playwright_browser_authentication_check_uses_login_marker():
     browser = PlaywrightBrowserAutomation(Settings())
     actions = []
 
@@ -431,11 +430,9 @@ def test_playwright_browser_authentication_check_uses_home_marker():
 
     browser._page = Page()
 
-    assert browser._is_authenticated(AutomationSession()) is True
+    assert browser._is_authenticated(False) is True
     assert actions == [
-        browser._selectors.close_notification_button,
-        ("visible", 5000),
-        browser._selectors.logged_in_user_notifications_link,
+        Selectors.LOGGED_IN_LOGIN_BUTTON,
         ("visible", 5000),
     ]
 
@@ -479,9 +476,9 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     browser._submit_validation_code(session, "123456")
     browser._submit_password(session)
 
-    assert ("click", browser._selectors.receive_code_button) in actions
-    assert ("fill", browser._selectors.code_field, "123456") in actions
-    assert ("fill", browser._selectors.password_field, settings.senha) in actions
+    assert ("click", Selectors.RECEIVE_CODE_BUTTON) in actions
+    assert ("fill", Selectors.CODE_FIELD, "123456") in actions
+    assert ("fill", Selectors.PASSWORD_FIELD, settings.senha) in actions
 
 
 def test_playwright_browser_retries_payment_until_confirmation_modal_is_visible():
@@ -519,7 +516,7 @@ def test_playwright_browser_retries_payment_until_confirmation_modal_is_visible(
         url = "http://lottery/#/mega-sena"
 
         def locator(self, selector):
-            return payment if selector == browser._selectors.go_to_payment_button else confirmation
+            return payment if selector == Selectors.GO_TO_PAYMENT_BUTTON else confirmation
 
         def wait_for_timeout(self, timeout):
             clicks.append(("pause", timeout))

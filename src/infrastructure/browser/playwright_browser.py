@@ -21,9 +21,8 @@ from infrastructure import Settings, Selectors
 logger = logging.getLogger(__name__)
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
-    def __init__(self, settings: Settings, selectors: Selectors | None = None) -> None:
+    def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._selectors = selectors or Selectors()
         self._playwright: Any | None = None
         self._context: Any | None = None
         self._page: Any | None = None
@@ -90,7 +89,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def access_lottery_portal(self, session: AutomationSession) -> None:
         self.access_home(session)
 
-    def is_authenticated(self, click_login_button: bool | AutomationSession) -> bool:
+    def is_authenticated(self, click_login_button: bool) -> bool:
         return self._run_on_browser_thread(self._is_authenticated, click_login_button)
 
     def accept_terms(self, session: AutomationSession) -> None:       
@@ -134,92 +133,77 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _access_home(self, session: AutomationSession) -> None:
         self._access_home_page(session)
-        self._click_if_exists(self._selectors.logged_off_login_button, True)
+        self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
 
     def _access_home_page(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_home)
 
-    def _is_authenticated(self, click_login_button: bool | AutomationSession) -> bool:
-        if isinstance(click_login_button, AutomationSession):
-            return self._is_authenticated_from_home()
-
-        if not click_login_button or self._click_if_exists(self._selectors.logged_off_login_button, True):
+    def _is_authenticated(self, click_login_button: bool) -> bool:
+        if not click_login_button or self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True):
             timeout_ms = self._timeout_ms
             try:
-                self._require_page().locator(self._selectors.logged_in_login_button).first.wait_for(state="visible", timeout=timeout_ms)
+                self._require_page().locator(Selectors.LOGGED_IN_LOGIN_BUTTON).first.wait_for(state="visible", timeout=timeout_ms)
                 return True
             except Exception:
                 logger.debug(
                     "A sessão não está autenticada ou o elemento de login autenticado não ficou visível dentro do tempo limite de %d ms: %s",
                     timeout_ms,
-                    self._selectors.logged_in_login_button,
+                    Selectors.LOGGED_IN_LOGIN_BUTTON,
                 )
         return False
-
-    def _is_authenticated_from_home(self) -> bool:
-        timeout_ms = self._timeout_ms
-        try:
-            self._require_page().locator(self._selectors.close_notification_button).first.wait_for(state="visible", timeout=timeout_ms)
-            self._require_page().locator(self._selectors.logged_in_user_notifications_link).first.wait_for(
-                state="visible",
-                timeout=timeout_ms,
-            )
-            return True
-        except Exception:
-            return False
 
     def _accept_terms(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_termo_de_uso)
         self._accept_privacy()
-        self._click(self._selectors.terms_yes_button)
+        self._click(Selectors.TERMS_YES_BUTTON)
 
     def _accept_privacy(self) -> None:
-        self._click_if_exists(self._selectors.privacy_yes_button, True)
+        self._click_if_exists(Selectors.PRIVACY_YES_BUTTON, True)
 
     def _submit_cpf(self, session: AutomationSession) -> None:
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
-        self._fill(self._selectors.cpf_field, self._settings.cpf)
-        self._click(self._selectors.cpf_next_button)
+        self._fill(Selectors.CPF_FIELD, self._settings.cpf)
+        self._click(Selectors.CPF_NEXT_BUTTON)
         self._sync_auth_session_from_current_url(session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
         self._raise_if_forbidden(Operation.REQUEST_VALIDATION_CODE)
-        self._click(self._selectors.receive_code_button)
+        self._click(Selectors.RECEIVE_CODE_BUTTON)
 
     def _submit_validation_code(self, session: AutomationSession, code: str) -> None:
         self._raise_if_forbidden(Operation.SUBMIT_VALIDATION_CODE)
-        self._fill(self._selectors.code_field, code)
-        self._click(self._selectors.code_send_button)
+        self._fill(Selectors.CODE_FIELD, code)
+        self._click(Selectors.CODE_SEND_BUTTON)
 
     def _submit_password(self, session: AutomationSession) -> None:
         self._raise_if_forbidden(Operation.SUBMIT_PASSWORD)
-        self._fill(self._selectors.password_field, self._settings.senha)
-        self._click(self._selectors.password_enter_button)
+        self._fill(Selectors.PASSWORD_FIELD, self._settings.senha)
+        self._click(Selectors.PASSWORD_ENTER_BUTTON)
 
     def _disable_notification(self) -> None:
-        if self._click_if_exists(self._selectors.do_not_show_notification_checkbox, True):
-            self._click_if_exists(self._selectors.close_notification_button, True)
+        if self._click_if_exists(Selectors.DO_NOT_SHOW_NOTIFICATION_CHECKBOX, True):
+            self._click_if_exists(Selectors.CLOSE_NOTIFICATION_BUTTON, True)
 
     def _select_lottery_modality(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_home)
         self._accept_privacy()
-        #self._click_if_exists(self._selectors.notification_popup_close, True)
-        self._click(self._selectors.modality_button(self._settings.modalidade_selecionada))
-        if self._click_if_exists(self._selectors.close_bet_registration_alert_button, True):
+        #self._click_if_exists(Selectors.notification_popup_close, True)
+        self._click(Selectors.modality_button(self._settings.modalidade_selecionada))
+        if self._click_if_exists(Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON, True):
             logger.debug("Alerta de registro de apostas individuais fechado")
 
     def _choose_random_numbers(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_escolhe_numeros_aposta)
-        self._click(self._selectors.complete_game_button)
+        self._click(Selectors.COMPLETE_GAME_BUTTON)
 
     def _add_bet_to_cart(self, session: AutomationSession) -> None:
-        self._click(self._selectors.add_to_cart_button)
+        self._click(Selectors.ADD_TO_CART_BUTTON)
 
     def _confirm_purchase(self, session: AutomationSession) -> None:
         try:
             page = self._require_page()
-            payment_button = page.locator(self._selectors.go_to_payment_button).first
-            confirmation_button = page.locator(self._selectors.confirm_purchase_button).first
+            payment_button = page.locator(Selectors.GO_TO_PAYMENT_BUTTON).first
+            confirmation_button = page.locator(Selectors.CONFIRM_PURCHASE_BUTTON).first
             timeout_ms = self._timeout_ms
 
             for attempt in range(2):
@@ -250,19 +234,19 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _select_payment_method(self, session: AutomationSession) -> None:
         self._goto(self._settings.url_seleciona_pix_ou_cartao)
-        self._click(self._selectors.card_selector(self._settings.final_cartao_credito))
+        self._click(Selectors.card_selector(self._settings.final_cartao_credito))
 
     def _confirm_payment(self, session: AutomationSession) -> None:
-        self._click(self._selectors.continue_payment_button)
-        self._fill(self._selectors.security_code_field, self._settings.codigo_de_seguranca_do_cartao_de_credito)
-        self._click(self._selectors.confirm_payment_button)
+        self._click(Selectors.CONTINUE_PAYMENT_BUTTON)
+        self._fill(Selectors.SECURITY_CODE_FIELD, self._settings.codigo_de_seguranca_do_cartao_de_credito)
+        self._click(Selectors.CONFIRM_PAYMENT_BUTTON)
 
     def _finish_bet(self, session: AutomationSession) -> str:
         self._goto(self._settings.url_finaliza_a_aposta_processando)
-        self._page.wait_for_selector(self._selectors.finished_order_text)
+        self._page.wait_for_selector(Selectors.FINISHED_ORDER_TEXT.value)
         tracking_code = self._tracking_code_from_url(self._page.url)
-        self._click(self._selectors.logged_in_login_button)
-        self._click(self._selectors.logout_button)
+        self._click(Selectors.LOGGED_IN_LOGIN_BUTTON)
+        self._click(Selectors.LOGOUT_BUTTON)
         return tracking_code
 
     def _run_on_browser_thread(self, action, *args):
@@ -274,11 +258,12 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _goto(self, url: str) -> None:
         self._require_page().goto(url, wait_until="domcontentloaded", timeout=self._timeout_ms)
 
-    def _click(self, selector: str) -> bool:
+    def _click(self, selector: Selectors | str) -> bool:
         return self._click_if_exists(selector, False)
 
-    def _click_if_exists(self, selector: str, check_selector: bool) -> bool:
-        element = self._require_page().locator(selector)
+    def _click_if_exists(self, selector: Selectors | str, check_selector: bool) -> bool:
+        selector_value = self._selector_value(selector)
+        element = self._require_page().locator(selector_value).first
         if check_selector:
             timeout_ms = self._timeout_ms
             try:
@@ -289,7 +274,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 logger.debug(
                     "Clique ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
                     timeout_ms,
-                    selector,
+                    selector_value,
                 )
             return False
 
@@ -298,11 +283,12 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
 
 
-    def _fill(self, selector: str, value: str) -> bool:
+    def _fill(self, selector: Selectors | str, value: str) -> bool:
         return self._fill_if_exists(selector, value, False)
 
-    def _fill_if_exists(self, selector: str, value: str, check_selector: bool) -> bool:
-        element = self._require_page().locator(selector)
+    def _fill_if_exists(self, selector: Selectors | str, value: str, check_selector: bool) -> bool:
+        selector_value = self._selector_value(selector)
+        element = self._require_page().locator(selector_value).first
         if check_selector:
             timeout_ms = self._timeout_ms
             try:
@@ -313,12 +299,19 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 logger.debug(
                     "Preenchimento ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
                     timeout_ms,
-                    selector,
+                    selector_value,
                 )
             return False
 
         element.fill(value)
         return True
+
+    @staticmethod
+    def _selector_value(selector: Selectors | str) -> str:
+        if isinstance(selector, Selectors):
+            return selector.value
+        return selector
+
 
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
