@@ -38,26 +38,26 @@ class RunBetFlowUseCase:
             if not self._session.is_open:
                 self._session_control.start()
 
-            self._execute(Operation.SELECT_LOTTERY_MODALITY, self._browser.select_lottery_modality)
-            self._execute(Operation.CHOOSE_RANDOM_NUMBERS, self._browser.choose_random_numbers)
-            self._execute(Operation.ADD_BET_TO_CART, self._browser.add_bet_to_cart)
+            self._execute(Operation.SELECT_LOTTERY_MODALITY, lambda _: self._browser.select_lottery_modality())
+            self._execute(Operation.CHOOSE_RANDOM_NUMBERS, lambda _: self._browser.choose_random_numbers())
+            self._execute(Operation.ADD_BET_TO_CART, lambda _: self._browser.add_bet_to_cart())
             self._execute(Operation.CONFIRM_PURCHASE, self._browser.confirm_purchase)
-            self._execute(Operation.SELECT_PAYMENT_METHOD, self._browser.select_payment_method)
+            self._execute(Operation.SELECT_PAYMENT_METHOD, lambda _: self._browser.select_payment_method())
 
             self._session.mark_running(Operation.CONFIRM_PAYMENT)
             self._payment_authorization.require_confirmation()
-            self._browser.confirm_payment(self._session)
+            self._browser.confirm_payment()
             logger.info("Operação concluída", extra=Operation.executed_operation(self._session.executed_operation))
 
             self._session.mark_running(Operation.COMPLETE_BET)
-            tracking_code = self._browser.finish_bet(self._session)
+            tracking_code = self._browser.finish_bet()
             self._session.mark_finished(tracking_code)
             self._session_control.close_if_open()
             return AutomationRunResult(
                 session_id=self._session.id,
                 status="finished",
                 message="Aposta finalizada com sucesso.",
-                executed_operation=Operation.COMPLETE_BET,
+                executed_operation=self._session.executed_operation,
                 tracking_code=tracking_code,
             )
         except AutomationError as exc:

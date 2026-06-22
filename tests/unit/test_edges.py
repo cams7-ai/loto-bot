@@ -327,9 +327,10 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
         LOTTOBOT_BROWSER_TIMEOUT_SECONDS=12,
     )
     browser = PlaywrightBrowserAutomation(settings)
+    session = AutomationSession()
 
     async def start_inside_asyncio_loop():
-        return browser.start(AutomationSession())
+        return browser.start(session)
 
     tab_id = asyncio.run(start_inside_asyncio_loop())
     browser.stop()

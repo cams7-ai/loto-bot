@@ -13,16 +13,13 @@ class BrowserAutomationPort(Protocol):
     def stop(self) -> None:
         """Fecha a sessão ativa."""
 
-    def access_home(self, session: AutomationSession) -> None:
+    def access_home(self) -> None:
         """Acessa a home autenticável."""
-
-    def access_lottery_portal(self, session: AutomationSession) -> None:
-        """Acessa o portal Loterias Online."""
 
     def is_authenticated(self, click_login_button: bool) -> bool:
         """Verifica se a sessão está autenticada no portal."""
 
-    def accept_terms(self, session: AutomationSession) -> None:
+    def accept_terms(self) -> None:
         """Aceita os termos de uso."""
 
     def submit_cpf(self, session: AutomationSession) -> None:
@@ -40,23 +37,23 @@ class BrowserAutomationPort(Protocol):
     def disable_notification(self) -> None:
         """Desabilita notificações do portal."""
 
-    def select_lottery_modality(self, session: AutomationSession) -> None:
+    def select_lottery_modality(self) -> None:
         """Seleciona a modalidade."""
 
-    def choose_random_numbers(self, session: AutomationSession) -> None:
+    def choose_random_numbers(self) -> None:
         """Completa o jogo com números aleatórios."""
 
-    def add_bet_to_cart(self, session: AutomationSession) -> None:
+    def add_bet_to_cart(self) -> None:
         """Adiciona a aposta ao carrinho."""
 
     def confirm_purchase(self, session: AutomationSession) -> None:
         """Confirma a compra."""
 
-    def select_payment_method(self, session: AutomationSession) -> None:
+    def select_payment_method(self) -> None:
         """Seleciona a forma de pagamento."""
 
-    def confirm_payment(self, session: AutomationSession) -> None:
+    def confirm_payment(self) -> None:
         """Confirma o pagamento no portal."""
 
-    def finish_bet(self, session: AutomationSession) -> str:
+    def finish_bet(self) -> str:
         """Finaliza a aposta e retorna o código de acompanhamento."""

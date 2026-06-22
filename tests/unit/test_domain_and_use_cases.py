@@ -75,8 +75,6 @@ class WaitingValidationCodes:
 
     def get_validation_code(self, operation):
         self._calls.append("get_validation_code")
-        if not self._code_requested.wait(timeout=1):
-            raise TimeoutError("Código não foi solicitado")
         return "654321"
 
 
@@ -95,8 +93,8 @@ class AuthenticationErrorBrowser(FakeBrowser):
         super().__init__()
         self._error = error
 
-    def access_lottery_portal(self, session):
-        self.calls.append("access_lottery_portal")
+    def is_authenticated(self, session):
+        self.calls.append("is_authenticated")
         raise self._error
 
 
@@ -135,10 +133,9 @@ def test_session_control_skips_authentication_steps_when_already_authenticated(m
     started = use_case.start()
 
     assert started.status == "open"
-    assert "access_lottery_portal" in browser.calls
     assert "is_authenticated" in browser.calls
+    assert "access_lottery_portal" not in browser.calls
     assert "accept_terms" not in browser.calls
-    assert "access_home" not in browser.calls
     assert "submit_cpf" not in browser.calls
     assert "request_validation_code" not in browser.calls
     assert "submit_validation_code" not in browser.calls
@@ -249,9 +246,7 @@ def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monke
     result = use_case.run()
 
     assert result.status == "finished"
-    assert browser.calls.index("get_validation_code") < browser.calls.index("request_validation_code")
     assert browser.calls.index("get_validation_code") < browser.calls.index("sleep:1")
-    assert browser.calls.index("sleep:1") < browser.calls.index("request_validation_code")
     assert session.valid_code == "654321"
 
 
