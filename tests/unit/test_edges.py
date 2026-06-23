@@ -368,8 +368,11 @@ def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
         def wait_for_url(self, pattern, timeout):
             self.pattern = pattern
             self.timeout = timeout
+            if "registration" in pattern.pattern:
+                raise TimeoutError
 
     session = AutomationSession()
+    session.mark_running(Operation.SUBMIT_CPF)
     browser._page = FakePage()
 
     browser._sync_auth_session_from_current_url(session)
@@ -386,7 +389,8 @@ def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
         url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
 
         def wait_for_url(self, pattern, timeout):
-            pass
+            if "registration" in pattern.pattern:
+                raise TimeoutError
 
     session = AutomationSession(tab_id="tab-original", execution="exec-original")
     browser._page = FakePage()
@@ -395,6 +399,73 @@ def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
 
     assert session.execution == "exec-original"
     assert session.tab_id == "tab-original"
+
+
+def test_playwright_browser_raises_when_cpf_redirects_from_authenticate_to_registration():
+    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+
+    class FakePage:
+        url = (
+            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
+            "?execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
+        )
+
+        def wait_for_url(self, pattern, timeout):
+            if "registration" in pattern.pattern:
+                self.url = (
+                    "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
+                    "?client_id=cli-web-lce&tab_id=tab-real"
+                )
+
+    session = AutomationSession()
+    session.mark_running(Operation.SUBMIT_CPF)
+    browser._page = FakePage()
+
+    with pytest.raises(AutomationError, match="CPF Inválido") as exc:
+        browser._sync_auth_session_from_current_url(session)
+
+    assert session.execution == "exec-real"
+    assert session.tab_id == "tab-real"
+    assert exc.value.operation == Operation.SUBMIT_CPF
+
+
+def test_playwright_browser_request_validation_code_converts_click_timeout_after_registration_redirect():
+    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+
+    class Locator:
+        def __init__(self, page, selector):
+            self._page = page
+            self._selector = selector
+            self.first = self
+
+        def count(self):
+            return 0
+
+        def click(self):
+            if self._selector == Selectors.RECEIVE_CODE_BUTTON:
+                self._page.url = (
+                    "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
+                    "?client_id=cli-web-lce&tab_id=tab-real"
+                )
+                raise TimeoutError("Timeout 5000ms exceeded")
+
+    class Page:
+        url = (
+            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
+            "?execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
+        )
+
+        def locator(self, selector):
+            return Locator(self, selector)
+
+    session = AutomationSession()
+    session.mark_running(Operation.REQUEST_VALIDATION_CODE)
+    browser._page = Page()
+
+    with pytest.raises(AutomationError, match="CPF Inválido") as exc:
+        browser._request_validation_code(session)
+
+    assert exc.value.operation == Operation.SUBMIT_CPF
 
 
 def test_playwright_browser_checks_authentication_on_browser_thread():
@@ -473,6 +544,7 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
         raise AssertionError(f"Nao deveria navegar diretamente para {url}")
 
     browser._goto = fail_goto
+    browser._raise_if_unregistered_cpf = lambda operation: actions.append(("registration-check", operation))
     browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
     browser._click = lambda selector: actions.append(("click", selector))
     browser._fill = lambda selector, value: actions.append(("fill", selector, value))

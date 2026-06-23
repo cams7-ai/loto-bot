@@ -21,6 +21,8 @@ from infrastructure import Settings, Selectors
 logger = logging.getLogger(__name__)
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
+    _INVALID_CPF = "CPF Inválido"
+
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._playwright: Any | None = None
@@ -126,14 +128,13 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._submit_cpf, session)
 
     def _submit_cpf(self, session: AutomationSession) -> None:
-        error_message = "CPF Inválido"
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
         self._fill(Selectors.CPF_FIELD, self._settings.cpf)
         self._click(Selectors.CPF_NEXT_BUTTON)
-        self._raise_if_invalid_cpf(session.executed_operation, error_message)
+        self._raise_if_invalid_cpf(session.executed_operation)
         self._sync_auth_session_from_current_url(session)
 
-    def _raise_if_invalid_cpf(self, operation: Operation, error_message: str) -> None:
+    def _raise_if_invalid_cpf(self, operation: Operation) -> None:
         page = self._require_page()
         try:
             page.locator(Selectors.CPF_INVALID_ALERT).first.wait_for(
@@ -143,7 +144,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception:
             return
 
-        raise AutomationError(error_message, operation=operation)
+        raise AutomationError(self._INVALID_CPF, operation=operation)
 
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
@@ -159,13 +160,38 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             session.execution = execution
         if tab_id:
             session.tab_id = tab_id
+        self._raise_if_unregistered_cpf(session)
+
+    def _raise_if_unregistered_cpf(self, session: AutomationSession) -> None:
+        operation = Operation.SUBMIT_CPF
+        page = self._require_page()
+        if self._is_registration_url(page.url):
+            session.mark_running(operation)
+            raise AutomationError(self._INVALID_CPF, operation=session.executed_operation)
+
+        try:
+            page.wait_for_url(re.compile(r".*/login-actions/registration.*"), timeout=self._short_timeout_ms)
+        except Exception:
+            return
+
+        session.mark_running(operation)
+        raise AutomationError(self._INVALID_CPF, operation=session.executed_operation)
+
+    @staticmethod
+    def _is_registration_url(url: str) -> bool:
+        return "/login-actions/registration" in url
 
     def request_validation_code(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._request_validation_code, session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
+        self._raise_if_unregistered_cpf(session)
         self._raise_if_forbidden(session.executed_operation)
-        self._click(Selectors.RECEIVE_CODE_BUTTON)
+        try:
+            self._click(Selectors.RECEIVE_CODE_BUTTON)
+        except Exception:
+            self._raise_if_unregistered_cpf(session)
+            raise
 
     def submit_validation_code(self, session: AutomationSession, code: str) -> None:
         self._run_on_browser_thread(self._submit_validation_code, session, code)

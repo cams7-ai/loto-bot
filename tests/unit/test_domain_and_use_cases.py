@@ -68,7 +68,11 @@ class FakeNotifier:
 
 
 class FakeValidationCodes:
+    def __init__(self) -> None:
+        self.calls: list[Operation] = []
+
     def get_validation_code(self, operation):
+        self.calls.append(operation)
         return "654321"
 
 
@@ -100,6 +104,12 @@ class AuthenticationErrorBrowser(FakeBrowser):
     def is_authenticated(self, session):
         self.calls.append("is_authenticated")
         raise self._error
+
+
+class InvalidCpfOnValidationCodeBrowser(FakeBrowser):
+    def request_validation_code(self, session):
+        self.calls.append("request_validation_code")
+        raise AutomationError("CPF Inválido", operation=Operation.REQUEST_VALIDATION_CODE)
 
 
 class AuthenticatedBrowser(FakeBrowser):
@@ -205,6 +215,28 @@ def test_session_control_keeps_whatsapp_session_when_failure_notification_has_no
     assert browser.open is False
     assert browser.calls[-1] == "stop"
     assert notifier.stopped is False
+
+
+def test_session_control_does_not_read_code_for_invalid_cpf(monkeypatch):
+    session = AutomationSession()
+    browser = InvalidCpfOnValidationCodeBrowser()
+    validation_codes = FakeValidationCodes()
+    notifier = FakeNotifier()
+    monkeypatch.setattr(session_control_module, "sleep", lambda seconds: browser.calls.append(f"sleep:{seconds}"))
+    use_case = SessionControlUseCase(session, browser, validation_codes, notifier)
+
+    try:
+        use_case.start()
+    except AutomationError as exc:
+        assert str(exc) == "CPF Inválido"
+        assert exc.operation == Operation.REQUEST_VALIDATION_CODE
+    else:
+        raise AssertionError("Erro esperado")
+
+    assert validation_codes.calls == []
+    assert notifier.messages
+    assert session.status.value == "closed"
+    assert browser.open is False
 
 
 def test_session_control_rejects_invalid_lifecycle(monkeypatch):

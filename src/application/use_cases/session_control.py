@@ -71,13 +71,14 @@ class SessionControlUseCase:
         self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_home())
         self._execute(Operation.SUBMIT_CPF, self._browser.submit_cpf)
 
+        operation = Operation.REQUEST_VALIDATION_CODE
+        self._execute(operation, self._browser.request_validation_code)
+
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="lotobot-validation-code") as executor:
-            operation = Operation.REQUEST_VALIDATION_CODE
             validation_code_request_started = Event()
             validation_code = self._request_validation_code_async(executor, validation_code_request_started, operation)
             validation_code_request_started.wait()
             sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
-            self._execute(operation, self._browser.request_validation_code)
             self._session.valid_code = validation_code.result()
 
         self._execute(Operation.SUBMIT_VALIDATION_CODE, self._submit_validation_code)
