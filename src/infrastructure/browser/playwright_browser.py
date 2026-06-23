@@ -126,10 +126,39 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._submit_cpf, session)
 
     def _submit_cpf(self, session: AutomationSession) -> None:
+        error_message = "CPF Inválido"
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
         self._fill(Selectors.CPF_FIELD, self._settings.cpf)
         self._click(Selectors.CPF_NEXT_BUTTON)
+        self._raise_if_invalid_cpf(session.executed_operation, error_message)
         self._sync_auth_session_from_current_url(session)
+
+    def _raise_if_invalid_cpf(self, operation: Operation, error_message: str) -> None:
+        page = self._require_page()
+        try:
+            page.locator(Selectors.CPF_INVALID_ALERT).first.wait_for(
+                state="visible",
+                timeout=self._short_timeout_ms,
+            )
+        except Exception:
+            return
+
+        raise AutomationError(error_message, operation=operation)
+
+    def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
+        page = self._require_page()
+        try:
+            page.wait_for_url(re.compile(r".*/login-actions/authenticate.*"), timeout=self._timeout_ms)
+        except Exception:
+            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA")
+
+        params = parse_qs(urlparse(page.url).query)
+        execution = self._first_query_param(params, "execution")
+        tab_id = self._first_query_param(params, "tab_id")
+        if execution:
+            session.execution = execution
+        if tab_id:
+            session.tab_id = tab_id
 
     def request_validation_code(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._request_validation_code, session)
@@ -308,21 +337,6 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             return selector.value
         return selector
 
-    def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
-        page = self._require_page()
-        try:
-            page.wait_for_url(re.compile(r".*/login-actions/authenticate.*"), timeout=self._timeout_ms)
-        except Exception:
-            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA")
-
-        params = parse_qs(urlparse(page.url).query)
-        execution = self._first_query_param(params, "execution")
-        tab_id = self._first_query_param(params, "tab_id")
-        if execution:
-            session.execution = execution
-        if tab_id:
-            session.tab_id = tab_id
-
     def _raise_if_forbidden(self, operation: Operation) -> None:
         page = self._require_page()
         title = page.locator("h1.error-header__title")
@@ -351,6 +365,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     @property
     def _timeout_ms(self) -> int:
         return self._settings.browser_timeout_seconds * 1000
+
+    @property
+    def _short_timeout_ms(self) -> int:
+        return min(2000, self._timeout_ms)
 
     def _add_init_script(self) -> None:
         if self._context is None:

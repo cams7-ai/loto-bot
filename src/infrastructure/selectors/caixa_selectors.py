@@ -14,6 +14,7 @@ class Selectors(StrEnum):
     # Informa o CPF
     CPF_FIELD = "//input[@id='username']"
     CPF_NEXT_BUTTON = "//button[@id='button-submit']"
+    CPF_INVALID_ALERT = "//div[@id='username-alert' and @style='display: block;']"
     # Solicita o código de acesso
     RECEIVE_CODE_BUTTON = "//*[@id='form-login']//button[@name='login']"
     # Informa o código de acesso
