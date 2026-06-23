@@ -10,15 +10,15 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
-from api.dependencies import get_container
-from api.server import app
 from domain import (
     Operation,
     AutomationSession, 
+    AutomationError,
+    ErrorCode,
     ExternalServiceError, 
     PaymentAuthorization,
 )
+from application import RunBetFlowUseCase
 from infrastructure import (
     Settings,
     configure_logging,
@@ -29,7 +29,8 @@ from infrastructure import (
     PlaywrightBrowserAutomation,
     Selectors,
 )
-
+from api.dependencies import get_container
+from api.server import app
 
 class NoopNotifier:
     def start_whatsapp_session(self, session):
@@ -38,8 +39,9 @@ class NoopNotifier:
     def stop_whatsapp_session(self, session):
         pass
 
-    def notify_failure(self, session, message):
-        self.message = message
+    def notify_failure(self, session, error_code, whatsapp_message, mail_message):
+        self.message = whatsapp_message
+        return False
 
 
 class BrokenBrowser:
@@ -49,7 +51,7 @@ class BrokenBrowser:
     def stop(self):
         self.stopped = True
 
-    def access_lottery_portal(self, session):
+    def access_home(self, click_login_button):
         raise ValueError("quebrou")
 
 
@@ -64,16 +66,19 @@ def response(status_code: int, payload: dict | None = None) -> httpx.Response:
 
 def test_run_bet_flow_handles_unexpected_exception():
     session = AutomationSession()
+    session.mark_open("tab")
     browser = BrokenBrowser()
     notifier = NoopNotifier()
-    control = SessionControlUseCase(session, browser, CodeReader(), notifier)
-    use_case = RunBetFlowUseCase(session, browser, notifier, control, PaymentAuthorization(True))
+    use_case = RunBetFlowUseCase(session, browser, notifier, PaymentAuthorization(True))
 
-    result = use_case.run()
+    try:
+        use_case.run()
+    except AutomationError as exc:
+        assert "quebrou" in str(exc)
+    else:
+        raise AssertionError("Erro esperado")
 
-    assert result.status == "failed"
-    assert "inesperado" in result.message
-    assert browser.stopped is True
+    assert session.status.value == "failed"
 
 
 def test_clients_error_edges():
@@ -136,19 +141,19 @@ def test_notification_gateway_success_and_stop_warning():
         def status(self, operation):
             return "SESSAO_ABERTA"
 
-        def send_message(self, message):
+        def send_message(self, operation, message):
             return "enviado"
 
     class Mail:
-        def send(self, subject, body):
+        def send(self, operation, subject, body):
             raise AssertionError("Não deveria enviar e-mail")
 
     session = AutomationSession()
     session.executed_operation = Operation.UNKNOWN_OPERATION
-    gateway = NotificationGateway(WhatsApp(), Mail())
+    gateway = NotificationGateway(WhatsApp(), Mail(), whatsapp_enabled=True)
 
     gateway.start_whatsapp_session(session)
-    gateway.notify_failure(session, "ok")
+    gateway.notify_failure(session, ErrorCode.AUTOMATION_ERROR_CODE, "Mensagem de falha", "Mensagem de falha por e-mail")
     gateway.stop_whatsapp_session(session)
 
     assert session.whatsapp_enabled is False
@@ -208,7 +213,7 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
     session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
-    gateway.notify_failure(session, "Falha")
+    gateway.notify_failure(session, ErrorCode.AUTOMATION_ERROR_CODE, "Mensagem de falha", "Mensagem de falha por e-mail")
 
 
 def test_settings_selectors_and_logging(monkeypatch):

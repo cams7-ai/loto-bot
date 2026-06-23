@@ -5,7 +5,7 @@ import pytest
 
 from api.dependencies import get_container
 from api.server import app
-from application.dto import AutomationRunResult, SessionStatusResult
+from application import AutomationRunResult, SessionStatusResult
 from domain import Operation, BrowserSessionClosedError, BrowserSessionOpenError
 
 
@@ -94,7 +94,7 @@ async def test_run_bet_route_returns_failed_flow_without_real_network():
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/v1/bets/run")
 
-    assert response.status_code == 422
+    assert response.status_code == 200
     assert response.json()["status"] == "failed"
     assert response.json()["executedOperation"] == "Confirma o pagamento"
 

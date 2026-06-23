@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from domain.entities import Operation
+from domain.enums import Operation
 from domain.exceptions import PaymentConfirmationDisabledError
 
 @dataclass(frozen=True)

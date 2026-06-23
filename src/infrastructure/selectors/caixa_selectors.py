@@ -6,16 +6,23 @@ from enum import StrEnum
 
 
 class Selectors(StrEnum):
+    #Aceita os termos de uso
     PRIVACY_YES_BUTTON = "//button[@id='adopt-accept-all-button']"
     TERMS_YES_BUTTON = "//a[@id='botaosim']"
+    #Home
     LOGGED_OFF_LOGIN_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='btnLogin']"
+    # Informa o CPF
     CPF_FIELD = "//input[@id='username']"
     CPF_NEXT_BUTTON = "//button[@id='button-submit']"
+    # Solicita o código de acesso
     RECEIVE_CODE_BUTTON = "//*[@id='form-login']//button[@name='login']"
+    # Informa o código de acesso
     CODE_FIELD = "//input[@id='codigo']"
     CODE_SEND_BUTTON = "//*[@id='form-login']//button[@name='login']"
+    #Informa a senha
     PASSWORD_FIELD = "//*[@id='password']"
     PASSWORD_ENTER_BUTTON = "//*[@id='template-section']//button[text()='Entrar']"
+
     LOGGED_IN_LOGIN_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
     LOGGED_IN_USER_NOTIFICATIONS_LINK = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
     DO_NOT_SHOW_NOTIFICATION_CHECKBOX = "//div[contains(@class,'modal-notificacao')]//input[@type='checkbox' and contains(@aria-label,'Não mostrar mais')]"

@@ -1,6 +1,10 @@
-from domain.entities import (
+from domain.enums import (
     Operation,
     ErrorCode,
+    WhatsAppSessionStatus,
+    WhatsAppMessageStatus,
+)
+from domain.entities import (
     AutomationSession,
     AutomationStatus,
 )
@@ -16,6 +20,8 @@ from domain.value_objects import PaymentAuthorization
 __all__ = [
     "Operation",
     "ErrorCode",
+    "WhatsAppSessionStatus",
+    "WhatsAppMessageStatus",
     "AutomationSession",
     "AutomationStatus",
     "AutomationError",

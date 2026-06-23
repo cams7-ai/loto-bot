@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from application.use_cases import RunBetFlowUseCase, SessionControlUseCase
+from application import RunBetFlowUseCase, SessionControlUseCase
 from domain import AutomationSession, PaymentAuthorization
 from infrastructure import (
     PlaywrightBrowserAutomation, 
@@ -38,7 +38,6 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         session=session,
         browser=browser,
         notifier=notifier,
-        session_control=session_control,
         payment_authorization=PaymentAuthorization(resolved_settings.confirma_pagamento),
     )
     return AppContainer(

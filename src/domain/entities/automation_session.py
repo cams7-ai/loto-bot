@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID, uuid4
-from domain.entities.operation import Operation
+
+from domain.enums import Operation
 
 class AutomationStatus(StrEnum):
     CLOSED = "closed"
@@ -29,11 +30,7 @@ class AutomationSession:
 
     @property
     def is_open(self) -> bool:
-        return self.status in {
-            AutomationStatus.OPEN,
-            AutomationStatus.RUNNING,
-            AutomationStatus.FINISHED,
-        }
+        return self.status != AutomationStatus.CLOSED
 
     def mark_open(self, tab_id: str) -> None:
         self.executed_operation = Operation.START_SESSION
@@ -52,7 +49,7 @@ class AutomationSession:
         self.executed_operation = operation
         self.status = AutomationStatus.FAILED
 
-    def mark_closed(self) -> None:
-        self.executed_operation = Operation.END_SESSION
+    def mark_closed(self, operation: Operation | None = None) -> None:
+        self.executed_operation = operation if operation is not None else Operation.END_SESSION
         self.status = AutomationStatus.CLOSED
         self.whatsapp_enabled = False

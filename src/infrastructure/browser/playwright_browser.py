@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from application.ports import BrowserAutomationPort
+from application import BrowserAutomationPort
 from domain import (
     Operation, 
     AutomationSession, 
@@ -83,12 +83,13 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._page = None
         self._playwright = None
 
-    def access_home(self) -> None:
-        self._run_on_browser_thread(self._access_home)
+    def access_home(self, click_login_button: bool = True) -> None:
+        self._run_on_browser_thread(self._access_home, click_login_button)
 
-    def _access_home(self) -> None:
+    def _access_home(self, click_login_button: bool) -> None:
         self._access_home_page()
-        self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
+        if click_login_button:
+            self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
 
     def _access_home_page(self) -> None:
         self._goto(self._settings.url_home)
@@ -211,7 +212,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 screenshot_path.parent.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(screenshot_path), full_page=True)
             except Exception:
-                logger.exception("Não foi possível capturar screenshot da falha na confirmação da compra")
+                #logger.exception("Não foi possível capturar screenshot da falha na confirmação da compra", extra=Operation.executed_operation(self._session.executed_operation))
                 logger.error(
                     "Falha ao confirmar compra; url=%s screenshot=%s",
                     page.url,

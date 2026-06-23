@@ -13,7 +13,7 @@ class BrowserAutomationPort(Protocol):
     def stop(self) -> None:
         """Fecha a sessão ativa."""
 
-    def access_home(self) -> None:
+    def access_home(self, click_login_button: bool = True) -> None:
         """Acessa a home autenticável."""
 
     def is_authenticated(self, click_login_button: bool) -> bool:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from domain.entities import Operation, ErrorCode
+from domain.enums import Operation, ErrorCode
 
 class AutomationError(RuntimeError):
     code = ErrorCode.AUTOMATION_ERROR_CODE

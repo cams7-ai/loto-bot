@@ -7,19 +7,23 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
 from time import sleep
 
-from application.dto import SessionStatusResult
-from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
 from domain import (
     Operation,
     AutomationSession,
-    AutomationError, 
-    BrowserSessionClosedError, 
-    BrowserSessionOpenError,     
+    AutomationError,
+    BrowserSessionClosedError,
+    BrowserSessionOpenError,
+)
+from application.dto import SessionStatusResult
+from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
+from application.services import (
+    handle_failure,
+    handle_custom_failure,
+    close_if_open
 )
 
 logger = logging.getLogger(__name__)
 VALIDATION_CODE_LOOKUP_LEAD_SECONDS = 1
-
 
 class SessionControlUseCase:
     def __init__(
@@ -46,14 +50,10 @@ class SessionControlUseCase:
             if self._authenticate():
                 self._disable_notification(Operation.ACCESS_HOME)
                 logger.info("Sessão de navegador autenticada", extra=Operation.executed_operation(self._session.executed_operation))
-        except AutomationError:
-            self.close_if_open()
-            raise
+        except AutomationError as exc:
+            handle_custom_failure(self._session, self._browser, self._notifier, exc)
         except Exception as exc:
-            error_message = "Erro inesperado ao autenticar a sessão"
-            logger.exception(error_message)
-            self.close_if_open()
-            raise AutomationError(error_message, operation=self._session.executed_operation) from exc
+            handle_failure(self._session, self._browser, self._notifier, exc)
 
         self._session.mark_open(self._session.tab_id)
         return self.status()
@@ -61,13 +61,6 @@ class SessionControlUseCase:
     def _disable_notification(self, operation: Operation) -> None:
         self._session.mark_running(operation)
         self._browser.disable_notification()
-
-    def close_if_open(self) -> None:
-        if self._session.status.value != "closed":
-            self._browser.stop()
-            self._notifier.stop_whatsapp_session(self._session)
-            logger.debug("Fechando sessão de navegador aberta", extra=Operation.executed_operation(self._session.executed_operation))
-        self._session.mark_closed()
 
     def _authenticate(self) -> bool:
         self._execute(Operation.ACCESS_LOTTERY_PORTAL, lambda _: self._browser.access_home())
@@ -111,11 +104,11 @@ class SessionControlUseCase:
         if not self._session.is_open:
             raise BrowserSessionClosedError("A sessão de navegador já está fechada")
 
-        self._browser.stop()
-        self._session.mark_closed()
-        self._notifier.stop_whatsapp_session(self._session)
-        logger.info("Sessão de navegador encerrada", extra=Operation.executed_operation(self._session.executed_operation))
+        self._close()
         return self.status()
+
+    def _close(self) -> None:
+        close_if_open(self._session, self._browser, self._notifier, None,True)
 
     def status(self) -> SessionStatusResult:
         return SessionStatusResult(

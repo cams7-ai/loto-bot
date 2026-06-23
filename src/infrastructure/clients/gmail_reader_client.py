@@ -6,7 +6,7 @@ import logging
 
 import httpx
 
-from application.ports import ValidationCodePort
+from application import ValidationCodePort
 from domain import Operation, ExternalServiceError
 from infrastructure import Settings
 from shared import mask_sensitive_value
@@ -39,6 +39,7 @@ class GmailReaderClient(ValidationCodePort):
             ) from exc
         if response.status_code >= 400:
             raise ExternalServiceError("Não foi possível buscar o código de validação.", operation=operation)
+
         payload = response.json()
         code = str(payload.get("code", "")).strip()
         if not code:

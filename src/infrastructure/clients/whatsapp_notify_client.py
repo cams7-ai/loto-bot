@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-
 import httpx
 
 from domain import Operation, ExternalServiceError
 from infrastructure import Settings
 
-
 logger = logging.getLogger(__name__)
-
 
 class WhatsAppNotifyClient:
     def __init__(self, settings: Settings, client: httpx.Client | None = None) -> None:
