@@ -38,6 +38,7 @@ class SessionFailureHandler:
             notifier=notifier,
             operation=operation,
             error_code=exc.code,
+            error_message=str(exc),
         )
 
         SessionFailureHandler._handle_session_after_failure(
@@ -133,9 +134,10 @@ class SessionFailureHandler:
         notifier: NotificationPort,
         operation: Operation,
         error_code: ErrorCode,
+        error_message: str | None = None
     ) -> bool:
-        whatsapp_message = build_whatsapp_message(operation, error_code)
-        email_message = build_email_message()
+        whatsapp_message = build_whatsapp_message(operation, error_code, error_message)
+        email_message = build_email_message(operation, error_message)
 
         return notifier.notify_failure(
             session,

@@ -21,7 +21,9 @@ from infrastructure import Settings, Selectors
 logger = logging.getLogger(__name__)
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
-    _INVALID_CPF = "CPF Inválido"
+    _AUTHENTICATE_PATH = "/login-actions/authenticate"
+    _REGISTRATION_PATH = "/login-actions/registration"
+    _INVALID_CPF = "O CPF é inválido"
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -89,12 +91,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._access_home, click_login_button)
 
     def _access_home(self, click_login_button: bool) -> None:
-        self._access_home_page()
+        self._goto(self._settings.url_home)
         if click_login_button:
             self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
-
-    def _access_home_page(self) -> None:
-        self._goto(self._settings.url_home)
 
     def is_authenticated(self, click_login_button: bool) -> bool:
         return self._run_on_browser_thread(self._is_authenticated, click_login_button)
@@ -149,9 +148,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
         try:
-            page.wait_for_url(re.compile(r".*/login-actions/authenticate.*"), timeout=self._timeout_ms)
+            page.wait_for_url(re.compile(rf".*{self._AUTHENTICATE_PATH}.*"), timeout=self._timeout_ms)
         except Exception:
-            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA")
+            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA", extra=Operation.executed_operation(session.executed_operation))
 
         params = parse_qs(urlparse(page.url).query)
         execution = self._first_query_param(params, "execution")
@@ -160,38 +159,27 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             session.execution = execution
         if tab_id:
             session.tab_id = tab_id
-        self._raise_if_unregistered_cpf(session)
-
-    def _raise_if_unregistered_cpf(self, session: AutomationSession) -> None:
-        operation = Operation.SUBMIT_CPF
-        page = self._require_page()
-        if self._is_registration_url(page.url):
-            session.mark_running(operation)
-            raise AutomationError(self._INVALID_CPF, operation=session.executed_operation)
-
-        try:
-            page.wait_for_url(re.compile(r".*/login-actions/registration.*"), timeout=self._short_timeout_ms)
-        except Exception:
-            return
-
-        session.mark_running(operation)
-        raise AutomationError(self._INVALID_CPF, operation=session.executed_operation)
-
-    @staticmethod
-    def _is_registration_url(url: str) -> bool:
-        return "/login-actions/registration" in url
 
     def request_validation_code(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._request_validation_code, session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
-        self._raise_if_unregistered_cpf(session)
         self._raise_if_forbidden(session.executed_operation)
         try:
             self._click(Selectors.RECEIVE_CODE_BUTTON)
         except Exception:
-            self._raise_if_unregistered_cpf(session)
+            self._raise_if_unregistered_cpf(session, self._require_page().url)
             raise
+
+    @staticmethod
+    def _raise_if_unregistered_cpf(session: AutomationSession, url: str) -> None:
+        if PlaywrightBrowserAutomation._is_registration_url(url):
+            session.mark_running(Operation.SUBMIT_CPF)
+            raise AutomationError(PlaywrightBrowserAutomation._INVALID_CPF, operation=session.executed_operation)
+
+    @staticmethod
+    def _is_registration_url(url: str) -> bool:
+        return PlaywrightBrowserAutomation._REGISTRATION_PATH in url
 
     def submit_validation_code(self, session: AutomationSession, code: str) -> None:
         self._run_on_browser_thread(self._submit_validation_code, session, code)
@@ -248,7 +236,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             page = self._require_page()
             payment_button = page.locator(Selectors.GO_TO_PAYMENT_BUTTON)
             confirmation_button = page.locator(Selectors.CONFIRM_PURCHASE_BUTTON)
-            timeout_ms = self._timeout_ms
+            timeout_ms = self._short_timeout_ms
 
             for attempt in range(2):
                 payment_button.click(no_wait_after=True)
@@ -318,7 +306,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         selector_value = self._selector_value(selector)
         element = self._require_page().locator(selector_value)
         if check_selector:
-            timeout_ms = self._timeout_ms
+            timeout_ms = self._short_timeout_ms
             try:
                 element.wait_for(state="visible", timeout=timeout_ms)
                 element.click()
@@ -341,7 +329,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         selector_value = self._selector_value(selector)
         element = self._require_page().locator(selector_value)
         if check_selector:
-            timeout_ms = self._timeout_ms
+            timeout_ms = self._short_timeout_ms
             try:
                 element.wait_for(state="visible", timeout=timeout_ms)
                 element.fill(value)

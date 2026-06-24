@@ -401,31 +401,17 @@ def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
     assert session.tab_id == "tab-original"
 
 
-def test_playwright_browser_raises_when_cpf_redirects_from_authenticate_to_registration():
-    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
-
-    class FakePage:
-        url = (
-            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
-            "?execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
-        )
-
-        def wait_for_url(self, pattern, timeout):
-            if "registration" in pattern.pattern:
-                self.url = (
-                    "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
-                    "?client_id=cli-web-lce&tab_id=tab-real"
-                )
-
+def test_playwright_browser_raises_when_cpf_redirects_to_registration():
     session = AutomationSession()
     session.mark_running(Operation.SUBMIT_CPF)
-    browser._page = FakePage()
+    url = (
+        "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
+        "?client_id=cli-web-lce&tab_id=tab-real"
+    )
 
-    with pytest.raises(AutomationError, match="CPF Inválido") as exc:
-        browser._sync_auth_session_from_current_url(session)
+    with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
+        PlaywrightBrowserAutomation._raise_if_unregistered_cpf(session, url)
 
-    assert session.execution == "exec-real"
-    assert session.tab_id == "tab-real"
     assert exc.value.operation == Operation.SUBMIT_CPF
 
 
@@ -462,7 +448,7 @@ def test_playwright_browser_request_validation_code_converts_click_timeout_after
     session.mark_running(Operation.REQUEST_VALIDATION_CODE)
     browser._page = Page()
 
-    with pytest.raises(AutomationError, match="CPF Inválido") as exc:
+    with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
         browser._request_validation_code(session)
 
     assert exc.value.operation == Operation.SUBMIT_CPF
