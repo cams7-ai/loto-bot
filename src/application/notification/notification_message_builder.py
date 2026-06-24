@@ -31,10 +31,10 @@ class NotificationMessageBuilder:
     def build_whatsapp_message(operation: Operation, error_code: ErrorCode, error_message: str | None = None) -> str:
         if error_message is not None:
             if operation == Operation.SUBMIT_CPF:
-                return NotificationMessageBuilder._build_whatsapp_message(operation, "CPF", error_message)
+                return NotificationMessageBuilder._build_whatsapp_message(operation, "CPF inválido", error_message)
 
             if operation == Operation.SUBMIT_PASSWORD:
-                return NotificationMessageBuilder._build_whatsapp_message(operation, "Senha", error_message)
+                return NotificationMessageBuilder._build_whatsapp_message(operation, "Senha inválida", error_message)
 
         return (
             f"❌ {ErrorMessageBuilder.get_error_message(error_code)}.\n\n"
@@ -44,9 +44,9 @@ class NotificationMessageBuilder:
         )
 
     @staticmethod
-    def _build_whatsapp_message(operation: Operation, field: str, error_message: str) -> str:
+    def _build_whatsapp_message(operation: Operation, title: str, error_message: str) -> str:
         return (
-            f"❌ {field} inválido(a).\n\n"
+            f"❌ {title}.\n\n"
             f"Etapa: {operation.value}\n\n"
             f"{error_message}. "
             "Por favor, verifique e tente novamente."

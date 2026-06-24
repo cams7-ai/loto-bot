@@ -23,7 +23,7 @@ class Selectors(StrEnum):
     #Informa a senha
     PASSWORD_FIELD = "//*[@id='password']"
     PASSWORD_ENTER_BUTTON = "//*[@id='template-section']//button[text()='Entrar']"
-
+    PASSWORD_INVALID_ALERT = "//section[@id='template-section']//div[contains(@class,'alert-error') and normalize-space()='Senha inválida.']"
     LOGGED_IN_LOGIN_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
     LOGGED_IN_USER_NOTIFICATIONS_LINK = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
     DO_NOT_SHOW_NOTIFICATION_CHECKBOX = "//div[contains(@class,'modal-notificacao')]//input[@type='checkbox' and contains(@aria-label,'Não mostrar mais')]"

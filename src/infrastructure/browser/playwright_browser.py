@@ -24,6 +24,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     _AUTHENTICATE_PATH = "/login-actions/authenticate"
     _REGISTRATION_PATH = "/login-actions/registration"
     _INVALID_CPF = "O CPF é inválido"
+    _INVALID_PASSWORD = "A senha é inválida"
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -198,6 +199,19 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._raise_if_forbidden(session.executed_operation)
         self._fill(Selectors.PASSWORD_FIELD, self._settings.senha)
         self._click(Selectors.PASSWORD_ENTER_BUTTON)
+        self._raise_if_invalid_password(session.executed_operation)
+
+    def _raise_if_invalid_password(self, operation: Operation) -> None:
+        page = self._require_page()
+        try:
+            page.locator(Selectors.PASSWORD_INVALID_ALERT).first.wait_for(
+                state="visible",
+                timeout=self._short_timeout_ms,
+            )
+        except Exception:
+            return
+
+        raise AutomationError(self._INVALID_PASSWORD, operation=operation)
 
     def disable_notification(self) -> None:
         self._run_on_browser_thread(self._disable_notification)

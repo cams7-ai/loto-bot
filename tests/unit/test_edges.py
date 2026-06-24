@@ -554,6 +554,7 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     browser._goto = fail_goto
     browser._raise_if_unregistered_cpf = lambda operation: actions.append(("registration-check", operation))
     browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
+    browser._raise_if_invalid_password = lambda operation: actions.append(("password-check", operation))
     browser._click = lambda selector: actions.append(("click", selector))
     browser._fill = lambda selector, value: actions.append(("fill", selector, value))
 
