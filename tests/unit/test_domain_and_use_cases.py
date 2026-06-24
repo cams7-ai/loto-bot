@@ -45,6 +45,10 @@ class FakeBrowser:
         self.calls.append("is_authenticated")
         return self.authenticated
 
+    def is_valid_cpf(self):
+        self.calls.append("is_valid_cpf")
+        return True
+
 
 class FakeNotifier:
     def __init__(self, failure_response: object | None = "enviado") -> None:
@@ -107,9 +111,9 @@ class AuthenticationErrorBrowser(FakeBrowser):
 
 
 class InvalidCpfOnValidationCodeBrowser(FakeBrowser):
-    def request_validation_code(self, session):
-        self.calls.append("request_validation_code")
-        raise AutomationError("CPF Inválido", operation=Operation.REQUEST_VALIDATION_CODE)
+    def is_valid_cpf(self):
+        self.calls.append("is_valid_cpf")
+        return False
 
 
 class AuthenticatedBrowser(FakeBrowser):
@@ -228,12 +232,13 @@ def test_session_control_does_not_read_code_for_invalid_cpf(monkeypatch):
     try:
         use_case.start()
     except AutomationError as exc:
-        assert str(exc) == "CPF Inválido"
-        assert exc.operation == Operation.REQUEST_VALIDATION_CODE
+        assert str(exc) == "O CPF é inválido"
+        assert exc.operation == Operation.SUBMIT_CPF
     else:
         raise AssertionError("Erro esperado")
 
     assert validation_codes.calls == []
+    assert "request_validation_code" not in browser.calls
     assert notifier.messages
     assert session.status.value == "closed"
     assert browser.open is False

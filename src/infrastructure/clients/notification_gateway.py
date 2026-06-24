@@ -27,12 +27,10 @@ class NotificationGateway(NotificationPort):
         self,
         whatsapp: WhatsAppNotifyClient,
         mail: MailSenderClient,
-        timezone_name: str = _TIMEZONE,
         whatsapp_enabled: bool = False,
     ) -> None:
         self._whatsapp = whatsapp
         self._mail = mail
-        self._timezone_name = timezone_name
         self._whatsapp_enabled = whatsapp_enabled
 
     def start_whatsapp_session(self, session: AutomationSession) -> None:
@@ -80,12 +78,12 @@ class NotificationGateway(NotificationPort):
     def _send_mail_fallback(self, session: AutomationSession, error_code: ErrorCode, message: str) -> None:
         operation = session.executed_operation
         try:
-            timestamp_timezone = ZoneInfo(self._timezone_name)
+            timestamp_timezone = ZoneInfo(self._TIMEZONE)
         except ZoneInfoNotFoundError:  # pragma: no cover - depends on host timezone database.
-            logger.warning("Timezone %s indisponível; usando UTC-03:00", self._timezone_name, extra=Operation.executed_operation(operation))
+            logger.warning("Timezone %s indisponível; usando UTC-03:00", self._TIMEZONE, extra=Operation.executed_operation(operation))
             timestamp_timezone = timezone(timedelta(hours=-3), name=self._TIMEZONE)
 
-        now = datetime.now(timestamp_timezone).isoformat()
+        now = datetime.now(timestamp_timezone).strftime("%d/%m/%Y %H:%M:%S")
         subject = f"LotoBot - falha durante {operation.value}"
         body = (
             "<html><body>"

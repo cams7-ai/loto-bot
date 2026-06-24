@@ -413,7 +413,7 @@ def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_
             raise TimeoutError("Timeout 5000ms exceeded")
 
     session = AutomationSession()
-    session.mark_running(Operation.REQUEST_VALIDATION_CODE)
+    session.mark_running(Operation.SUBMIT_CPF)
     browser._page = FakePage()
 
     with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
@@ -423,57 +423,92 @@ def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_
     assert exc.value.operation == Operation.SUBMIT_CPF
 
 
-def test_playwright_browser_raises_when_cpf_redirects_to_registration():
-    session = AutomationSession()
-    session.mark_running(Operation.SUBMIT_CPF)
-    url = (
-        "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
-        "?client_id=cli-web-lce&tab_id=tab-real"
-    )
-
-    with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
-        PlaywrightBrowserAutomation._raise_if_unregistered_cpf(session, url)
-
-    assert exc.value.operation == Operation.SUBMIT_CPF
-
-
-def test_playwright_browser_request_validation_code_converts_click_timeout_after_registration_redirect():
+def test_playwright_browser_raises_invalid_password_when_alert_is_visible():
     browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
 
     class Locator:
-        def __init__(self, page, selector):
-            self._page = page
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def wait_for(self, **kwargs):
+            self.kwargs = kwargs
+
+    class Page:
+        def locator(self, selector):
+            assert selector == Selectors.PASSWORD_INVALID_ALERT
+            return Locator()
+
+    browser._page = Page()
+
+    with pytest.raises(AutomationError, match="A senha") as exc:
+        browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
+
+    assert exc.value.operation == Operation.SUBMIT_PASSWORD
+
+
+def test_playwright_browser_raises_invalid_password_when_password_screen_remains_visible():
+    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    waits = []
+
+    class Locator:
+        first = None
+
+        def __init__(self, selector):
             self._selector = selector
             self.first = self
 
-        def count(self):
-            return 0
-
-        def click(self):
-            if self._selector == Selectors.RECEIVE_CODE_BUTTON:
-                self._page.url = (
-                    "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
-                    "?client_id=cli-web-lce&tab_id=tab-real"
-                )
-                raise TimeoutError("Timeout 5000ms exceeded")
+        def wait_for(self, **kwargs):
+            waits.append((self._selector, kwargs))
+            if self._selector == Selectors.PASSWORD_INVALID_ALERT:
+                raise TimeoutError
+            raise TimeoutError("password field still visible")
 
     class Page:
-        url = (
-            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
-            "?execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
-        )
-
         def locator(self, selector):
-            return Locator(self, selector)
+            return Locator(selector)
 
-    session = AutomationSession()
-    session.mark_running(Operation.REQUEST_VALIDATION_CODE)
     browser._page = Page()
 
-    with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
-        browser._request_validation_code(session)
+    with pytest.raises(AutomationError, match="A senha") as exc:
+        browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
 
-    assert exc.value.operation == Operation.SUBMIT_CPF
+    assert exc.value.operation == Operation.SUBMIT_PASSWORD
+    assert waits == [
+        (Selectors.PASSWORD_INVALID_ALERT, {"state": "visible", "timeout": 2000}),
+        (Selectors.PASSWORD_FIELD, {"state": "hidden", "timeout": 5000}),
+    ]
+
+
+def test_playwright_browser_accepts_password_when_password_screen_disappears():
+    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    waits = []
+
+    class Locator:
+        first = None
+
+        def __init__(self, selector):
+            self._selector = selector
+            self.first = self
+
+        def wait_for(self, **kwargs):
+            waits.append((self._selector, kwargs))
+            if self._selector == Selectors.PASSWORD_INVALID_ALERT:
+                raise TimeoutError
+
+    class Page:
+        def locator(self, selector):
+            return Locator(selector)
+
+    browser._page = Page()
+
+    browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
+
+    assert waits == [
+        (Selectors.PASSWORD_INVALID_ALERT, {"state": "visible", "timeout": 2000}),
+        (Selectors.PASSWORD_FIELD, {"state": "hidden", "timeout": 5000}),
+    ]
 
 
 def test_playwright_browser_checks_authentication_on_browser_thread():
@@ -552,7 +587,6 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
         raise AssertionError(f"Nao deveria navegar diretamente para {url}")
 
     browser._goto = fail_goto
-    browser._raise_if_unregistered_cpf = lambda operation: actions.append(("registration-check", operation))
     browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
     browser._raise_if_invalid_password = lambda operation: actions.append(("password-check", operation))
     browser._click = lambda selector: actions.append(("click", selector))

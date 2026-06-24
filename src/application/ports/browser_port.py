@@ -25,6 +25,9 @@ class BrowserAutomationPort(Protocol):
     def submit_cpf(self, session: AutomationSession) -> None:
         """Informa o CPF."""
 
+    def is_valid_cpf(self) -> bool:
+        """Verifica se o CPF informado é válido."""
+
     def request_validation_code(self, session: AutomationSession) -> None:
         """Solicita o código de acesso."""
 

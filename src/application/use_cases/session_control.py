@@ -9,6 +9,7 @@ from time import sleep
 
 from domain import (
     Operation,
+    INVALID_CPF,
     AutomationSession,
     AutomationError,
     BrowserSessionClosedError,
@@ -71,14 +72,13 @@ class SessionControlUseCase:
         self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_home())
         self._execute(Operation.SUBMIT_CPF, self._browser.submit_cpf)
 
-        operation = Operation.REQUEST_VALIDATION_CODE
-        self._execute(operation, self._browser.request_validation_code)
-
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="lotobot-validation-code") as executor:
+            operation = Operation.REQUEST_VALIDATION_CODE
             validation_code_request_started = Event()
             validation_code = self._request_validation_code_async(executor, validation_code_request_started, operation)
             validation_code_request_started.wait()
             sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
+            self._execute(operation, self._browser.request_validation_code)
             self._session.valid_code = validation_code.result()
 
         self._execute(Operation.SUBMIT_VALIDATION_CODE, self._submit_validation_code)
@@ -87,6 +87,9 @@ class SessionControlUseCase:
         return self._browser.is_authenticated(True)
 
     def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation) -> Future[str]:
+        if not self._browser.is_valid_cpf():
+            raise AutomationError(INVALID_CPF, operation=Operation.SUBMIT_CPF)
+
         return executor.submit(self._get_validation_code, request_started, operation)
 
     def _get_validation_code(self, request_started: Event, operation: Operation) -> str:

@@ -12,7 +12,9 @@ from urllib.parse import parse_qs, urlparse
 
 from application import BrowserAutomationPort
 from domain import (
-    Operation, 
+    Operation,
+    INVALID_CPF,
+    INVALID_PASSWORD,
     AutomationSession, 
     AutomationError,
 )
@@ -22,9 +24,6 @@ logger = logging.getLogger(__name__)
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
     _AUTHENTICATE_PATH = "/login-actions/authenticate"
-    _REGISTRATION_PATH = "/login-actions/registration"
-    _INVALID_CPF = "O CPF é inválido"
-    _INVALID_PASSWORD = "A senha é inválida"
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -66,6 +65,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             return token_hex(4)
         except Exception as exc:
             self._stop()
+            logging.debug("Falha ao iniciar a sessão de navegador; encerrando contexto e Playwright", extra=Operation.executed_operation(session.executed_operation))
             raise AutomationError("Não foi possível iniciar a sessão de navegador.", operation=session.executed_operation) from exc
 
     def stop(self) -> None:
@@ -144,17 +144,15 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception:
             return
 
-        raise AutomationError(self._INVALID_CPF, operation=operation)
+        raise AutomationError(INVALID_CPF, operation=operation)
 
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
         try:
             page.wait_for_url(re.compile(rf".*{self._AUTHENTICATE_PATH}.*"), timeout=self._timeout_ms)
         except Exception as exc:
-            logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA", extra=Operation.executed_operation(session.executed_operation))
+            raise AutomationError(INVALID_CPF, operation=session.executed_operation) from exc
 
-            session.mark_running(Operation.SUBMIT_CPF)
-            raise AutomationError(self._INVALID_CPF, operation=session.executed_operation) from exc
         params = parse_qs(urlparse(page.url).query)
         execution = self._first_query_param(params, "execution")
         tab_id = self._first_query_param(params, "tab_id")
@@ -163,26 +161,28 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         if tab_id:
             session.tab_id = tab_id
 
+    def is_valid_cpf(self) -> bool:
+        return self._run_on_browser_thread(self._is_valid_cpf)
+
+    def _is_valid_cpf(self) -> bool:
+        timeout_ms = self._timeout_ms
+        try:
+            self._require_page().locator(Selectors.RECEIVE_CODE_BUTTON).first.wait_for(state="visible", timeout=timeout_ms)
+            return True
+        except Exception:
+            logger.debug(
+                "O CPF não é válido ou o botão de receber código não ficou visível dentro do tempo limite de %d ms: %s",
+                timeout_ms,
+                Selectors.RECEIVE_CODE_BUTTON,
+            )
+        return False
+
     def request_validation_code(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._request_validation_code, session)
 
     def _request_validation_code(self, session: AutomationSession) -> None:
         self._raise_if_forbidden(session.executed_operation)
-        try:
-            self._click(Selectors.RECEIVE_CODE_BUTTON)
-        except Exception:
-            self._raise_if_unregistered_cpf(session, self._require_page().url)
-            raise
-
-    @staticmethod
-    def _raise_if_unregistered_cpf(session: AutomationSession, url: str) -> None:
-        if PlaywrightBrowserAutomation._is_registration_url(url):
-            session.mark_running(Operation.SUBMIT_CPF)
-            raise AutomationError(PlaywrightBrowserAutomation._INVALID_CPF, operation=session.executed_operation)
-
-    @staticmethod
-    def _is_registration_url(url: str) -> bool:
-        return PlaywrightBrowserAutomation._REGISTRATION_PATH in url
+        self._click(Selectors.RECEIVE_CODE_BUTTON)
 
     def submit_validation_code(self, session: AutomationSession, code: str) -> None:
         self._run_on_browser_thread(self._submit_validation_code, session, code)
@@ -209,9 +209,17 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 timeout=self._short_timeout_ms,
             )
         except Exception:
-            return
+            pass
+        else:
+            raise AutomationError(INVALID_PASSWORD, operation=operation)
 
-        raise AutomationError(self._INVALID_PASSWORD, operation=operation)
+        try:
+            page.locator(Selectors.PASSWORD_FIELD).first.wait_for(
+                state="hidden",
+                timeout=self._timeout_ms,
+            )
+        except Exception as exc:
+            raise AutomationError(INVALID_PASSWORD, operation=operation) from exc
 
     def disable_notification(self) -> None:
         self._run_on_browser_thread(self._disable_notification)

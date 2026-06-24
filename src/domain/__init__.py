@@ -4,6 +4,10 @@ from domain.enums import (
     WhatsAppSessionStatus,
     WhatsAppMessageStatus,
 )
+from domain.constants import (
+    INVALID_CPF,
+    INVALID_PASSWORD,
+)
 from domain.entities import (
     AutomationSession,
     AutomationStatus,
@@ -22,6 +26,8 @@ __all__ = [
     "ErrorCode",
     "WhatsAppSessionStatus",
     "WhatsAppMessageStatus",
+    "INVALID_CPF",
+    "INVALID_PASSWORD",
     "AutomationSession",
     "AutomationStatus",
     "AutomationError",
