@@ -149,9 +149,11 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         page = self._require_page()
         try:
             page.wait_for_url(re.compile(rf".*{self._AUTHENTICATE_PATH}.*"), timeout=self._timeout_ms)
-        except Exception:
+        except Exception as exc:
             logger.debug("Não foi possível aguardar a URL de autenticação do Login CAIXA", extra=Operation.executed_operation(session.executed_operation))
 
+            session.mark_running(Operation.SUBMIT_CPF)
+            raise AutomationError(self._INVALID_CPF, operation=session.executed_operation) from exc
         params = parse_qs(urlparse(page.url).query)
         execution = self._first_query_param(params, "execution")
         tab_id = self._first_query_param(params, "tab_id")

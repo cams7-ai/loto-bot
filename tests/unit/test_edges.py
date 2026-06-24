@@ -401,6 +401,28 @@ def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
     assert session.tab_id == "tab-original"
 
 
+def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_out():
+    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+
+    class FakePage:
+        url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
+
+        def wait_for_url(self, pattern, timeout):
+            self.pattern = pattern
+            self.timeout = timeout
+            raise TimeoutError("Timeout 5000ms exceeded")
+
+    session = AutomationSession()
+    session.mark_running(Operation.REQUEST_VALIDATION_CODE)
+    browser._page = FakePage()
+
+    with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
+        browser._sync_auth_session_from_current_url(session)
+
+    assert session.executed_operation == Operation.SUBMIT_CPF
+    assert exc.value.operation == Operation.SUBMIT_CPF
+
+
 def test_playwright_browser_raises_when_cpf_redirects_to_registration():
     session = AutomationSession()
     session.mark_running(Operation.SUBMIT_CPF)
