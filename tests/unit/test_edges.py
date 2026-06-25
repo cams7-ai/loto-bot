@@ -82,7 +82,7 @@ def test_run_bet_flow_handles_unexpected_exception():
 
 
 def test_clients_error_edges():
-    settings = Settings(URL_GMAIL_READER="http://gmail", URL_MAIL_SENDER="http://mail")
+    settings = Settings(GMAIL_READER_URL="http://gmail", MAIL_SENDER_URL="http://mail")
     empty_gmail = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(200, {"code": ""}))))
     failing_mail = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}}))))
 
@@ -102,7 +102,7 @@ def test_clients_error_edges():
 
 
 def test_whatsapp_send_error_with_invalid_json():
-    settings = Settings(URL_WHATSAPP_NOTIFY="http://whatsapp")
+    settings = Settings(WHATSAPP_NOTIFY_URL="http://whatsapp")
     raw = httpx.Response(500, content=b"erro", request=httpx.Request("POST", "http://test"))
     client = WhatsAppNotifyClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: raw)))
 
@@ -115,7 +115,7 @@ def test_whatsapp_send_error_with_invalid_json():
 
 
 def test_whatsapp_start_and_stop_error_branches():
-    settings = Settings(URL_WHATSAPP_NOTIFY="http://whatsapp")
+    settings = Settings(WHATSAPP_NOTIFY_URL="http://whatsapp")
     client = WhatsAppNotifyClient(
         settings,
         httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {"message": "falhou"}}))),
@@ -217,7 +217,7 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
 
 
 def test_settings_selectors_and_logging(monkeypatch):
-    settings = Settings(URL_HOME="http://home", URL_LOGIN_CAIXA="http://login", EXECUTION="exec")
+    settings = Settings(ONLINE_LOTTERY_URL="http://online_lottery", HOME_PATH="/home", LOGIN_URL="http://login", EXECUTION_ID="exec")
     assert "tab" in settings.authentication_url("tab")
     assert "execution=dynamic" in settings.authentication_url("tab", "dynamic")
     assert "state" in settings.cpf_url("state", "nonce")
@@ -240,24 +240,24 @@ def test_lotobot_browser_settings_parse_like_whatsapp_notify(tmp_path, monkeypat
     monkeypatch.chdir(tmp_path)
 
     settings = Settings(
-        LOTTOBOT_BROWSER_PROFILE_DIR="perfil-local",
-        LOTTOBOT_BROWSER_HEADLESS="sim",
-        LOTTOBOT_BROWSER_TIMEOUT_SECONDS=45,
+        BROWSER_PROFILE_DIR="perfil-local",
+        BROWSER_HEADLESS="sim",
+        BROWSER_TIMEOUT_SECONDS=45,
     )
 
     assert settings.browser_headless is True
     assert settings.browser_timeout_seconds == 45
     project_root = Path(__file__).resolve().parents[2]
     assert settings.browser_profile_dir == (project_root / "perfil-local").resolve()
-    assert Settings(LOTTOBOT_BROWSER_HEADLESS="").browser_headless is False
+    assert Settings(BROWSER_HEADLESS="").browser_headless is False
 
 
 def test_lotobot_browser_settings_reject_invalid_values():
     with pytest.raises(ValidationError):
-        Settings(LOTTOBOT_BROWSER_HEADLESS="talvez")
+        Settings(BROWSER_HEADLESS="talvez")
 
     with pytest.raises(ValidationError):
-        Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=0)
+        Settings(BROWSER_TIMEOUT_SECONDS=0)
 
 
 def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch):
@@ -327,9 +327,9 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
     monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_sync_api)
 
     settings = Settings(
-        LOTTOBOT_BROWSER_PROFILE_DIR=tmp_path / "lotobot-profile",
-        LOTTOBOT_BROWSER_HEADLESS=True,
-        LOTTOBOT_BROWSER_TIMEOUT_SECONDS=12,
+        BROWSER_PROFILE_DIR=tmp_path / "lotobot-profile",
+        BROWSER_HEADLESS=True,
+        BROWSER_TIMEOUT_SECONDS=12,
     )
     browser = PlaywrightBrowserAutomation(settings)
     session = AutomationSession()
@@ -356,7 +356,7 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
 
 
 def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
-    settings = Settings(URL_LOGIN_CAIXA="http://login", EXECUTION="<EXECUTION_ID_DA_SESSAO>")
+    settings = Settings(LOGIN_URL="http://login", EXECUTION_ID="<EXECUTION_ID_DA_SESSAO>")
     browser = PlaywrightBrowserAutomation(settings)
 
     class FakePage:
@@ -377,9 +377,9 @@ def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
 
     browser._sync_auth_session_from_current_url(session)
 
-    assert session.execution == "exec-real"
+    assert session.execution_id == "exec-real"
     assert session.tab_id == "tab-real"
-    assert settings.authentication_url(session.tab_id, session.execution).endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
+    assert settings.authentication_url(session.tab_id, session.execution_id).endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
 
 
 def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
@@ -392,17 +392,17 @@ def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
             if "registration" in pattern.pattern:
                 raise TimeoutError
 
-    session = AutomationSession(tab_id="tab-original", execution="exec-original")
+    session = AutomationSession(tab_id="tab-original", execution_id="exec-original")
     browser._page = FakePage()
 
     browser._sync_auth_session_from_current_url(session)
 
-    assert session.execution == "exec-original"
+    assert session.execution_id == "exec-original"
     assert session.tab_id == "tab-original"
 
 
 def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_out():
-    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
 
     class FakePage:
         url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
@@ -424,7 +424,7 @@ def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_
 
 
 def test_playwright_browser_raises_invalid_password_when_alert_is_visible():
-    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
 
     class Locator:
         first = None
@@ -449,7 +449,7 @@ def test_playwright_browser_raises_invalid_password_when_alert_is_visible():
 
 
 def test_playwright_browser_raises_invalid_password_when_password_screen_remains_visible():
-    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
     waits = []
 
     class Locator:
@@ -482,7 +482,7 @@ def test_playwright_browser_raises_invalid_password_when_password_screen_remains
 
 
 def test_playwright_browser_accepts_password_when_password_screen_disappears():
-    browser = PlaywrightBrowserAutomation(Settings(LOTTOBOT_BROWSER_TIMEOUT_SECONDS=5))
+    browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
     waits = []
 
     class Locator:
@@ -592,14 +592,14 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     browser._click = lambda selector: actions.append(("click", selector))
     browser._fill = lambda selector, value: actions.append(("fill", selector, value))
 
-    session = AutomationSession(tab_id="tab", execution="exec")
+    session = AutomationSession(tab_id="tab", execution_id="exec")
     browser._request_validation_code(session)
     browser._submit_validation_code(session, "123456")
     browser._submit_password(session)
 
     assert ("click", Selectors.RECEIVE_CODE_BUTTON) in actions
     assert ("fill", Selectors.CODE_FIELD, "123456") in actions
-    assert ("fill", Selectors.PASSWORD_FIELD, settings.senha) in actions
+    assert ("fill", Selectors.PASSWORD_FIELD, settings.bettor_password) in actions
 
 
 def test_playwright_browser_retries_payment_until_confirmation_modal_is_visible():

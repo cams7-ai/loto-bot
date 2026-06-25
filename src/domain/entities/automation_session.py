@@ -21,7 +21,7 @@ class AutomationSession:
     state: UUID = field(default_factory=uuid4)
     nonce: UUID = field(default_factory=uuid4)
     tab_id: str = ""
-    execution: str = ""
+    execution_id: str = ""
     executed_operation: Operation = Operation.UNKNOWN_OPERATION
     status: AutomationStatus = AutomationStatus.CLOSED
     valid_code: str | None = None

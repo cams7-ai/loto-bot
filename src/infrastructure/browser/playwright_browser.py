@@ -92,7 +92,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._access_home, click_login_button)
 
     def _access_home(self, click_login_button: bool) -> None:
-        self._goto(self._settings.url_home)
+        self._goto(self._settings.home_url)
         if click_login_button:
             self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
 
@@ -117,7 +117,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._accept_terms)
 
     def _accept_terms(self) -> None:
-        self._goto(self._settings.url_termo_de_uso)
+        self._goto(self._settings.terms_of_use_url)
         self._accept_privacy()
         self._click(Selectors.TERMS_YES_BUTTON)
 
@@ -129,7 +129,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _submit_cpf(self, session: AutomationSession) -> None:
         self._goto(self._settings.cpf_url(str(session.state), str(session.nonce)))
-        self._fill(Selectors.CPF_FIELD, self._settings.cpf)
+        self._fill(Selectors.CPF_FIELD, self._settings.bettor_cpf)
         self._click(Selectors.CPF_NEXT_BUTTON)
         self._raise_if_invalid_cpf(session.executed_operation)
         self._sync_auth_session_from_current_url(session)
@@ -154,10 +154,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             raise AutomationError(INVALID_CPF, operation=session.executed_operation) from exc
 
         params = parse_qs(urlparse(page.url).query)
-        execution = self._first_query_param(params, "execution")
+        execution_id = self._first_query_param(params, "execution")
         tab_id = self._first_query_param(params, "tab_id")
-        if execution:
-            session.execution = execution
+        if execution_id:
+            session.execution_id = execution_id
         if tab_id:
             session.tab_id = tab_id
 
@@ -197,7 +197,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _submit_password(self, session: AutomationSession) -> None:
         self._raise_if_forbidden(session.executed_operation)
-        self._fill(Selectors.PASSWORD_FIELD, self._settings.senha)
+        self._fill(Selectors.PASSWORD_FIELD, self._settings.bettor_password)
         self._click(Selectors.PASSWORD_ENTER_BUTTON)
         self._raise_if_invalid_password(session.executed_operation)
 
@@ -232,10 +232,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._select_lottery_modality)
 
     def _select_lottery_modality(self) -> None:
-        self._goto(self._settings.url_home)
+        self._goto(self._settings.home_url)
         self._accept_privacy()
         #self._click_if_exists(Selectors.notification_popup_close, True)
-        self._click(Selectors.modality_button(self._settings.modalidade_selecionada))
+        self._click(Selectors.modality_button(self._settings.selected_lottery_modality))
         if self._click_if_exists(Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON, True):
             logger.debug("Alerta de registro de apostas individuais fechado")
 
@@ -243,7 +243,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._choose_random_numbers)
 
     def _choose_random_numbers(self) -> None:
-        self._goto(self._settings.url_escolhe_numeros_aposta)
+        self._goto(self._settings.bet_number_selection_url)
         self._click(Selectors.COMPLETE_GAME_BUTTON)
 
     def add_bet_to_cart(self) -> None:
@@ -292,22 +292,22 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._run_on_browser_thread(self._select_payment_method)
 
     def _select_payment_method(self) -> None:
-        self._goto(self._settings.url_seleciona_pix_ou_cartao)
-        self._click(Selectors.card_selector(self._settings.final_cartao_credito))
+        self._goto(self._settings.payment_method_selection_url)
+        self._click(Selectors.card_selector(self._settings.credit_card_last_digits))
 
     def confirm_payment(self) -> None:
         self._run_on_browser_thread(self._confirm_payment)
 
     def _confirm_payment(self) -> None:
         self._click(Selectors.CONTINUE_PAYMENT_BUTTON)
-        self._fill(Selectors.SECURITY_CODE_FIELD, self._settings.codigo_de_seguranca_do_cartao_de_credito)
+        self._fill(Selectors.SECURITY_CODE_FIELD, self._settings.credit_card_security_code)
         self._click(Selectors.CONFIRM_PAYMENT_BUTTON)
 
     def finish_bet(self) -> str:
         return self._run_on_browser_thread(self._finish_bet)
 
     def _finish_bet(self) -> str:
-        self._goto(self._settings.url_finaliza_a_aposta_processando)
+        self._goto(self._settings.bet_processing_url)
         self._page.wait_for_selector(Selectors.FINISHED_ORDER_TEXT.value)
         tracking_code = self._tracking_code_from_url(self._page.url)
         self._click(Selectors.LOGGED_IN_LOGIN_BUTTON)

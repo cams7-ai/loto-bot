@@ -21,12 +21,12 @@ class MailSenderClient:
     def send(self, operation: Operation, subject: str, body: str) -> None:
         logger.info("Chamando API Mail Sender para enviar e-mail", extra=Operation.executed_operation(operation))
         response = self._client.post(
-            f"{self._settings.url_mail_sender}/api/v1/mail/send",
+            f"{self._settings.mail_sender_url}/api/v1/mail/send",
             json={
                 "to": self._settings.mail_to,
                 "subject": subject,
                 "body": body,
-                "message_type": self._settings.mail_type,
+                "message_type": self._settings.mail_content_type,
             },
         )
         if response.status_code >= 400:

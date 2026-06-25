@@ -26,9 +26,9 @@ python -m playwright install chromium
 
 Copie `.env.example` para `.env` e preencha apenas localmente. Nunca versionar CPF, senha, CVV, cartão ou códigos reais.
 
-`CONFIRMA_PAGAMENTO=false` é o padrão seguro. O clique real de confirmação de pagamento só é executado quando `CONFIRMA_PAGAMENTO=true`.
+`CONFIRM_PAYMENT=false` é o padrão seguro. O clique real de confirmação de pagamento só é executado quando `CONFIRM_PAYMENT=true`.
 
-As variáveis `LOTTOBOT_BROWSER_PROFILE_DIR`, `LOTTOBOT_BROWSER_HEADLESS` e `LOTTOBOT_BROWSER_TIMEOUT_SECONDS` controlam o Chromium do Playwright. O diretório de perfil persistente é criado automaticamente e caminhos relativos são resolvidos a partir da raiz local do projeto, seguindo o mesmo comportamento usado no `whatsapp-notify`.
+As variáveis `BROWSER_PROFILE_DIR`, `BROWSER_HEADLESS` e `BROWSER_TIMEOUT_SECONDS` controlam o Chromium do Playwright. O diretório de perfil persistente é criado automaticamente e caminhos relativos são resolvidos a partir da raiz local do projeto, seguindo o mesmo comportamento usado no `whatsapp-notify`.
 
 ## Execução
 
@@ -48,7 +48,7 @@ python src/main.py
 python -m pytest
 ```
 
-Os testes usam fakes e `httpx.MockTransport`. Nenhum teste abre o Chromium nem acessa `URL_LOTERIAS_ONLINE`.
+Os testes usam fakes e `httpx.MockTransport`. Nenhum teste abre o Chromium nem acessa `ONLINE_LOTTERY_URL`.
 
 ## Integrações Locais
 

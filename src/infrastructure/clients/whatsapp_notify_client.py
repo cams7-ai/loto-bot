@@ -21,7 +21,7 @@ class WhatsAppNotifyClient:
             extra=Operation.executed_operation(operation),
         )
         response = self._client.get(
-            f"{self._settings.url_whatsapp_notify}/whatsapp/session/start",
+            f"{self._settings.whatsapp_notify_url}/whatsapp/session/start",
             params={
                 "headless": self._settings.whatsapp_headless,
                 "timeoutInSeconds": self._settings.whatsapp_timeout_seconds,
@@ -36,7 +36,7 @@ class WhatsAppNotifyClient:
             "Chamando API WhatsApp Notify para encerrar sessão",
             extra=Operation.executed_operation(operation),
         )
-        response = self._client.get(f"{self._settings.url_whatsapp_notify}/whatsapp/session/stop")
+        response = self._client.get(f"{self._settings.whatsapp_notify_url}/whatsapp/session/stop")
         if response.status_code >= 400:
             self._raise_from_error(response, operation)
         return str(response.json().get("status", ""))
@@ -46,7 +46,7 @@ class WhatsAppNotifyClient:
             "Chamando API WhatsApp Notify para consultar sessão",
             extra=Operation.executed_operation(operation),
         )
-        response = self._client.get(f"{self._settings.url_whatsapp_notify}/whatsapp/session/status")
+        response = self._client.get(f"{self._settings.whatsapp_notify_url}/whatsapp/session/status")
         if response.status_code >= 400:
             self._raise_from_error(response, operation)
         return str(response.json().get("status", ""))
@@ -57,7 +57,7 @@ class WhatsAppNotifyClient:
             extra=Operation.executed_operation(operation),
         )
         response = self._client.post(
-            f"{self._settings.url_whatsapp_notify}/whatsapp/messages/send",
+            f"{self._settings.whatsapp_notify_url}/whatsapp/messages/send",
             json={"contact": self._settings.whatsapp_contact, "message": message},
         )
         if response.status_code >= 400:

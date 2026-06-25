@@ -37,7 +37,7 @@ FastAPI, rotas, schemas, tratamento padronizado de erros e composição de depen
 5. seleciona modalidade;
 6. completa jogo e adiciona ao carrinho;
 7. seleciona pagamento;
-8. exige `CONFIRMA_PAGAMENTO=true`;
+8. exige `CONFIRM_PAYMENT=true`;
 9. confirma pagamento;
 10. valida finalização;
 11. encerra recursos.

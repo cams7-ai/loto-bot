@@ -16,18 +16,18 @@ ENV_FILE = PROJECT_ROOT / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
-    cpf: str = Field(default="<CPF_DO_APOSTADOR>", alias="CPF")
-    senha: str = Field(default="<SENHA_DO_APOSTADOR>", alias="SENHA")
-    url_loterias_online: str = Field(default="https://www.loteriasonline.caixa.gov.br", alias="URL_LOTERIAS_ONLINE")
-    url_termo_de_uso: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/termos-de-uso", alias="URL_TERMO_DE_USO")
-    url_home: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/home", alias="URL_HOME")
+    bettor_cpf: str = Field(default="<CPF_DO_APOSTADOR>", alias="BETTOR_CPF")
+    bettor_password: str = Field(default="<SENHA_DO_APOSTADOR>", alias="BETTOR_PASSWORD")
+    online_lottery_url: str = Field(default="https://www.loteriasonline.caixa.gov.br", alias="ONLINE_LOTTERY_URL")
+    terms_of_use_path: str = Field(default="/silce-web/#/termos-de-uso", alias="TERMS_OF_USE_PATH")
+    home_path: str = Field(default="/silce-web/#/home", alias="HOME_PATH")
     client_id: str = Field(default="cli-web-lce", alias="CLIENT_ID")
-    url_login_caixa: str = Field(default="https://login.caixa.gov.br", alias="URL_LOGIN_CAIXA")
-    execution: str = Field(default="<EXECUTION_ID_DA_SESSAO>", alias="EXECUTION")
+    login_url: str = Field(default="https://login.caixa.gov.br", alias="LOGIN_URL")
+    execution_id: str = Field(default="<EXECUTION_ID_DA_SESSAO>", alias="EXECUTION_ID")
 
-    url_gmail_reader: str = Field(default="http://localhost:8001", alias="URL_GMAIL_READER")
-    url_mail_sender: str = Field(default="http://localhost:8002", alias="URL_MAIL_SENDER")
-    url_whatsapp_notify: str = Field(default="http://localhost:8003", alias="URL_WHATSAPP_NOTIFY")
+    gmail_reader_url: str = Field(default="http://localhost:8001", alias="GMAIL_READER_URL")
+    mail_sender_url: str = Field(default="http://localhost:8002", alias="MAIL_SENDER_URL")
+    whatsapp_notify_url: str = Field(default="http://localhost:8003", alias="WHATSAPP_NOTIFY_URL")
 
     validation_code_wait_timeout_seconds: int = Field(default=30, alias="VALIDATION_CODE_WAIT_TIMEOUT_SECONDS")
     whatsapp_headless: bool = Field(default=True, alias="WHATSAPP_HEADLESS")
@@ -35,21 +35,21 @@ class Settings(BaseSettings):
     whatsapp_timeout_seconds: int = Field(default=10, alias="WHATSAPP_TIMEOUT_SECONDS")
     whatsapp_contact: str = Field(default="Notificação via App", alias="WHATSAPP_CONTACT")
     mail_to: str = Field(default="<EMAIL_DESTINATARIO>", alias="MAIL_TO")
-    mail_type: str = Field(default="HTML", alias="MAIL_TYPE")
+    mail_content_type: str = Field(default="HTML", alias="MAIL_CONTENT_TYPE")
 
-    modalidade_selecionada: str = Field(default="mega-sena", alias="MODALIDADE_SELECIONADA")
-    url_escolhe_numeros_aposta: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/mega-sena", alias="URL_ESCOLHE_NUMEROS_APOSTA")
-    url_seleciona_pix_ou_cartao: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/carrinho/pagamento#container-meio-pagamento", alias="URL_SELECIONA_PIX_OU_CARTAO")
-    final_cartao_credito: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="FINAL_CARTAO_CREDITO")
-    codigo_de_seguranca_do_cartao_de_credito: str = Field(default="<CVV>", alias="CODIGO_DE_SEGURANCA_DO_CARTAO_DE_CREDITO")
-    confirma_pagamento: bool = Field(default=False, alias="CONFIRMA_PAGAMENTO")
-    url_finaliza_a_aposta_processando: str = Field(default="https://www.loteriasonline.caixa.gov.br/silce-web/#/carrinho/processamento", alias="URL_FINALIZA_A_APOSTA_PROCESSANDO")
+    selected_lottery_modality: str = Field(default="mega-sena", alias="SELECTED_LOTTERY_MODALITY")
+    bet_number_selection_path: str = Field(default="/silce-web/#/{lottery_modality}", alias="BET_NUMBER_SELECTION_PATH")
+    payment_method_selection_path: str = Field(default="/silce-web/#/carrinho/pagamento#container-meio-pagamento", alias="PAYMENT_METHOD_SELECTION_PATH")
+    credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
+    credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
+    confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
+    bet_processing_path: str = Field(default="/silce-web/#/carrinho/processamento", alias="BET_PROCESSING_PATH")
 
-    browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="LOTTOBOT_BROWSER_PROFILE_DIR")
-    browser_headless: bool = Field(default=True, alias="LOTTOBOT_BROWSER_HEADLESS")
-    browser_timeout_seconds: int = Field(default=5, alias="LOTTOBOT_BROWSER_TIMEOUT_SECONDS")
+    browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="BROWSER_PROFILE_DIR")
+    browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
+    browser_timeout_seconds: int = Field(default=5, alias="BROWSER_TIMEOUT_SECONDS")
 
-    @field_validator("whatsapp_headless", "whatsapp_enabled", "confirma_pagamento", "browser_headless", mode="before")
+    @field_validator("whatsapp_headless", "whatsapp_enabled", "confirm_payment", "browser_headless", mode="before")
     @classmethod
     def parse_browser_headless(cls, value: object) -> object:
         if not isinstance(value, str):
@@ -79,19 +79,39 @@ class Settings(BaseSettings):
             self.browser_profile_dir = (base_dir / profile_dir).resolve()
         return self
 
-    def authentication_url(self, tab_id: str, execution: str | None = None) -> str:
-        execution_id = execution or self.execution
+    def authentication_url(self, tab_id: str, execution_id: str | None = None) -> str:
+        execution = execution_id or self.execution_id
         return (
-            f"{self.url_login_caixa}/auth/realms/internet/login-actions/authenticate"
-            f"?execution={execution_id}&client_id={self.client_id}&tab_id={tab_id}"
+            f"{self.login_url}/auth/realms/internet/login-actions/authenticate"
+            f"?execution={execution}&client_id={self.client_id}&tab_id={tab_id}"
         )
 
     def cpf_url(self, state: str, nonce: str) -> str:
         return (
-            f"{self.url_login_caixa}/auth/realms/internet/protocol/openid-connect/auth"
-            f"?response_type=code&client_id={self.client_id}&redirect_uri={self.url_home}"
+            f"{self.login_url}/auth/realms/internet/protocol/openid-connect/auth"
+            f"?response_type=code&client_id={self.client_id}&redirect_uri={self.home_url}"
             f"&state={state}&nonce={nonce}"
         )
+
+    @property
+    def terms_of_use_url(self) -> str:
+        return f"{self.online_lottery_url}{self.terms_of_use_path}"
+
+    @property
+    def home_url(self) -> str:
+        return f"{self.online_lottery_url}{self.home_path}"
+
+    @property
+    def bet_number_selection_url(self) -> str:
+        return f"{self.online_lottery_url}{self.bet_number_selection_path.format(lottery_modality=self.selected_lottery_modality)}"
+    
+    @property
+    def payment_method_selection_url(self) -> str:
+        return f"{self.online_lottery_url}{self.payment_method_selection_path}"
+    
+    @property
+    def bet_processing_url(self) -> str:
+        return f"{self.online_lottery_url}{self.bet_processing_path}"
 
 
 @lru_cache

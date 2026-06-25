@@ -38,7 +38,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         session=session,
         browser=browser,
         notifier=notifier,
-        payment_authorization=PaymentAuthorization(resolved_settings.confirma_pagamento),
+        payment_authorization=PaymentAuthorization(resolved_settings.confirm_payment),
     )
     return AppContainer(
         settings=resolved_settings,

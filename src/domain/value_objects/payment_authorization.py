@@ -14,6 +14,6 @@ class PaymentAuthorization:
     def require_confirmation(self) -> None:
         if not self.confirmed:
             raise PaymentConfirmationDisabledError(
-                "A confirmação de pagamento real está desabilitada. Configure CONFIRMA_PAGAMENTO=true apenas quando desejar executar o pagamento.",
+                "A confirmação de pagamento real está desabilitada. Configure CONFIRM_PAYMENT=true apenas quando desejar executar o pagamento.",
                 operation=Operation.CONFIRM_PAYMENT,
             )

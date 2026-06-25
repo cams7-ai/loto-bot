@@ -29,7 +29,7 @@ def test_mask_sensitive_value():
 
 
 def test_gmail_reader_client_reads_code():
-    settings = Settings(URL_GMAIL_READER="http://gmail.local")
+    settings = Settings(GMAIL_READER_URL="http://gmail.local")
     transport = httpx.MockTransport(lambda request: response(200, {"code": "123456"}))
     client = GmailReaderClient(settings, httpx.Client(transport=transport))
 
@@ -44,7 +44,7 @@ def test_gmail_reader_client_sends_wait_timeout_and_read_timeout():
         seen["timeout"] = request.extensions["timeout"]
         return response(200, {"code": "123456"})
 
-    settings = Settings(URL_GMAIL_READER="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=45)
+    settings = Settings(GMAIL_READER_URL="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=45)
     client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
     assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "123456"
@@ -56,7 +56,7 @@ def test_gmail_reader_client_maps_http_timeout():
     def handler(request):
         raise httpx.ReadTimeout("timeout", request=request)
 
-    settings = Settings(URL_GMAIL_READER="http://gmail.local")
+    settings = Settings(GMAIL_READER_URL="http://gmail.local")
     client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
     try:
@@ -68,7 +68,7 @@ def test_gmail_reader_client_maps_http_timeout():
 
 
 def test_gmail_reader_client_rejects_error():
-    settings = Settings(URL_GMAIL_READER="http://gmail.local")
+    settings = Settings(GMAIL_READER_URL="http://gmail.local")
     transport = httpx.MockTransport(lambda request: response(500, {"error": {"message": "erro"}}))
     client = GmailReaderClient(settings, httpx.Client(transport=transport))
 
@@ -87,7 +87,7 @@ def test_mail_sender_client_posts_payload():
         seen["payload"] = request.content
         return response(200, {"message": "ok"})
 
-    settings = Settings(URL_MAIL_SENDER="http://mail.local", MAIL_TO="destino@example.com")
+    settings = Settings(MAIL_SENDER_URL="http://mail.local", MAIL_TO="destino@example.com")
     client = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
     client.send(Operation.UNKNOWN_OPERATION, "Assunto", "<p>Body</p>")
@@ -95,7 +95,7 @@ def test_mail_sender_client_posts_payload():
 
 
 def test_whatsapp_notify_client_maps_success_and_error():
-    settings = Settings(URL_WHATSAPP_NOTIFY="http://whatsapp.local")
+    settings = Settings(WHATSAPP_NOTIFY_URL="http://whatsapp.local")
     transport = httpx.MockTransport(lambda request: response(200, {"status": "SESSAO_ABERTA"}))
     client = WhatsAppNotifyClient(settings, httpx.Client(transport=transport))
 

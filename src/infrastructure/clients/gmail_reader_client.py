@@ -21,7 +21,7 @@ class GmailReaderClient(ValidationCodePort):
         self._client = client or httpx.Client(timeout=settings.validation_code_wait_timeout_seconds + 5)
 
     def get_validation_code(self, operation: Operation) -> str:
-        url = f"{self._settings.url_gmail_reader}/api/v1/validation-code"
+        url = f"{self._settings.gmail_reader_url}/api/v1/validation-code"
         logger.info(
             "Chamando API Gmail Reader para buscar código de validação",
             extra=Operation.executed_operation(operation),
