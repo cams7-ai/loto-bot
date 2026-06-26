@@ -50,6 +50,9 @@ class Selectors(StrEnum):
     LOGOUT_BUTTON = "//*[@id='sair']"
     CLOSE_BET_REGISTRATION_ALERT_BUTTON = "//div[contains(@class,'modal-content')][.//p[contains(., 'O registro de apostas individuais para o concurso') and contains(., 'foi encerrado')]]//button[@id='fecharModalAlerta']"
 
+    BET_CANNOT_BE_PROCESSED_ALERT = "//div[@id='div_alertas' and contains(normalize-space(.), 'não poderão ser efetivadas')]" # A(s) aposta(s) apresentada(s) a seguir não poderão ser efetivadas, pois o concurso/modalidade não está(ão) disponível(s) para captação: Mega-Sena
+    OVERNIGHT_BET_PROCESSING_ALERT = "//div[@id='div_alertas' and contains(normalize-space(.), 'apostas realizadas entre 22:00:00 e 05:00:00')]" # As apostas realizadas entre 22:00:00 e 05:00:00 permanecerão na situação "Pagamento recebido - Aguardando efetivação da aposta" até sua atualização de status, que ocorrerá a partir das 05:00:00
+
     @staticmethod
     def modality_button(modality: str) -> str:
         return (

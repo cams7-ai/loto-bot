@@ -526,7 +526,7 @@ def test_playwright_browser_checks_authentication_on_browser_thread():
 
     browser._is_authenticated = fake_is_authenticated
 
-    assert browser.is_authenticated(AutomationSession()) is True
+    assert browser.is_already_authenticated() is True
     assert calls[0][0] == "fake_is_authenticated"
 
 

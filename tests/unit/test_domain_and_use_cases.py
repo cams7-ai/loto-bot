@@ -41,7 +41,11 @@ class FakeBrowser:
 
         return method
 
-    def is_authenticated(self, click_login_button):
+    def is_already_authenticated(self):
+        self.calls.append("is_already_authenticated")
+        return self.authenticated
+
+    def is_authenticated(self):
         self.calls.append("is_authenticated")
         return self.authenticated
 
@@ -109,7 +113,7 @@ class AuthenticationErrorBrowser(FakeBrowser):
         super().__init__()
         self._error = error
 
-    def is_authenticated(self, session):
+    def is_authenticated(self):
         self.calls.append("is_authenticated")
         raise self._error
 
@@ -121,7 +125,7 @@ class InvalidCpfOnValidationCodeBrowser(FakeBrowser):
 
 
 class AuthenticatedBrowser(FakeBrowser):
-    def is_authenticated(self, session):
+    def is_authenticated(self):
         self.calls.append("is_authenticated")
         return True
 

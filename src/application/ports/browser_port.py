@@ -19,8 +19,11 @@ class BrowserAutomationPort(Protocol):
     def access_authenticated_home(self) -> None:
         """Acessa a home autenticada."""
 
-    def is_authenticated(self, click_login_button: bool) -> bool:
-        """Verifica se a sessão está autenticada no portal."""
+    def is_already_authenticated(self) -> bool:
+        """Apenas verifica se o usuário já está logado, sem clicar em nada."""
+
+    def is_authenticated(self) -> bool:
+        """Tenta acessar a área autenticada e verifica se o usuário está logado."""
 
     def accept_terms(self) -> None:
         """Aceita os termos de uso."""

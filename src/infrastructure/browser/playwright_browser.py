@@ -99,8 +99,11 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         if click_login_button:
             self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True)
 
-    def is_authenticated(self, click_login_button: bool) -> bool:
-        return self._run_on_browser_thread(self._is_authenticated, click_login_button)
+    def is_already_authenticated(self) -> bool:
+        return self._run_on_browser_thread(self._is_authenticated, True)
+    
+    def is_authenticated(self) -> bool:
+        return self._run_on_browser_thread(self._is_authenticated, False)
 
     def _is_authenticated(self, click_login_button: bool) -> bool:
         if not click_login_button or self._click_if_exists(Selectors.LOGGED_OFF_LOGIN_BUTTON, True):

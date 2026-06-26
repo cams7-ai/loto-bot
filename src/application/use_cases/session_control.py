@@ -61,7 +61,7 @@ class SessionControlUseCase:
 
     def _authenticate(self) -> bool:
         self._execute(Operation.ACCESS_LOTTERY_PORTAL, lambda _: self._browser.access_home())
-        if self._browser.is_authenticated(False):
+        if self._browser.is_authenticated():
             return True
 
         self._execute(Operation.ACCEPT_TERMS, lambda _: self._browser.accept_terms())
@@ -79,7 +79,7 @@ class SessionControlUseCase:
         self._execute(Operation.SUBMIT_VALIDATION_CODE, self._submit_validation_code)
         self._execute(Operation.SUBMIT_PASSWORD, self._browser.submit_password)
 
-        return self._browser.is_authenticated(True)
+        return self._browser.is_already_authenticated()
 
     def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation) -> Future[str]:
         if not self._browser.is_valid_cpf():
