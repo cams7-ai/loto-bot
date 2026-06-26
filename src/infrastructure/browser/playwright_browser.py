@@ -88,8 +88,11 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._page = None
         self._playwright = None
 
-    def access_home(self, click_login_button: bool = True) -> None:
-        self._run_on_browser_thread(self._access_home, click_login_button)
+    def access_home(self) -> None:
+        self._run_on_browser_thread(self._access_home, True)
+
+    def access_authenticated_home(self) -> None:
+        self._run_on_browser_thread(self._access_home, False)
 
     def _access_home(self, click_login_button: bool) -> None:
         self._goto(self._settings.home_url)
@@ -177,6 +180,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             )
         return False
 
+    def validation_code_lookup_lead(self) -> int:
+        return self._settings.validation_code_lookup_lead_seconds * 1000
+
     def request_validation_code(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._request_validation_code, session)
 
@@ -227,6 +233,24 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _disable_notification(self) -> None:
         if self._click_if_exists(Selectors.DO_NOT_SHOW_NOTIFICATION_CHECKBOX, True):
             self._click_if_exists(Selectors.CLOSE_NOTIFICATION_BUTTON, True)
+
+    def clear_shopping_cart(self) -> None:
+        self._run_on_browser_thread(self._clear_shopping_cart_if_needed)
+
+    def _clear_shopping_cart_if_needed(self) -> None:
+        if self._shopping_cart_items_count() > 0:
+            self._click(Selectors.SHOPPING_CART_BUTTON)
+            self._clear_shopping_cart()
+
+    def _shopping_cart_items_count(self) -> int:
+        text = self._require_page().locator(Selectors.SHOPPING_CART_BUTTON).first.text_content()
+        match = re.search(r"\d+", text or "")
+        return int(match.group()) if match else 0
+
+    def _clear_shopping_cart(self) -> None:
+        self._goto(self._settings.shopping_cart_url)
+        self._click(Selectors.CLEAR_CART_BUTTON)
+        self._click(Selectors.CONFIRM_CLEAR_CART_BUTTON)
 
     def select_lottery_modality(self) -> None:
         self._run_on_browser_thread(self._select_lottery_modality)

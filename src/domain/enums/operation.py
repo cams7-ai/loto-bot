@@ -14,6 +14,7 @@ class Operation(StrEnum):
     SUBMIT_VALIDATION_CODE = "Informa o código de acesso"
     SUBMIT_PASSWORD = "Informa a senha"
     SELECT_LOTTERY_MODALITY = "Seleciona uma modalidade"
+    SHOPPING_CART = "Carrinho de compras"
     CHOOSE_RANDOM_NUMBERS = "Escolhe os números da aposta"
     ADD_BET_TO_CART = "Adiciona a aposta ao carrinho"
     CONFIRM_PURCHASE = "Confirma a compra"

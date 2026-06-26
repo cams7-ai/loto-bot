@@ -40,7 +40,7 @@ class RunBetFlowUseCase:
             raise BrowserSessionClosedError("A sessão de navegador já está fechada")
 
         try:
-            self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_home(False))
+            self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_authenticated_home())
             self._execute(Operation.SELECT_LOTTERY_MODALITY, lambda _: self._browser.select_lottery_modality())
             self._execute(Operation.CHOOSE_RANDOM_NUMBERS, lambda _: self._browser.choose_random_numbers())
             self._execute(Operation.ADD_BET_TO_CART, lambda _: self._browser.add_bet_to_cart())

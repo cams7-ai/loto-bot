@@ -49,6 +49,10 @@ class FakeBrowser:
         self.calls.append("is_valid_cpf")
         return True
 
+    def validation_code_lookup_lead(self):
+        self.calls.append("validation_code_lookup_lead")
+        return 1000
+
 
 class FakeNotifier:
     def __init__(self, failure_response: object | None = "enviado") -> None:
@@ -158,6 +162,22 @@ def test_session_control_skips_authentication_steps_when_already_authenticated(m
     assert "request_validation_code" not in browser.calls
     assert "submit_validation_code" not in browser.calls
     assert "submit_password" not in browser.calls
+
+
+def test_session_control_waits_minimum_time_before_requesting_validation_code(monkeypatch):
+    session = AutomationSession()
+    browser = FakeBrowser()
+    sleeps: list[float] = []
+    timestamps = iter([10.0, 10.25])
+    request_started = Event()
+    request_started.set()
+    monkeypatch.setattr(session_control_module, "monotonic", lambda: next(timestamps))
+    monkeypatch.setattr(session_control_module, "sleep", sleeps.append)
+    use_case = SessionControlUseCase(session, browser, FakeValidationCodes(), FakeNotifier())
+
+    use_case._wait_for_validation_code_request_start(request_started)
+
+    assert sleeps == [0.75]
 
 
 def test_session_control_closes_session_when_authentication_fails_with_automation_error(monkeypatch):
@@ -282,7 +302,7 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
 
     assert result.status == "finished"
     assert result.tracking_code == "123456"
-    assert browser.calls[0] == "access_home"
+    assert browser.calls[0] == "access_authenticated_home"
     assert "confirm_payment" in browser.calls
     assert browser.calls[-1] == "stop"
 

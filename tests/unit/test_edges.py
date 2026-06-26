@@ -51,7 +51,7 @@ class BrokenBrowser:
     def stop(self):
         self.stopped = True
 
-    def access_home(self, click_login_button):
+    def access_authenticated_home(self):
         raise ValueError("quebrou")
 
 

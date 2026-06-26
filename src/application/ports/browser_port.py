@@ -13,8 +13,11 @@ class BrowserAutomationPort(Protocol):
     def stop(self) -> None:
         """Fecha a sessão ativa."""
 
-    def access_home(self, click_login_button: bool = True) -> None:
+    def access_home(self) -> None:
         """Acessa a home autenticável."""
+
+    def access_authenticated_home(self) -> None:
+        """Acessa a home autenticada."""
 
     def is_authenticated(self, click_login_button: bool) -> bool:
         """Verifica se a sessão está autenticada no portal."""
@@ -28,6 +31,9 @@ class BrowserAutomationPort(Protocol):
     def is_valid_cpf(self) -> bool:
         """Verifica se o CPF informado é válido."""
 
+    def validation_code_lookup_lead(self) -> int:
+        """Tempo de antecedência para buscar o código de validação."""
+
     def request_validation_code(self, session: AutomationSession) -> None:
         """Solicita o código de acesso."""
 
@@ -39,6 +45,9 @@ class BrowserAutomationPort(Protocol):
 
     def disable_notification(self) -> None:
         """Desabilita notificações do portal."""
+
+    def clear_shopping_cart(self) -> None:
+        """Limpa carrinho no portal."""
 
     def select_lottery_modality(self) -> None:
         """Seleciona a modalidade."""

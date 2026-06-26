@@ -6,10 +6,10 @@ from enum import StrEnum
 
 
 class Selectors(StrEnum):
-    #Aceita os termos de uso
+    # Aceita os termos de uso
     PRIVACY_YES_BUTTON = "//button[@id='adopt-accept-all-button']"
     TERMS_YES_BUTTON = "//a[@id='botaosim']"
-    #Home
+    # Home do usuário deslogado
     LOGGED_OFF_LOGIN_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='btnLogin']"
     # Informa o CPF
     CPF_FIELD = "//input[@id='username']"
@@ -20,15 +20,26 @@ class Selectors(StrEnum):
     # Informa o código de acesso
     CODE_FIELD = "//input[@id='codigo']"
     CODE_SEND_BUTTON = "//*[@id='form-login']//button[@name='login']"
-    #Informa a senha
+    # Informa a senha
     PASSWORD_FIELD = "//*[@id='password']"
     PASSWORD_ENTER_BUTTON = "//*[@id='template-section']//button[text()='Entrar']"
-    PASSWORD_INVALID_ALERT = "//section[@id='template-section']//div[contains(@class,'alert-error') and normalize-space()='Senha inválida.']"
+    PASSWORD_INVALID_ALERT = "//section[@id='template-section']//div[contains(@class,'alert-error') and normalize-space()='Senha inválida.']"    
+    # Home quando o usuário está logado
     LOGGED_IN_LOGIN_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
-    LOGGED_IN_USER_NOTIFICATIONS_LINK = "//div[@id='LoginHeaderView.html']//a[@id='suaconta']"
     DO_NOT_SHOW_NOTIFICATION_CHECKBOX = "//div[contains(@class,'modal-notificacao')]//input[@type='checkbox' and contains(@aria-label,'Não mostrar mais')]"
     CLOSE_NOTIFICATION_BUTTON = "//div[contains(@class,'modal-notificacao')]//button[contains(@class,'btn-fechar-notificacao')]"
+    # Carrinho de compras
+    SHOPPING_CART_COUNT = "normalize-space(//div[@id='LoginHeaderView.html']//a[@id='carrinho'])"
+    SHOPPING_CART_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='carrinho']"
+    CLEAR_CART_BUTTON = "//button[@id='limparcarrinho']"
+    CONFIRM_CLEAR_CART_BUTTON = (
+        "//div[@id='modalUl']"
+        "[.//span[normalize-space(.)='Deseja realmente remover todas as apostas do carrinho?']]"
+        "//button[contains(@class,'data-limpar-carrinho')]"
+    )
+    # Seleciona uma modalidade
     COMPLETE_GAME_BUTTON = "//*[@id='completeojogo']"
+    # Carrinho de compras
     ADD_TO_CART_BUTTON = "//*[@id='colocarnocarrinho']"
     GO_TO_PAYMENT_BUTTON = "//*[@id='irparapagamento']"
     CONFIRM_PURCHASE_BUTTON = "//div[contains(@class,'modal-content')]//button[@id='confirma']"

@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     bettor_cpf: str = Field(default="<CPF_DO_APOSTADOR>", alias="BETTOR_CPF")
     bettor_password: str = Field(default="<SENHA_DO_APOSTADOR>", alias="BETTOR_PASSWORD")
     online_lottery_url: str = Field(default="https://www.loteriasonline.caixa.gov.br", alias="ONLINE_LOTTERY_URL")
-    terms_of_use_path: str = Field(default="/silce-web/#/termos-de-uso", alias="TERMS_OF_USE_PATH")
-    home_path: str = Field(default="/silce-web/#/home", alias="HOME_PATH")
+    online_lottery_path: str = Field(default="/silce-web/#", alias="ONLINE_LOTTERY_PATH")
+    terms_of_use_path: str = Field(default="/termos-de-uso", alias="TERMS_OF_USE_PATH")
+    home_path: str = Field(default="/home", alias="HOME_PATH")
     client_id: str = Field(default="cli-web-lce", alias="CLIENT_ID")
     login_url: str = Field(default="https://login.caixa.gov.br", alias="LOGIN_URL")
     execution_id: str = Field(default="<EXECUTION_ID_DA_SESSAO>", alias="EXECUTION_ID")
@@ -37,21 +38,24 @@ class Settings(BaseSettings):
     mail_to: str = Field(default="<EMAIL_DESTINATARIO>", alias="MAIL_TO")
     mail_content_type: str = Field(default="HTML", alias="MAIL_CONTENT_TYPE")
 
+    shopping_cart_path: str = Field(default="/carrinho", alias="SHOPPING_CART_PATH")
+
     selected_lottery_modality: str = Field(default="mega-sena", alias="SELECTED_LOTTERY_MODALITY")
-    bet_number_selection_path: str = Field(default="/silce-web/#/{lottery_modality}", alias="BET_NUMBER_SELECTION_PATH")
-    payment_method_selection_path: str = Field(default="/silce-web/#/carrinho/pagamento#container-meio-pagamento", alias="PAYMENT_METHOD_SELECTION_PATH")
+    bet_number_selection_path: str = Field(default="/{lottery_modality}", alias="BET_NUMBER_SELECTION_PATH")
+    payment_method_selection_path: str = Field(default="/pagamento#container-meio-pagamento", alias="PAYMENT_METHOD_SELECTION_PATH")
     credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
     credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
     confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
-    bet_processing_path: str = Field(default="/silce-web/#/carrinho/processamento", alias="BET_PROCESSING_PATH")
+    bet_processing_path: str = Field(default="/processamento", alias="BET_PROCESSING_PATH")
 
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="BROWSER_PROFILE_DIR")
     browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
     browser_timeout_seconds: int = Field(default=5, alias="BROWSER_TIMEOUT_SECONDS")
+    validation_code_lookup_lead_seconds: int = Field(default=1, alias="VALIDATION_CODE_LOOKUP_LEAD_SECONDS")
 
     @field_validator("whatsapp_headless", "whatsapp_enabled", "confirm_payment", "browser_headless", mode="before")
     @classmethod
-    def parse_browser_headless(cls, value: object) -> object:
+    def parse_bool(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
 
@@ -64,9 +68,9 @@ class Settings(BaseSettings):
             return False
         raise ValueError("Valor booleano inválido. Use um dos seguintes: 1, 0, true, false, yes, no, y, n, sim, nao.")
 
-    @field_validator("validation_code_wait_timeout_seconds", "whatsapp_timeout_seconds", "browser_timeout_seconds")
+    @field_validator("validation_code_wait_timeout_seconds", "whatsapp_timeout_seconds", "browser_timeout_seconds", "validation_code_lookup_lead_seconds")
     @classmethod
-    def validate_browser_timeout_seconds(cls, value: int) -> int:
+    def validate_positive_int(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("O valor deve ser um inteiro positivo.")
         return value
@@ -94,24 +98,32 @@ class Settings(BaseSettings):
         )
 
     @property
+    def _lottery_url(self) -> str:
+        return f"{self.online_lottery_url}{self.online_lottery_path}"
+
+    @property
     def terms_of_use_url(self) -> str:
-        return f"{self.online_lottery_url}{self.terms_of_use_path}"
+        return f"{self._lottery_url}{self.terms_of_use_path}"
 
     @property
     def home_url(self) -> str:
-        return f"{self.online_lottery_url}{self.home_path}"
+        return f"{self._lottery_url}{self.home_path}"
+
+    @property
+    def shopping_cart_url(self) -> str:
+        return f"{self._lottery_url}{self.shopping_cart_path}"
 
     @property
     def bet_number_selection_url(self) -> str:
-        return f"{self.online_lottery_url}{self.bet_number_selection_path.format(lottery_modality=self.selected_lottery_modality)}"
+        return f"{self._lottery_url}{self.bet_number_selection_path.format(lottery_modality=self.selected_lottery_modality)}"
     
     @property
     def payment_method_selection_url(self) -> str:
-        return f"{self.online_lottery_url}{self.payment_method_selection_path}"
+        return f"{self.shopping_cart_url}{self.payment_method_selection_path}"
     
     @property
     def bet_processing_url(self) -> str:
-        return f"{self.online_lottery_url}{self.bet_processing_path}"
+        return f"{self.shopping_cart_url}{self.bet_processing_path}"
 
 
 @lru_cache

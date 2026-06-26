@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
-from time import sleep
+from time import monotonic, sleep
 
 from domain import (
     Operation,
@@ -24,7 +24,6 @@ from application.services import (
 )
 
 logger = logging.getLogger(__name__)
-VALIDATION_CODE_LOOKUP_LEAD_SECONDS = 1
 
 class SessionControlUseCase:
     def __init__(
@@ -49,7 +48,8 @@ class SessionControlUseCase:
         logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation))
         try:
             if self._authenticate():
-                self._disable_notification(Operation.ACCESS_HOME)
+                self._execute(Operation.ACCESS_HOME, lambda _:  self._browser.disable_notification())
+                self._execute(Operation.SHOPPING_CART, lambda _: self._browser.clear_shopping_cart())
                 logger.info("Sessão de navegador autenticada", extra=Operation.executed_operation(self._session.executed_operation))
         except AutomationError as exc:
             handle_custom_failure(self._session, self._browser, self._notifier, exc)
@@ -58,10 +58,6 @@ class SessionControlUseCase:
 
         self._session.mark_open(self._session.tab_id)
         return self.status()
-
-    def _disable_notification(self, operation: Operation) -> None:
-        self._session.mark_running(operation)
-        self._browser.disable_notification()
 
     def _authenticate(self) -> bool:
         self._execute(Operation.ACCESS_LOTTERY_PORTAL, lambda _: self._browser.access_home())
@@ -76,8 +72,7 @@ class SessionControlUseCase:
             operation = Operation.REQUEST_VALIDATION_CODE
             validation_code_request_started = Event()
             validation_code = self._request_validation_code_async(executor, validation_code_request_started, operation)
-            validation_code_request_started.wait()
-            sleep(VALIDATION_CODE_LOOKUP_LEAD_SECONDS)
+            self._wait_for_validation_code_request_start(validation_code_request_started)
             self._execute(operation, self._browser.request_validation_code)
             self._session.valid_code = validation_code.result()
 
@@ -95,6 +90,13 @@ class SessionControlUseCase:
     def _get_validation_code(self, request_started: Event, operation: Operation) -> str:
         request_started.set()
         return self._validation_codes.get_validation_code(operation)
+
+    def _wait_for_validation_code_request_start(self, request_started: Event) -> None:
+        started_at = monotonic()
+        request_started.wait()
+        remaining_milliseconds = self._browser.validation_code_lookup_lead() - ((monotonic() - started_at) * 1000)
+        if remaining_milliseconds > 0:
+            sleep(remaining_milliseconds / 1000)
 
     def _submit_validation_code(self, session: AutomationSession) -> None:
         self._browser.submit_validation_code(session, self._session.valid_code or "")
