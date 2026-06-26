@@ -37,7 +37,7 @@ class RunBetFlowUseCase:
 
     def run(self) -> AutomationRunResult | None:
         if not self._session.is_open:
-            raise BrowserSessionClosedError("A sessão de navegador já está fechada")
+            raise BrowserSessionClosedError(self._session.executed_operation)
 
         try:
             self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_authenticated_home())

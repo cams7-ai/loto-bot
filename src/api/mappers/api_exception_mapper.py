@@ -5,9 +5,11 @@ from fastapi import status
 from api.exceptions import ApiError
 from domain import (
     AutomationError,
-    BrowserSessionClosedError,
-    BrowserSessionOpenError,
     ExternalServiceError,
+    BrowserSessionOpenError,
+    BrowserSessionClosedError,    
+    InvalidCPFError,
+    InvalidPasswordError,    
 )
 
 class ApiExceptionMapper:
@@ -23,11 +25,14 @@ class ApiExceptionMapper:
     def _status_for_error(exc: AutomationError) -> int:
         if isinstance(exc, ExternalServiceError):
             # Quando o serviço externo está indisponível
-            return status.HTTP_503_SERVICE_UNAVAILABLE
+            return status.HTTP_503_SERVICE_UNAVAILABLE         
 
         if isinstance(exc, (BrowserSessionOpenError, BrowserSessionClosedError)):
             # Quando a sessão já está aberta ou fechada
             return status.HTTP_409_CONFLICT
+        
+        if isinstance(exc, (InvalidCPFError, InvalidPasswordError)):
+            return status.HTTP_400_BAD_REQUEST
 
         # Outros erros de automação
         return status.HTTP_500_INTERNAL_SERVER_ERROR

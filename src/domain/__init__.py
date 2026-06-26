@@ -5,6 +5,12 @@ from domain.enums import (
     WhatsAppMessageStatus,
 )
 from domain.constants import (
+    FALLBACK_EMAIL_SEND_FAILED,
+    VALIDATION_CODE_FETCH_TIMEOUT,
+    VALIDATION_CODE_FETCH_FAILED,
+    GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED,
+    BROWSER_SESSION_OPEN,
+    BROWSER_SESSION_CLOSED,
     INVALID_CPF,
     INVALID_PASSWORD,
 )
@@ -14,9 +20,11 @@ from domain.entities import (
 )
 from domain.exceptions import (
     AutomationError,
-    BrowserSessionClosedError,
-    BrowserSessionOpenError,
     ExternalServiceError,
+    BrowserSessionOpenError,
+    BrowserSessionClosedError,    
+    InvalidCPFError,
+    InvalidPasswordError,    
     PaymentConfirmationDisabledError,
 )
 from domain.value_objects import PaymentAuthorization
@@ -26,14 +34,22 @@ __all__ = [
     "ErrorCode",
     "WhatsAppSessionStatus",
     "WhatsAppMessageStatus",
+    "FALLBACK_EMAIL_SEND_FAILED",
+    "VALIDATION_CODE_FETCH_TIMEOUT",
+    "VALIDATION_CODE_FETCH_FAILED",
+    "GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED",
+    "BROWSER_SESSION_OPEN",
+    "BROWSER_SESSION_CLOSED",
     "INVALID_CPF",
     "INVALID_PASSWORD",
     "AutomationSession",
     "AutomationStatus",
     "AutomationError",
-    "BrowserSessionClosedError",
-    "BrowserSessionOpenError",
     "ExternalServiceError",
+    "BrowserSessionOpenError",
+    "BrowserSessionClosedError",    
+    "InvalidCPFError",
+    "InvalidPasswordError",    
     "PaymentConfirmationDisabledError",
     "PaymentAuthorization",
 ]

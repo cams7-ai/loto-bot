@@ -1,2 +1,8 @@
+FALLBACK_EMAIL_SEND_FAILED = "Não foi possível enviar o e-mail de fallback"
+VALIDATION_CODE_FETCH_TIMEOUT = "Tempo esgotado ao buscar o código de validação"
+VALIDATION_CODE_FETCH_FAILED = "Não foi possível buscar o código de validação"
+GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED = "A API Gmail Reader não retornou código de validação"
+BROWSER_SESSION_OPEN = "Já existe uma sessão de navegador aberta"
+BROWSER_SESSION_CLOSED = "A sessão de navegador já está fechada"
 INVALID_CPF = "O CPF é inválido"
 INVALID_PASSWORD = "A senha é inválida"

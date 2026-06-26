@@ -6,7 +6,11 @@ import logging
 
 import httpx
 
-from domain import Operation, ExternalServiceError
+from domain import (
+    FALLBACK_EMAIL_SEND_FAILED,
+    Operation, 
+    ExternalServiceError,
+)
 from infrastructure import Settings
 
 
@@ -30,4 +34,4 @@ class MailSenderClient:
             },
         )
         if response.status_code >= 400:
-            raise ExternalServiceError("Não foi possível enviar o e-mail de fallback.", operation=operation)
+            raise ExternalServiceError(FALLBACK_EMAIL_SEND_FAILED, operation=operation)

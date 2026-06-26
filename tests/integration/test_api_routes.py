@@ -44,10 +44,10 @@ class FakeContainer:
 
 class FailingSessionControl(FakeSessionControl):
     def start(self):
-        raise BrowserSessionOpenError("aberta")
+        raise BrowserSessionOpenError(Operation.START_SESSION)
 
     def stop(self):
-        raise BrowserSessionClosedError("fechada")
+        raise BrowserSessionClosedError(Operation.END_SESSION)
 
 
 @pytest.fixture(autouse=True)

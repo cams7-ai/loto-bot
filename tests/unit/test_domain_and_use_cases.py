@@ -5,6 +5,8 @@ from threading import Event
 import application.use_cases.session_control as session_control_module
 from application import RunBetFlowUseCase, SessionControlUseCase
 from domain import (
+    BROWSER_SESSION_OPEN,
+    BROWSER_SESSION_CLOSED,
     Operation, 
     AutomationSession, 
     AutomationError, 
@@ -13,7 +15,6 @@ from domain import (
     ErrorCode,
     PaymentAuthorization,
 )
-
 
 class FakeBrowser:
     def __init__(self) -> None:
@@ -277,7 +278,7 @@ def test_session_control_rejects_invalid_lifecycle(monkeypatch):
     try:
         use_case.stop()
     except BrowserSessionClosedError as exc:
-        assert "fechada" in str(exc)
+        assert BROWSER_SESSION_CLOSED in str(exc)
     else:
         raise AssertionError("A sessão fechada deveria ser recusada")
 
@@ -285,7 +286,7 @@ def test_session_control_rejects_invalid_lifecycle(monkeypatch):
     try:
         use_case.start()
     except BrowserSessionOpenError as exc:
-        assert "aberta" in str(exc)
+        assert BROWSER_SESSION_OPEN in str(exc)
     else:
         raise AssertionError("A sessão aberta deveria ser recusada")
 

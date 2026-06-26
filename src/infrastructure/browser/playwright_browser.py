@@ -13,10 +13,10 @@ from urllib.parse import parse_qs, urlparse
 from application import BrowserAutomationPort
 from domain import (
     Operation,
-    INVALID_CPF,
-    INVALID_PASSWORD,
     AutomationSession, 
     AutomationError,
+    InvalidCPFError,
+    InvalidPasswordError,
 )
 from infrastructure import Settings, Selectors
 
@@ -150,14 +150,14 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception:
             return
 
-        raise AutomationError(INVALID_CPF, operation=operation)
+        raise InvalidCPFError()
 
     def _sync_auth_session_from_current_url(self, session: AutomationSession) -> None:
         page = self._require_page()
         try:
             page.wait_for_url(re.compile(rf".*{self._AUTHENTICATE_PATH}.*"), timeout=self._timeout_ms)
         except Exception as exc:
-            raise AutomationError(INVALID_CPF, operation=session.executed_operation) from exc
+            raise InvalidCPFError() from exc
 
         params = parse_qs(urlparse(page.url).query)
         execution_id = self._first_query_param(params, "execution")
@@ -220,7 +220,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception:
             pass
         else:
-            raise AutomationError(INVALID_PASSWORD, operation=operation)
+            raise InvalidPasswordError()
 
         try:
             page.locator(Selectors.PASSWORD_FIELD).first.wait_for(
@@ -228,7 +228,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 timeout=self._timeout_ms,
             )
         except Exception as exc:
-            raise AutomationError(INVALID_PASSWORD, operation=operation) from exc
+            raise InvalidPasswordError() from exc
 
     def disable_notification(self) -> None:
         self._run_on_browser_thread(self._disable_notification)
@@ -260,7 +260,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _select_lottery_modality(self) -> None:
         self._goto(self._settings.home_url)
-        self._accept_privacy()
+        #self._accept_privacy()
         #self._click_if_exists(Selectors.notification_popup_close, True)
         self._click(Selectors.modality_button(self._settings.selected_lottery_modality))
         if self._click_if_exists(Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON, True):

@@ -9,11 +9,11 @@ from time import monotonic, sleep
 
 from domain import (
     Operation,
-    INVALID_CPF,
     AutomationSession,
     AutomationError,
-    BrowserSessionClosedError,
     BrowserSessionOpenError,
+    BrowserSessionClosedError,    
+    InvalidCPFError,
 )
 from application.dto import SessionStatusResult
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
@@ -40,7 +40,7 @@ class SessionControlUseCase:
 
     def start(self) -> SessionStatusResult:
         if self._session.is_open:
-            raise BrowserSessionOpenError("Já existe uma sessão de navegador aberta")
+            raise BrowserSessionOpenError(self._session.executed_operation)
 
         tab_id = self._browser.start(self._session)
         self._session.mark_open(tab_id)
@@ -83,7 +83,7 @@ class SessionControlUseCase:
 
     def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation) -> Future[str]:
         if not self._browser.is_valid_cpf():
-            raise AutomationError(INVALID_CPF, operation=Operation.SUBMIT_CPF)
+            raise InvalidCPFError()
 
         return executor.submit(self._get_validation_code, request_started, operation)
 
@@ -108,7 +108,7 @@ class SessionControlUseCase:
 
     def stop(self) -> SessionStatusResult:
         if not self._session.is_open:
-            raise BrowserSessionClosedError("A sessão de navegador já está fechada")
+            raise BrowserSessionClosedError(self._session.executed_operation)
 
         self._close()
         return self.status()
