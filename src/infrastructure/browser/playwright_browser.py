@@ -1,4 +1,4 @@
-"""Adapter Playwright para automação do portal CAIXA."""
+"""Adapter Playwright para automação do portal CAIXA"""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from domain import (
     AutomationError,
     InvalidCPFError,
     InvalidPasswordError,
+    IndividualBetRegistrationClosedError,
 )
 from infrastructure import Settings, Selectors
 
@@ -66,7 +67,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception as exc:
             self._stop()
             logging.debug("Falha ao iniciar a sessão de navegador; encerrando contexto e Playwright", extra=Operation.executed_operation(session.executed_operation))
-            raise AutomationError("Não foi possível iniciar a sessão de navegador.", operation=session.executed_operation) from exc
+            raise AutomationError("Não foi possível iniciar a sessão de navegador", operation=session.executed_operation) from exc
 
     def stop(self) -> None:
         if self._executor is None:
@@ -264,7 +265,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         #self._click_if_exists(Selectors.notification_popup_close, True)
         self._click(Selectors.modality_button(self._settings.selected_lottery_modality))
         if self._click_if_exists(Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON, True):
-            logger.debug("Alerta de registro de apostas individuais fechado")
+            raise IndividualBetRegistrationClosedError()
 
     def choose_random_numbers(self) -> None:
         self._run_on_browser_thread(self._choose_random_numbers)
@@ -408,13 +409,13 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         if title.count() > 0 and title.first.inner_text().strip().lower() == "forbidden":
             raise AutomationError(
                 "Login CAIXA retornou Forbidden ao continuar a autenticação. "
-                "A sessão atual foi bloqueada pelo serviço; reinicie o navegador/perfil e tente novamente.",
+                "A sessão atual foi bloqueada pelo serviço; reinicie o navegador/perfil e tente novamente",
                 operation=operation,
             )
 
     def _require_page(self) -> Any:
         if self._page is None:
-            raise AutomationError("A sessão de navegador está fechada.", operation=Operation.END_SESSION)
+            raise AutomationError("A sessão de navegador está fechada", operation=Operation.END_SESSION)
         return self._page
 
     @staticmethod

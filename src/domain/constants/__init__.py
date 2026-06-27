@@ -9,6 +9,7 @@ from domain.constants.error_messages import (
     INVALID_CPF,
     INVALID_PASSWORD,
     PAYMENT_CONFIRMATION_DISABLED,
+    INDIVIDUAL_BET_REGISTRATION_CLOSED,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "INVALID_CPF", 
     "INVALID_PASSWORD",
     "PAYMENT_CONFIRMATION_DISABLED",
+    "INDIVIDUAL_BET_REGISTRATION_CLOSED",
 ]

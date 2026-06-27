@@ -9,6 +9,7 @@ from domain.constants import (
     INVALID_CPF,
     INVALID_PASSWORD,
     PAYMENT_CONFIRMATION_DISABLED,
+    INDIVIDUAL_BET_REGISTRATION_CLOSED,
 )
 
 class AutomationError(RuntimeError):
@@ -50,5 +51,11 @@ class PaymentConfirmationDisabledError(AutomationError):
 
     def __init__(self) -> None:
         super().__init__(message=PAYMENT_CONFIRMATION_DISABLED, operation=Operation.CONFIRM_PAYMENT)
+
+class IndividualBetRegistrationClosedError(AutomationError):
+    code = ErrorCode.INDIVIDUAL_BET_REGISTRATION_CLOSED_ERROR_CODE
+
+    def __init__(self) -> None:
+        super().__init__(message=INDIVIDUAL_BET_REGISTRATION_CLOSED, operation=Operation.SELECT_LOTTERY_MODALITY)
 
 

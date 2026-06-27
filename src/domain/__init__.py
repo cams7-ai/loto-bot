@@ -15,6 +15,7 @@ from domain.constants import (
     INVALID_CPF,
     INVALID_PASSWORD,
     PAYMENT_CONFIRMATION_DISABLED,
+    INDIVIDUAL_BET_REGISTRATION_CLOSED,
 )
 from domain.entities import (
     AutomationSession,
@@ -28,6 +29,7 @@ from domain.exceptions import (
     InvalidCPFError,
     InvalidPasswordError,    
     PaymentConfirmationDisabledError,
+    IndividualBetRegistrationClosedError,
 )
 from domain.value_objects import PaymentAuthorization
 
@@ -55,5 +57,7 @@ __all__ = [
     "InvalidCPFError",
     "InvalidPasswordError",    
     "PaymentConfirmationDisabledError",
+    "IndividualBetRegistrationClosedError",
     "PaymentAuthorization",
+    "INDIVIDUAL_BET_REGISTRATION_CLOSED",
 ]

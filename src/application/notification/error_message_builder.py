@@ -16,6 +16,7 @@ class ErrorMessageBuilder:
             ErrorCode.INVALID_CPF_ERROR_CODE: "O CPF é inválido",
             ErrorCode.INVALID_PASSWORD_ERROR_CODE: "A senha é inválida",
             ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE: "Confirmação de pagamento desabilitada",
+            ErrorCode.INDIVIDUAL_BET_REGISTRATION_CLOSED_ERROR_CODE: "Registro de apostas indisponível",
         }
 
         return messages.get(error_code, "Erro desconhecido")

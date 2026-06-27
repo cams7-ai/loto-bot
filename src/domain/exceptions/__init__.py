@@ -6,6 +6,7 @@ from domain.exceptions.automation_errors import (
     InvalidCPFError,
     InvalidPasswordError,    
     PaymentConfirmationDisabledError,
+    IndividualBetRegistrationClosedError,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "InvalidCPFError",
     "InvalidPasswordError",    
     "PaymentConfirmationDisabledError",
+    "IndividualBetRegistrationClosedError",
 ]
