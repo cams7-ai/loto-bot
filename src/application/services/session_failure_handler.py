@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from application.notification import build_email_message, build_whatsapp_message
 from application.ports import BrowserAutomationPort, NotificationPort
 from domain import (
-    AutomationError,
+    OPERATION_CANNOT_BE_COMPLETED,
     AutomationSession,
     AutomationStatus,
-    ErrorCode,
     Operation,
+    AutomationError,
 )
 from infrastructure import playwright_error_message
 
@@ -23,35 +22,29 @@ class SessionFailureHandler:
         session: AutomationSession,
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
-        exc: AutomationError,
+        error: AutomationError,
         close: bool = True,
     ) -> None:
-        operation = session.executed_operation
+        operation = error.operation
 
         logger.error(
-            str(exc),
+            str(error),
             extra=Operation.executed_operation(operation),
         )
 
-        notification_sent = SessionFailureHandler._notify_failure(
-            session=session,
-            notifier=notifier,
-            operation=operation,
-            error_code=exc.code,
-            error_message=str(exc),
-        )
+        notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
 
         SessionFailureHandler._handle_session_after_failure(
             session=session,
             browser=browser,
             notifier=notifier,
             operation=operation,
-            error_message=str(exc),
+            error_message=str(error),
             close=close,
             notification_sent=notification_sent,
         )
 
-        raise exc
+        raise error
 
     @staticmethod
     def handle_failure(
@@ -63,19 +56,15 @@ class SessionFailureHandler:
     ) -> None:
         operation = session.executed_operation
         error_message = playwright_error_message(operation, str(exc))
-        error_code = ErrorCode.AUTOMATION_ERROR_CODE
 
         logger.error(
             error_message,
             extra=Operation.executed_operation(operation),
         )
 
-        notification_sent = SessionFailureHandler._notify_failure(
-            session=session,
-            notifier=notifier,
-            operation=operation,
-            error_code=error_code,
-        )
+        error = AutomationError(OPERATION_CANNOT_BE_COMPLETED, operation=operation)
+
+        notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
 
         SessionFailureHandler._handle_session_after_failure(
             session=session,
@@ -87,64 +76,7 @@ class SessionFailureHandler:
             notification_sent=notification_sent,
         )
 
-        raise AutomationError(error_message, operation=operation) from exc
-
-    @staticmethod
-    def close_if_open(
-        session: AutomationSession,
-        browser: BrowserAutomationPort,
-        notifier: NotificationPort,
-        operation: Operation | None = None,
-        notification_sent: bool = False,
-    ) -> None:
-        if session.status != AutomationStatus.CLOSED:
-            browser.stop()
-
-            if notification_sent:
-                notifier.stop_whatsapp_session(session)
-
-        session.mark_closed(operation)
-
-        log_message = "Fechando sessão de navegador aberta"
-        log_extra = Operation.executed_operation(session.executed_operation)
-
-        if operation is None:
-            logger.info(log_message, extra=log_extra)
-        else:
-            logger.error(log_message, extra=log_extra)
-
-    @staticmethod
-    def failed(
-        session: AutomationSession,
-        operation: Operation,
-        error_message: str,
-    ) -> None:
-        session.mark_failed(operation)
-
-        logger.error(
-            "Falha na automação LotoBot durante '%s': %s",
-            operation.value,
-            error_message,
-            extra=Operation.executed_operation(operation),
-        )
-
-    @staticmethod
-    def _notify_failure(
-        session: AutomationSession,
-        notifier: NotificationPort,
-        operation: Operation,
-        error_code: ErrorCode,
-        error_message: str | None = None
-    ) -> bool:
-        whatsapp_message = build_whatsapp_message(operation, error_code, error_message)
-        email_message = build_email_message(operation, error_message)
-
-        return notifier.notify_failure(
-            session,
-            error_code,
-            whatsapp_message,
-            email_message,
-        )
+        raise error from exc
 
     @staticmethod
     def _handle_session_after_failure(
@@ -170,4 +102,43 @@ class SessionFailureHandler:
             session=session,
             operation=operation,
             error_message=error_message,
+        )
+
+    @staticmethod
+    def close_if_open(
+            session: AutomationSession,
+            browser: BrowserAutomationPort,
+            notifier: NotificationPort,
+            operation: Operation | None = None,
+            notification_sent: bool = False,
+    ) -> None:
+        if session.status != AutomationStatus.CLOSED:
+            browser.stop()
+
+            if notification_sent:
+                notifier.stop_whatsapp_session(session)
+
+        session.mark_closed(operation)
+
+        log_message = "Fechando sessão de navegador aberta"
+        log_extra = Operation.executed_operation(session.executed_operation)
+
+        if operation is None:
+            logger.info(log_message, extra=log_extra)
+        else:
+            logger.error(log_message, extra=log_extra)
+
+    @staticmethod
+    def failed(
+            session: AutomationSession,
+            operation: Operation,
+            error_message: str,
+    ) -> None:
+        session.mark_failed(operation)
+
+        logger.error(
+            "Falha na automação LotoBot durante '%s': %s",
+            operation.value,
+            error_message,
+            extra=Operation.executed_operation(operation),
         )

@@ -7,6 +7,7 @@ from application import RunBetFlowUseCase, SessionControlUseCase
 from domain import (
     BROWSER_SESSION_OPEN,
     BROWSER_SESSION_CLOSED,
+    OPERATION_CANNOT_BE_COMPLETED,
     Operation, 
     AutomationSession, 
     AutomationError, 
@@ -74,9 +75,10 @@ class FakeNotifier:
         self.stopped = True
         session.whatsapp_enabled = False
 
-    def notify_failure(self, session, error_code, whatsapp_message, mail_message):
-        self.error_code = error_code
-        self.messages.append(whatsapp_message)
+    def notify_failure(self, whatsapp_enabled, error):
+        self.whatsapp_enabled = whatsapp_enabled
+        self.error_code = error.code
+        self.messages.append(str(error))
         return self.failure_response is not None
 
 
@@ -215,7 +217,7 @@ def test_session_control_closes_session_when_authentication_fails_unexpectedly(m
     try:
         use_case.start()
     except AutomationError as exc:
-        assert "quebrou" in str(exc)
+        assert str(exc) == OPERATION_CANNOT_BE_COMPLETED
         assert exc.operation == Operation.ACCESS_LOTTERY_PORTAL
     else:
         raise AssertionError("Erro esperado")

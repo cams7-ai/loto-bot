@@ -8,6 +8,7 @@ from domain.constants import (
     BROWSER_SESSION_CLOSED,
     INVALID_CPF,
     INVALID_PASSWORD,
+    PAYMENT_CONFIRMATION_DISABLED,
 )
 
 class AutomationError(RuntimeError):
@@ -46,5 +47,8 @@ class InvalidPasswordError(AutomationError):
 
 class PaymentConfirmationDisabledError(AutomationError):
     code = ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE
+
+    def __init__(self) -> None:
+        super().__init__(message=PAYMENT_CONFIRMATION_DISABLED, operation=Operation.CONFIRM_PAYMENT)
 
 

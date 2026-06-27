@@ -5,7 +5,7 @@ import httpx
 from domain import (
     Operation,
     AutomationSession, 
-    ErrorCode,
+    AutomationError,
     ExternalServiceError,
 )
 from infrastructure import (
@@ -143,7 +143,10 @@ def test_notification_gateway_uses_email_fallback():
     gateway = NotificationGateway(WhatsApp(), mail)
 
     gateway.start_whatsapp_session(session)
-    gateway.notify_failure(session, ErrorCode.AUTOMATION_ERROR_CODE, "Mensagem de falha", "Mensagem de falha por e-mail")
+    gateway.notify_failure(
+        session.whatsapp_enabled,
+        AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
+    )
 
     assert session.whatsapp_enabled is False
     assert mail.sent

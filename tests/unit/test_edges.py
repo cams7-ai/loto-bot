@@ -11,10 +11,10 @@ import pytest
 from pydantic import ValidationError
 
 from domain import (
+    OPERATION_CANNOT_BE_COMPLETED,
     Operation,
     AutomationSession, 
     AutomationError,
-    ErrorCode,
     ExternalServiceError, 
     PaymentAuthorization,
 )
@@ -39,8 +39,9 @@ class NoopNotifier:
     def stop_whatsapp_session(self, session):
         pass
 
-    def notify_failure(self, session, error_code, whatsapp_message, mail_message):
-        self.message = whatsapp_message
+    def notify_failure(self, whatsapp_enabled, error):
+        self.whatsapp_enabled = whatsapp_enabled
+        self.message = str(error)
         return False
 
 
@@ -74,7 +75,7 @@ def test_run_bet_flow_handles_unexpected_exception():
     try:
         use_case.run()
     except AutomationError as exc:
-        assert "quebrou" in str(exc)
+        assert str(exc) == OPERATION_CANNOT_BE_COMPLETED
     else:
         raise AssertionError("Erro esperado")
 
@@ -153,7 +154,10 @@ def test_notification_gateway_success_and_stop_warning():
     gateway = NotificationGateway(WhatsApp(), Mail(), whatsapp_enabled=True)
 
     gateway.start_whatsapp_session(session)
-    gateway.notify_failure(session, ErrorCode.AUTOMATION_ERROR_CODE, "Mensagem de falha", "Mensagem de falha por e-mail")
+    gateway.notify_failure(
+        session.whatsapp_enabled,
+        AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
+    )
     gateway.stop_whatsapp_session(session)
 
     assert session.whatsapp_enabled is False
@@ -213,7 +217,10 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
     session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
-    gateway.notify_failure(session, ErrorCode.AUTOMATION_ERROR_CODE, "Mensagem de falha", "Mensagem de falha por e-mail")
+    gateway.notify_failure(
+        session.whatsapp_enabled,
+        AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
+    )
 
 
 def test_settings_selectors_and_logging(monkeypatch):

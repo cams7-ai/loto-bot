@@ -5,6 +5,7 @@ from domain.enums import (
     WhatsAppMessageStatus,
 )
 from domain.constants import (
+    OPERATION_CANNOT_BE_COMPLETED,
     FALLBACK_EMAIL_SEND_FAILED,
     VALIDATION_CODE_FETCH_TIMEOUT,
     VALIDATION_CODE_FETCH_FAILED,
@@ -13,6 +14,7 @@ from domain.constants import (
     BROWSER_SESSION_CLOSED,
     INVALID_CPF,
     INVALID_PASSWORD,
+    PAYMENT_CONFIRMATION_DISABLED,
 )
 from domain.entities import (
     AutomationSession,
@@ -34,6 +36,7 @@ __all__ = [
     "ErrorCode",
     "WhatsAppSessionStatus",
     "WhatsAppMessageStatus",
+    "OPERATION_CANNOT_BE_COMPLETED",
     "FALLBACK_EMAIL_SEND_FAILED",
     "VALIDATION_CODE_FETCH_TIMEOUT",
     "VALIDATION_CODE_FETCH_FAILED",
@@ -42,6 +45,7 @@ __all__ = [
     "BROWSER_SESSION_CLOSED",
     "INVALID_CPF",
     "INVALID_PASSWORD",
+    "PAYMENT_CONFIRMATION_DISABLED",
     "AutomationSession",
     "AutomationStatus",
     "AutomationError",
