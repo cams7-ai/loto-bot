@@ -22,7 +22,7 @@ ERROR_RESPONSES = {
 async def start_session(container: AppContainer = Depends(get_container)) -> SessionControlResponse | None:
     try:
         result = container.session_control.start()
-        return ApiResponseMapper.session_response(result, "Sessão de navegador iniciada com sucesso.")
+        return ApiResponseMapper.session_response(result, "Sessão de navegador iniciada com sucesso")
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
 
@@ -31,7 +31,7 @@ async def start_session(container: AppContainer = Depends(get_container)) -> Ses
 async def stop_session(container: AppContainer = Depends(get_container)) -> SessionControlResponse | None:
     try:
         result = container.session_control.stop()
-        return ApiResponseMapper.session_response(result, "Sessão de navegador encerrada com sucesso.")
+        return ApiResponseMapper.session_response(result, "Sessão de navegador encerrada com sucesso")
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
 
@@ -39,4 +39,4 @@ async def stop_session(container: AppContainer = Depends(get_container)) -> Sess
 @router.get("/status", response_model=SessionStatusResponse, responses=ERROR_RESPONSES)
 async def session_status(container: AppContainer = Depends(get_container)) -> SessionStatusResponse:
     result = container.session_control.status()
-    return ApiResponseMapper.session_response(result, "Status da sessão obtido com sucesso.")
+    return ApiResponseMapper.session_response(result, "Status da sessão obtido com sucesso")

@@ -81,7 +81,7 @@ async def test_session_routes_delegate_to_use_case(override_container):
 
     assert start.status_code == 200
     assert start.json()["isOpen"] is True
-    assert start.json()["message"] == "Sessão de navegador iniciada com sucesso."
+    assert start.json()["message"] == "Sessão de navegador iniciada com sucesso"
     assert status.json()["status"] == "closed"
     assert stop.json()["isOpen"] is False
     assert override_container.session_control.started is True
