@@ -13,6 +13,29 @@ O código segue Clean Architecture: domínio e casos de uso não dependem de Fas
 - `GET /api/v1/bets/run`: executa o fluxo principal de aposta.
 - Swagger UI em `/docs`, ReDoc em `/redoc` e OpenAPI em `/openapi.json`.
 
+## Arquitetura
+
+O projeto separa responsabilidades em quatro camadas principais:
+
+- `domain`: entidades, enums, value objects, constantes e exceções de domínio.
+- `application`: casos de uso, portas, DTOs, serviços de aplicação e montagem de mensagens operacionais.
+- `infrastructure`: adapters concretos para Playwright, clients HTTP, configuração, logging e seletores.
+- `api`: rotas FastAPI, schemas, handlers HTTP, mappers e composição de dependências.
+
+As regras de dependência são validadas por testes de arquitetura com `grimp`:
+
+- `domain` não pode depender de `application`, `api` ou `infrastructure`.
+- `application` não pode depender de `api` ou `infrastructure`.
+- `infrastructure` não pode depender de `api`.
+- `api` não pode acessar diretamente Playwright ou clients HTTP.
+- frameworks externos proibidos por camada também são checados nos testes.
+
+Para executar apenas os testes de arquitetura:
+
+```powershell
+python -m pytest tests/unit/test_architecture.py
+```
+
 ## Respostas de Erro
 
 As exceções de domínio carregam o `status_code` como `http.HTTPStatus`. O `ApiExceptionMapper` usa esse valor para transformar falhas de automação em respostas HTTP padronizadas.
@@ -88,6 +111,8 @@ python -m pytest
 ```
 
 Os testes usam fakes e `httpx.MockTransport`. Nenhum teste abre o Chromium nem acessa `ONLINE_LOTTERY_URL`.
+
+Além dos testes unitários e de integração, a suíte inclui testes de arquitetura com `grimp` para impedir dependências indevidas entre camadas.
 
 ## Formatação e Qualidade
 

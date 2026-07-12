@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from application.ports import BrowserAutomationPort, NotificationPort
+from application.services.playwright_error_message_builder import PlaywrightErrorMessageBuilder
 from domain import (
     OPERATION_CANNOT_BE_COMPLETED,
     AutomationError,
@@ -12,7 +13,6 @@ from domain import (
     AutomationStatus,
     Operation,
 )
-from infrastructure.logging import playwright_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class SessionFailureHandler:
         close: bool = True,
     ) -> None:
         operation = session.executed_operation
-        error_message = playwright_error_message(operation, str(exc))
+        error_message = PlaywrightErrorMessageBuilder.build_error_message(operation, str(exc))
 
         logger.error(
             error_message,
