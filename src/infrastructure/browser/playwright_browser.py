@@ -438,8 +438,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         logger.info(
             f"Número da compra: {purchase_details.number}, "
             f"Situação da compra: {purchase_details.status}, "
-            f"Data da compra: {purchase_details.date}, "
-            f"Hora da compra: {purchase_details.time}",
+            f"Data/hora da compra: {purchase_details.datetime.isoformat()}",
             extra=Operation.executed_operation(session.executed_operation),
         )
         bets = self._get_bets(self._require_page())
