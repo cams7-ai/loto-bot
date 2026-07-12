@@ -13,5 +13,5 @@ class NotificationPort(Protocol):
     def stop_whatsapp_session(self, session: AutomationSession) -> None:
         """Encerra o WhatsApp Web quando disponível."""
 
-    def notify_failure(self, whatsapp_enabled: bool, error: AutomationError) -> bool:
+    def notify_failure(self, whatsapp_enabled: bool, exc: AutomationError) -> bool:
         """Envia WhatsApp e usa e-mail como fallback."""

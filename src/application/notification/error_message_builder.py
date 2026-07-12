@@ -1,4 +1,4 @@
-from domain import Operation, ErrorCode
+from domain import ErrorCode
 
 class ErrorMessageBuilder:
 

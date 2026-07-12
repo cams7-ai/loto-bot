@@ -13,16 +13,16 @@ from domain import (
 )
 
 class ApiExceptionMapper:
-    @staticmethod
-    def raise_api_error(exc: AutomationError) -> None:
+    @classmethod
+    def raise_api_error(cls, exc: AutomationError) -> None:
         raise ApiError(
-            status_code=ApiExceptionMapper._status_for_error(exc),
+            status_code=cls._status_for_error(exc),
             code=exc.code,
             message=str(exc),
         ) from exc
 
-    @staticmethod
-    def _status_for_error(exc: AutomationError) -> int:
+    @classmethod
+    def _status_for_error(cls, exc: AutomationError) -> int:
         if isinstance(exc, ExternalServiceError):
             # Quando o serviço externo está indisponível
             return status.HTTP_503_SERVICE_UNAVAILABLE         

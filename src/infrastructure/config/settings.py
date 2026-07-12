@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     home_path: str = Field(default="/home", alias="HOME_PATH")
     client_id: str = Field(default="cli-web-lce", alias="CLIENT_ID")
     login_url: str = Field(default="https://login.caixa.gov.br", alias="LOGIN_URL")
+    authenticate_path: str = Field(default="/auth/realms/internet/login-actions/authenticate", alias="AUTHENTICATE_PATH")
+    openid_connect_auth_path: str = Field(default="/auth/realms/internet/protocol/openid-connect/auth", alias="OPENID_CONNECT_AUTH_PATH")
     execution_id: str = Field(default="<EXECUTION_ID_DA_SESSAO>", alias="EXECUTION_ID")
 
     gmail_reader_url: str = Field(default="http://localhost:8001", alias="GMAIL_READER_URL")
@@ -41,12 +44,15 @@ class Settings(BaseSettings):
     shopping_cart_path: str = Field(default="/carrinho", alias="SHOPPING_CART_PATH")
 
     selected_lottery_modality: str = Field(default="mega-sena", alias="SELECTED_LOTTERY_MODALITY")
-    bet_number_selection_path: str = Field(default="/{lottery_modality}", alias="BET_NUMBER_SELECTION_PATH")
+    bet_page_path: str = Field(default="/{lottery_modality}", alias="BET_PAGE_PATH")
     payment_method_selection_path: str = Field(default="/pagamento#container-meio-pagamento", alias="PAYMENT_METHOD_SELECTION_PATH")
     credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
     credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
     confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
     bet_processing_path: str = Field(default="/processamento", alias="BET_PROCESSING_PATH")
+    bet_tracking_path: str = Field(default="/acompanhamento/{purchase_number}", alias="BET_TRACKING_PATH")
+    bet_purchase_path: str = Field(default="/compras/{purchase_number}", alias="BET_PURCHASE_PATH")
+    bet_tracking_timeout_seconds: int = Field(default=30, alias="BET_TRACKING_TIMEOUT_SECONDS")
 
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="BROWSER_PROFILE_DIR")
     browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
@@ -68,7 +74,7 @@ class Settings(BaseSettings):
             return False
         raise ValueError("Valor booleano inválido. Use um dos seguintes: 1, 0, true, false, yes, no, y, n, sim, nao.")
 
-    @field_validator("validation_code_wait_timeout_seconds", "whatsapp_timeout_seconds", "browser_timeout_seconds", "validation_code_lookup_lead_seconds")
+    @field_validator("validation_code_wait_timeout_seconds", "whatsapp_timeout_seconds", "browser_timeout_seconds", "validation_code_lookup_lead_seconds", "bet_tracking_timeout_seconds")
     @classmethod
     def validate_positive_int(cls, value: int) -> int:
         if value <= 0:
@@ -83,47 +89,29 @@ class Settings(BaseSettings):
             self.browser_profile_dir = (base_dir / profile_dir).resolve()
         return self
 
-    def authentication_url(self, tab_id: str, execution_id: str | None = None) -> str:
-        execution = execution_id or self.execution_id
-        return (
-            f"{self.login_url}/auth/realms/internet/login-actions/authenticate"
-            f"?execution={execution}&client_id={self.client_id}&tab_id={tab_id}"
-        )
-
-    def cpf_url(self, state: str, nonce: str) -> str:
-        return (
-            f"{self.login_url}/auth/realms/internet/protocol/openid-connect/auth"
-            f"?response_type=code&client_id={self.client_id}&redirect_uri={self.home_url}"
-            f"&state={state}&nonce={nonce}"
-        )
-
     @property
     def _lottery_url(self) -> str:
         return f"{self.online_lottery_url}{self.online_lottery_path}"
-
-    @property
-    def terms_of_use_url(self) -> str:
-        return f"{self._lottery_url}{self.terms_of_use_path}"
 
     @property
     def home_url(self) -> str:
         return f"{self._lottery_url}{self.home_path}"
 
     @property
-    def shopping_cart_url(self) -> str:
-        return f"{self._lottery_url}{self.shopping_cart_path}"
+    def bet_page_path_with_modality(self) -> str:
+        return f"{self.bet_page_path.format(lottery_modality=self.selected_lottery_modality)}"
+    
+    @property
+    def payment_method_selection_path_without_container(self) -> str:
+        return self.payment_method_selection_path.partition("#")[0] 
 
     @property
-    def bet_number_selection_url(self) -> str:
-        return f"{self._lottery_url}{self.bet_number_selection_path.format(lottery_modality=self.selected_lottery_modality)}"
-    
+    def bet_tracking_path_without_purchase(self) -> str:
+        return re.sub(r"\{[^/]+\}$", "", self.bet_tracking_path)
+
     @property
-    def payment_method_selection_url(self) -> str:
-        return f"{self.shopping_cart_url}{self.payment_method_selection_path}"
-    
-    @property
-    def bet_processing_url(self) -> str:
-        return f"{self.shopping_cart_url}{self.bet_processing_path}"
+    def bet_purchase_path_without_purchase(self) -> str:
+        return re.sub(r"\{[^/]+\}$", "", self.bet_purchase_path)
 
 
 @lru_cache

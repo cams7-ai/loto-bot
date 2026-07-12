@@ -17,37 +17,39 @@ from infrastructure import playwright_error_message
 logger = logging.getLogger(__name__)
 
 class SessionFailureHandler:
-    @staticmethod
+    @classmethod
     def handle_custom_failure(
+        cls,
         session: AutomationSession,
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
-        error: AutomationError,
+        exc: AutomationError,
         close: bool = True,
     ) -> None:
-        operation = error.operation
+        operation = exc.operation
 
         logger.error(
-            str(error),
+            str(exc),
             extra=Operation.executed_operation(operation),
         )
 
-        notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
+        notification_sent = notifier.notify_failure(session.whatsapp_enabled, exc)
 
-        SessionFailureHandler._handle_session_after_failure(
+        cls._handle_session_after_failure(
             session=session,
             browser=browser,
             notifier=notifier,
             operation=operation,
-            error_message=str(error),
+            error_message=str(exc),
             close=close,
             notification_sent=notification_sent,
         )
 
-        raise error
+        raise exc
 
-    @staticmethod
+    @classmethod
     def handle_failure(
+        cls,
         session: AutomationSession,
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
@@ -66,7 +68,7 @@ class SessionFailureHandler:
 
         notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
 
-        SessionFailureHandler._handle_session_after_failure(
+        cls._handle_session_after_failure(
             session=session,
             browser=browser,
             notifier=notifier,
@@ -78,8 +80,9 @@ class SessionFailureHandler:
 
         raise error from exc
 
-    @staticmethod
+    @classmethod
     def _handle_session_after_failure(
+        cls,
         session: AutomationSession,
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
@@ -89,7 +92,7 @@ class SessionFailureHandler:
         notification_sent: bool,
     ) -> None:
         if close:
-            SessionFailureHandler.close_if_open(
+            cls.close_if_open(
                 session=session,
                 browser=browser,
                 notifier=notifier,
@@ -98,14 +101,15 @@ class SessionFailureHandler:
             )
             return
 
-        SessionFailureHandler.failed(
+        cls._failed(
             session=session,
             operation=operation,
             error_message=error_message,
         )
 
-    @staticmethod
+    @classmethod
     def close_if_open(
+            cls,
             session: AutomationSession,
             browser: BrowserAutomationPort,
             notifier: NotificationPort,
@@ -128,8 +132,9 @@ class SessionFailureHandler:
         else:
             logger.error(log_message, extra=log_extra)
 
-    @staticmethod
-    def failed(
+    @classmethod
+    def _failed(
+            cls,
             session: AutomationSession,
             operation: Operation,
             error_message: str,

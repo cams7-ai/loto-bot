@@ -25,7 +25,7 @@ class BrowserAutomationPort(Protocol):
     def is_authenticated(self) -> bool:
         """Tenta acessar a área autenticada e verifica se o usuário está logado."""
 
-    def accept_terms(self) -> None:
+    def accept_terms(self, session: AutomationSession) -> None:
         """Aceita os termos de uso."""
 
     def submit_cpf(self, session: AutomationSession) -> None:
@@ -46,29 +46,28 @@ class BrowserAutomationPort(Protocol):
     def submit_password(self, session: AutomationSession) -> None:
         """Informa a senha."""
 
-    def disable_notification(self) -> None:
-        """Desabilita notificações do portal."""
-
-    def clear_shopping_cart(self) -> None:
+    def clear_shopping_cart(self, session: AutomationSession) -> None:
         """Limpa carrinho no portal."""
 
-    def select_lottery_modality(self) -> None:
+    def select_lottery_modality(self, session: AutomationSession) -> None:
         """Seleciona a modalidade."""
 
-    def choose_random_numbers(self) -> None:
+    def place_bet(self, session: AutomationSession) -> None:
         """Completa o jogo com números aleatórios."""
-
-    def add_bet_to_cart(self) -> None:
         """Adiciona a aposta ao carrinho."""
 
     def confirm_purchase(self, session: AutomationSession) -> None:
-        """Confirma a compra."""
-
-    def select_payment_method(self) -> None:
-        """Seleciona a forma de pagamento."""
+        """Confirma a compra."""        
 
     def confirm_payment(self) -> None:
+        """Seleciona a forma de pagamento."""
         """Confirma o pagamento no portal."""
 
-    def finish_bet(self) -> str:
+    def check_bet_processing(self, session: AutomationSession) -> None:
+        """Acessa a página de conferência de processamento da aposta."""
+
+    def check_your_purchases(self, session: AutomationSession) -> None:
+        """Acessa a página de conferência de compras."""
+
+    def finish_bet(self, session: AutomationSession) -> None:
         """Finaliza a aposta e retorna o código de acompanhamento."""

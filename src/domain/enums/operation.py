@@ -13,13 +13,12 @@ class Operation(StrEnum):
     REQUEST_VALIDATION_CODE = "Solicita o código de acesso"
     SUBMIT_VALIDATION_CODE = "Informa o código de acesso"
     SUBMIT_PASSWORD = "Informa a senha"
-    SELECT_LOTTERY_MODALITY = "Seleciona uma modalidade"
     SHOPPING_CART = "Carrinho de compras"
-    CHOOSE_RANDOM_NUMBERS = "Escolhe os números da aposta"
-    ADD_BET_TO_CART = "Adiciona a aposta ao carrinho"
-    CONFIRM_PURCHASE = "Confirma a compra"
-    SELECT_PAYMENT_METHOD = "Seleciona PIX ou cartão"
+    SELECT_LOTTERY_MODALITY = "Seleciona uma modalidade"
+    PLACE_BET = "Realiza aposta"
     CONFIRM_PAYMENT = "Confirma o pagamento"
+    CHECK_BET_PROCESSING = "Processamento da aposta"
+    CHECK_YOUR_PURCHASES = "Confira a suas compras"
     COMPLETE_BET = "Finaliza a aposta"
 
     @staticmethod

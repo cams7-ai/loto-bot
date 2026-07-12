@@ -41,27 +41,23 @@ class RunBetFlowUseCase:
 
         try:
             self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_authenticated_home())
-            self._execute(Operation.SELECT_LOTTERY_MODALITY, lambda _: self._browser.select_lottery_modality())
-            self._execute(Operation.CHOOSE_RANDOM_NUMBERS, lambda _: self._browser.choose_random_numbers())
-            self._execute(Operation.ADD_BET_TO_CART, lambda _: self._browser.add_bet_to_cart())
-            self._execute(Operation.CONFIRM_PURCHASE, self._browser.confirm_purchase)
-            self._execute(Operation.SELECT_PAYMENT_METHOD, lambda _: self._browser.select_payment_method())
-
-            self._session.mark_running(Operation.CONFIRM_PAYMENT)
+            self._execute(Operation.SELECT_LOTTERY_MODALITY, self._browser.select_lottery_modality)
+            self._execute(Operation.PLACE_BET, self._browser.place_bet)
+            self._execute(Operation.CONFIRM_PAYMENT, self._browser.confirm_purchase)
             self._payment_authorization.require_confirmation()
-            self._browser.confirm_payment()
+            self._execute(Operation.CONFIRM_PAYMENT, lambda _: self._browser.confirm_payment())
             logger.info("Operação concluída", extra=Operation.executed_operation(self._session.executed_operation))
-
-            self._session.mark_running(Operation.COMPLETE_BET)
-            tracking_code = self._browser.finish_bet()
-            self._session.mark_finished(tracking_code)
-            close_if_open(self._session, self._browser, self._notifier, None,True)
+            self._execute(Operation.CHECK_BET_PROCESSING, self._browser.check_bet_processing)
+            self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
+            self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
+            self._session.mark_finished(self._session.purchase_number)
+#            close_if_open(self._session, self._browser, self._notifier, None,True)
             return AutomationRunResult(
                 session_id=self._session.id,
                 status="finished",
                 message="Aposta finalizada com sucesso.",
                 executed_operation=self._session.executed_operation,
-                tracking_code=tracking_code,
+                tracking_code=self._session.purchase_number,
             )
 
         except AutomationError as exc:

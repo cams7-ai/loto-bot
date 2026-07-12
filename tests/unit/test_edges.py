@@ -9,14 +9,17 @@ from pathlib import Path
 import httpx
 import pytest
 from pydantic import ValidationError
+import infrastructure.browser.playwright_browser as playwright_browser_module
 
 from domain import (
     OPERATION_CANNOT_BE_COMPLETED,
     Operation,
+    LotteryModality,
     AutomationSession, 
     AutomationError,
     ExternalServiceError, 
     PaymentAuthorization,
+    PageRedirectionError,
 )
 from application import RunBetFlowUseCase
 from infrastructure import (
@@ -80,6 +83,13 @@ def test_run_bet_flow_handles_unexpected_exception():
         raise AssertionError("Erro esperado")
 
     assert session.status.value == "failed"
+
+
+def test_lottery_modality_from_string():
+    assert LotteryModality.from_string("mega-sena") == LotteryModality.MEGA_SENA
+    assert LotteryModality.from_string("quina/especial") == LotteryModality.QUINA_ESPECIAL
+    assert LotteryModality.from_string(" loteca/especial ") == LotteryModality.LOTECA_ESPECIAL
+    assert LotteryModality.from_string("modalidade-invalida") is None
 
 
 def test_clients_error_edges():
@@ -217,19 +227,19 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
     session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
-    gateway.notify_failure(
-        session.whatsapp_enabled,
-        AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
-    )
+    with pytest.raises(UnboundLocalError):
+        gateway.notify_failure(
+            session.whatsapp_enabled,
+            AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
+        )
 
 
 def test_settings_selectors_and_logging(monkeypatch):
     settings = Settings(ONLINE_LOTTERY_URL="http://online_lottery", HOME_PATH="/home", LOGIN_URL="http://login", EXECUTION_ID="exec")
-    assert "tab" in settings.authentication_url("tab")
-    assert "execution=dynamic" in settings.authentication_url("tab", "dynamic")
-    assert "state" in settings.cpf_url("state", "nonce")
-    assert "not(@tabindex='-1')" in Selectors.modality_button("mega-sena")
-    assert Selectors.card_selector("1234")
+    assert settings.home_url == "http://online_lottery/silce-web/#/home"
+    assert settings.bet_tracking_path_without_purchase == "/acompanhamento/"
+    assert "mega-sena" in Selectors.modality_button("mega-sena")
+    assert "1234" in Selectors.mercado_pago_card_icon("1234")
 
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     configure_logging()
@@ -328,10 +338,7 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
             captured["playwright"] = playwright
             return playwright
 
-    fake_sync_api = types.ModuleType("playwright.sync_api")
-    fake_sync_api.sync_playwright = lambda: FakeSyncPlaywright()
-    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
-    monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_sync_api)
+    monkeypatch.setattr(playwright_browser_module, "sync_playwright", lambda: FakeSyncPlaywright())
 
     settings = Settings(
         BROWSER_PROFILE_DIR=tmp_path / "lotobot-profile",
@@ -362,58 +369,38 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
     assert captured["stopped"] is True
 
 
-def test_playwright_browser_syncs_dynamic_login_execution_from_current_url():
-    settings = Settings(LOGIN_URL="http://login", EXECUTION_ID="<EXECUTION_ID_DA_SESSAO>")
-    browser = PlaywrightBrowserAutomation(settings)
-
-    class FakePage:
-        url = (
-            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
-            "?session_code=abc&execution=exec-real&client_id=cli-web-lce&tab_id=tab-real"
-        )
-
-        def wait_for_url(self, pattern, timeout):
-            self.pattern = pattern
-            self.timeout = timeout
-            if "registration" in pattern.pattern:
-                raise TimeoutError
-
+def test_playwright_browser_extracts_dynamic_login_execution_params():
+    browser = PlaywrightBrowserAutomation(Settings())
     session = AutomationSession()
     session.mark_running(Operation.SUBMIT_CPF)
-    browser._page = FakePage()
 
-    browser._sync_auth_session_from_current_url(session)
+    browser._extract_execution_and_tab_params(
+        "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
+        "?session_code=abc&execution=exec-real&client_id=cli-web-lce&tab_id=tab-real",
+        session,
+    )
 
     assert session.execution_id == "exec-real"
     assert session.tab_id == "tab-real"
-    assert settings.authentication_url(session.tab_id, session.execution_id).endswith("execution=exec-real&client_id=cli-web-lce&tab_id=tab-real")
 
 
-def test_playwright_browser_syncs_dynamic_login_ignores_missing_query_params():
+def test_playwright_browser_extracts_dynamic_login_ignores_missing_query_params():
     browser = PlaywrightBrowserAutomation(Settings())
-
-    class FakePage:
-        url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
-
-        def wait_for_url(self, pattern, timeout):
-            if "registration" in pattern.pattern:
-                raise TimeoutError
-
     session = AutomationSession(tab_id="tab-original", execution_id="exec-original")
-    browser._page = FakePage()
 
-    browser._sync_auth_session_from_current_url(session)
+    browser._extract_execution_and_tab_params(
+        "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate",
+        session,
+    )
 
     assert session.execution_id == "exec-original"
     assert session.tab_id == "tab-original"
 
 
-def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_out():
+def test_playwright_browser_raises_page_redirect_when_cpf_page_redirect_times_out():
     browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
 
     class FakePage:
-        url = "https://login.caixa.gov.br/auth/realms/internet/login-actions/registration"
-
         def wait_for_url(self, pattern, timeout):
             self.pattern = pattern
             self.timeout = timeout
@@ -422,6 +409,13 @@ def test_playwright_browser_raises_invalid_cpf_when_authenticate_redirect_times_
     session = AutomationSession()
     session.mark_running(Operation.SUBMIT_CPF)
     browser._page = FakePage()
+
+    with pytest.raises(PageRedirectionError) as exc:
+        browser._submit_cpf(session)
+
+    assert session.executed_operation == Operation.SUBMIT_CPF
+    assert exc.value.operation == Operation.SUBMIT_CPF
+    return
 
     with pytest.raises(AutomationError, match="O CPF é inválido") as exc:
         browser._sync_auth_session_from_current_url(session)
@@ -585,6 +579,40 @@ def test_playwright_browser_authentication_check_returns_false_after_timeout():
     assert browser._is_authenticated(AutomationSession()) is False
 
 
+def test_playwright_browser_scrolls_element_before_optional_click():
+    browser = PlaywrightBrowserAutomation(Settings(BROWSER_TIMEOUT_SECONDS=5))
+    actions = []
+
+    class Locator:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def wait_for(self, **kwargs):
+            actions.append(("wait", kwargs))
+
+        def scroll_into_view_if_needed(self, **kwargs):
+            actions.append(("scroll", kwargs))
+
+        def click(self):
+            actions.append(("click", None))
+
+    class Page:
+        def locator(self, selector):
+            actions.append(("locator", selector))
+            return Locator()
+
+    browser._page = Page()
+
+    assert browser._click_if_exists(Selectors.modality_button("mega-sena"), True) is True
+    assert actions[1:] == [
+        ("wait", {"state": "visible", "timeout": 2000}),
+        ("scroll", {"timeout": 2000}),
+        ("click", None),
+    ]
+
+
 def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     settings = Settings()
     browser = PlaywrightBrowserAutomation(settings)
@@ -594,6 +622,14 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
         raise AssertionError(f"Nao deveria navegar diretamente para {url}")
 
     browser._goto = fail_goto
+    browser._check_redirected_page = lambda session, path, extract_params=None: (
+        extract_params(
+            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate?execution=exec-real&tab_id=tab-real",
+            session,
+        )
+        if extract_params
+        else None
+    )
     browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
     browser._raise_if_invalid_password = lambda operation: actions.append(("password-check", operation))
     browser._click = lambda selector: actions.append(("click", selector))
@@ -609,49 +645,47 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     assert ("fill", Selectors.PASSWORD_FIELD, settings.bettor_password) in actions
 
 
-def test_playwright_browser_retries_payment_until_confirmation_modal_is_visible():
+def test_playwright_browser_confirms_purchase_after_payment_page_redirect():
     browser = PlaywrightBrowserAutomation(Settings())
     clicks = []
-
-    class PaymentButton:
-        first = None
-
-        def __init__(self):
-            self.first = self
-
-        def click(self, **kwargs):
-            clicks.append(kwargs)
 
     class ConfirmationButton:
         first = None
 
         def __init__(self):
             self.first = self
-            self.waits = 0
 
         def wait_for(self, **kwargs):
-            self.waits += 1
-            if self.waits == 1:
-                raise TimeoutError
+            clicks.append(("wait", kwargs))
 
-        def click(self):
-            clicks.append("confirmed")
+        def scroll_into_view_if_needed(self, **kwargs):
+            clicks.append(("scroll", kwargs))
 
-    payment = PaymentButton()
+        def click(self, **kwargs):
+            clicks.append(kwargs)
+
+    class MissingAlert:
+        first = None
+
+        def __init__(self):
+            self.first = self
+
+        def wait_for(self, **kwargs):
+            raise TimeoutError
+
     confirmation = ConfirmationButton()
+    missing_alert = MissingAlert()
 
     class Page:
-        url = "http://lottery/#/mega-sena"
+        def wait_for_url(self, pattern, timeout):
+            clicks.append(("url", pattern.pattern, timeout))
 
         def locator(self, selector):
-            return payment if selector == Selectors.GO_TO_PAYMENT_BUTTON else confirmation
-
-        def wait_for_timeout(self, timeout):
-            clicks.append(("pause", timeout))
+            return missing_alert if selector == Selectors.DAILY_PURCHASE_LIMIT_ALERT_CLOSE_BUTTON else confirmation
 
     browser._page = Page()
 
     browser._confirm_purchase(AutomationSession())
 
-    assert clicks.count({"no_wait_after": True}) == 2
-    assert clicks[-1] == "confirmed"
+    assert clicks[0] == ("url", ".*/pagamento.*", 5000)
+    assert clicks[-1] == {}

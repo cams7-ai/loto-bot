@@ -48,8 +48,7 @@ class SessionControlUseCase:
         logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation))
         try:
             if self._authenticate():
-                self._execute(Operation.ACCESS_HOME, lambda _:  self._browser.disable_notification())
-                self._execute(Operation.SHOPPING_CART, lambda _: self._browser.clear_shopping_cart())
+                self._execute(Operation.SHOPPING_CART, self._browser.clear_shopping_cart)
                 logger.info("Sessão de navegador autenticada", extra=Operation.executed_operation(self._session.executed_operation))
         except AutomationError as exc:
             handle_custom_failure(self._session, self._browser, self._notifier, exc)
@@ -64,7 +63,7 @@ class SessionControlUseCase:
         if self._browser.is_authenticated():
             return True
 
-        self._execute(Operation.ACCEPT_TERMS, lambda _: self._browser.accept_terms())
+        self._execute(Operation.ACCEPT_TERMS, self._browser.accept_terms)
         self._execute(Operation.ACCESS_HOME, lambda _: self._browser.access_home())
         self._execute(Operation.SUBMIT_CPF, self._browser.submit_cpf)
 

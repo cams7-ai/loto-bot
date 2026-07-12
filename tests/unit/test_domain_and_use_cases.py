@@ -37,8 +37,8 @@ class FakeBrowser:
             self.calls.append(name)
             if name == "submit_password":
                 self.authenticated = True
-            if name == "finish_bet":
-                return "123456"
+            if name == "check_your_purchases":
+                args[0].purchase_number = "123456"
             return None
 
         return method
@@ -311,7 +311,7 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
     assert result.tracking_code == "123456"
     assert browser.calls[0] == "access_authenticated_home"
     assert "confirm_payment" in browser.calls
-    assert browser.calls[-1] == "stop"
+    assert browser.calls[-1] == "finish_bet"
 
 
 def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monkeypatch):

@@ -14,11 +14,11 @@ class NotificationMessageBuilder:
         )
 
     @staticmethod
-    def build_whatsapp_message(error: AutomationError) -> str:
+    def build_whatsapp_message(exc: AutomationError) -> str:
         return (
-            f"❌ {ErrorMessageBuilder.get_error_message(error.code)}.\n\n"
-            f"Etapa: {error.operation.value}\n\n"
-            f"{str(error)}. "
+            f"❌ {ErrorMessageBuilder.get_error_message(exc.code)}.\n\n"
+            f"Etapa: {exc.operation.value}\n\n"
+            f"{str(exc)}. "
             "Por favor, verifique e tente novamente."
         )
 

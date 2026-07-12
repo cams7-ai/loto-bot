@@ -6,18 +6,19 @@ from domain import Operation
 class PlaywrightErrorMessageBuilder:
     _UNKNOWN_VALUE = "Não identificado"
 
-    @staticmethod
+    @classmethod
     def build_error_message(
+        cls,
         operation: Operation,
         error_message: str,
     ) -> str:
-        element = PlaywrightErrorMessageBuilder._extract_element(error_message)
+        element = cls._extract_element(error_message)
 
-        if element == PlaywrightErrorMessageBuilder._UNKNOWN_VALUE:
+        if element == cls._UNKNOWN_VALUE:
             return error_message
 
-        event = PlaywrightErrorMessageBuilder._extract_event(error_message)
-        cause = PlaywrightErrorMessageBuilder._extract_cause(error_message)
+        event = cls._extract_event(error_message)
+        cause = cls._extract_cause(error_message)
 
         return (
             f"Falha ao executar a operação '{operation.value}'. "
@@ -25,29 +26,29 @@ class PlaywrightErrorMessageBuilder:
             f"Motivo: {cause}."
         )
 
-    @staticmethod
-    def _extract_event(error_message: str) -> str:
+    @classmethod
+    def _extract_event(cls, error_message: str) -> str:
         match = re.search(r"^(Locator\.\w+):", error_message)
         return (
             match.group(1)
             if match
-            else PlaywrightErrorMessageBuilder._UNKNOWN_VALUE
+            else cls._UNKNOWN_VALUE
         )
 
-    @staticmethod
-    def _extract_element(error_message: str) -> str:
-        match = re.search(r"locator\((.*?)\)", error_message, re.DOTALL)
+    @classmethod
+    def _extract_element(cls, error_message: str) -> str:
+        match = re.search(r"locator\((['\"])(.*?)(?<!\\)\1\)", error_message, re.DOTALL)
         return (
-            match.group(1)
+            f"{match.group(1)}{match.group(2)}{match.group(1)}"
             if match
-            else PlaywrightErrorMessageBuilder._UNKNOWN_VALUE
+            else cls._UNKNOWN_VALUE
         )
 
-    @staticmethod
-    def _extract_cause(error_message: str) -> str:
+    @classmethod
+    def _extract_cause(cls, error_message: str) -> str:
         match = re.search(r":\s*(.+?)\.", error_message)
         return (
             match.group(1)
             if match
-            else PlaywrightErrorMessageBuilder._UNKNOWN_VALUE
+            else cls._UNKNOWN_VALUE
         )

@@ -65,23 +65,23 @@ class NotificationGateway(NotificationPort):
         finally:
             session.whatsapp_enabled = False
 
-    def notify_failure(self, whatsapp_enabled: bool, error: AutomationError) -> bool:
-        operation = error.operation
+    def notify_failure(self, whatsapp_enabled: bool, exc: AutomationError) -> bool:
+        operation = exc.operation
         if whatsapp_enabled:
             try:
                 status = self._whatsapp.status(operation)
-                response = self._whatsapp.send_message(operation, build_whatsapp_message(error)) if status == WhatsAppSessionStatus.SESSION_OPEN.value else None
+                response = self._whatsapp.send_message(operation, build_whatsapp_message(exc)) if status == WhatsAppSessionStatus.SESSION_OPEN.value else None
                 if response == WhatsAppMessageStatus.SENT.value:
                     logger.info("Notificação enviada pelo WhatsApp", extra=Operation.executed_operation(operation))
                     return True
             except Exception as exc:
                 logger.warning("Falha ao enviar WhatsApp: %s", exc, extra=Operation.executed_operation(operation))
 
-        self._send_mail_fallback(error)
+        self._send_mail_fallback(exc)
         return False
 
-    def _send_mail_fallback(self, error: AutomationError) -> None:
-        operation = error.operation
+    def _send_mail_fallback(self, exc: AutomationError) -> None:
+        operation = exc.operation
         try:
             timestamp_timezone = ZoneInfo(self._TIMEZONE)
         except ZoneInfoNotFoundError:  # pragma: no cover - depends on host timezone database.
@@ -92,10 +92,10 @@ class NotificationGateway(NotificationPort):
         subject = f"LotoBot - falha durante {operation.value}"
         body = (
             "<html><body>"
-            f"<h1>{get_error_message(error.code)}</h1>"
+            f"<h1>{get_error_message(exc.code)}</h1>"
             f"<p><strong>Operação:</strong> {operation.value}</p>"
             f"<p><strong>Data/hora:</strong> {now}</p>"
-            f"<p>{build_email_message(str(error))}</p>"
+            f"<p>{build_email_message(str(exc))}</p>"
             "</body></html>"
         )
         try:
