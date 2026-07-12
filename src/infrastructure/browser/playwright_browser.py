@@ -35,7 +35,7 @@ from domain import (
     Operation,
     PageRedirectionError,
 )
-from infrastructure.browser.portal_data import Bet, PurchaseDetails, PurchaseTotals
+from infrastructure.browser.portal_data import Bet, PortalDataFormatter, PurchaseDetails, PurchaseTotals
 from infrastructure.config import Settings
 from infrastructure.selectors import Selectors
 
@@ -447,18 +447,19 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 f"Números da aposta: {bet.numbers}, "
                 f"Concurso da aposta: {bet.draw}, "
                 f"Situação da aposta: {bet.status}, "
-                f"Valor da aposta: {bet.amount}",
+                f"Valor da aposta: {PortalDataFormatter.format_brl_currency(bet.amount)}",
                 extra=Operation.executed_operation(session.executed_operation),
             )
         purchase_totals = self._get_purchase_totals(self._require_page(), self._timeout_ms)
+        format_brl = PortalDataFormatter.format_brl_currency
 
         logger.info(
-            f"Total da compra: {purchase_totals.total_purchase}, "
-            f"Total de apostas em processamento: {purchase_totals.total_bets_in_processing}, "
-            f"Total de apostas efetivadas: {purchase_totals.total_bets_effective}, "
-            f"Total de apostas não efetivadas: {purchase_totals.total_bets_not_effective}, "
-            f"Total devolvido ao meio de pagamento: {purchase_totals.total_refunded}, "
-            f"Total em devolução ao meio de pagamento: {purchase_totals.total_in_refund}",
+            f"Total da compra: {format_brl(purchase_totals.total_purchase)}, "
+            f"Total de apostas em processamento: {format_brl(purchase_totals.total_bets_in_processing)}, "
+            f"Total de apostas efetivadas: {format_brl(purchase_totals.total_bets_effective)}, "
+            f"Total de apostas não efetivadas: {format_brl(purchase_totals.total_bets_not_effective)}, "
+            f"Total devolvido ao meio de pagamento: {format_brl(purchase_totals.total_refunded)}, "
+            f"Total em devolução ao meio de pagamento: {format_brl(purchase_totals.total_in_refund)}",
             extra=Operation.executed_operation(session.executed_operation),
         )
 
