@@ -9,11 +9,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from secrets import token_hex
 from time import monotonic
-from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import (
     BrowserContext,
+    Locator,
     Page,
     Playwright,
     sync_playwright,
@@ -35,7 +35,7 @@ from domain import (
     Operation,
     PageRedirectionError,
 )
-from infrastructure.browser.portal_data import Bet
+from infrastructure.browser.portal_data import Bet, PurchaseDetails, PurchaseTotals
 from infrastructure.config import Settings
 from infrastructure.selectors import Selectors
 
@@ -434,15 +434,12 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _finish_bet(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.bet_purchase_path_without_purchase)
-        purchase_number = self._required_inner_text(Selectors.purchase_details_value("Número da Compra"))
-        purchase_status = self._required_inner_text(Selectors.purchase_details_value("Situação da Compra"))
-        purchase_date = self._required_inner_text(Selectors.purchase_details_value("Data da Compra"))
-        purchase_time = self._required_inner_text(Selectors.purchase_details_value("Hora da Compra"))
+        purchase_details = self._get_purchase_details(self._require_page(), self._timeout_ms)
         logger.info(
-            f"Número da compra: {purchase_number}, "
-            f"Situação da compra: {purchase_status}, "
-            f"Data da compra: {purchase_date}, "
-            f"Hora da compra: {purchase_time}",
+            f"Número da compra: {purchase_details.number}, "
+            f"Situação da compra: {purchase_details.status}, "
+            f"Data da compra: {purchase_details.date}, "
+            f"Hora da compra: {purchase_details.time}",
             extra=Operation.executed_operation(session.executed_operation),
         )
         bets = self._get_bets(self._require_page())
@@ -454,30 +451,66 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 f"Valor da aposta: {bet.amount}",
                 extra=Operation.executed_operation(session.executed_operation),
             )
-
-        total_purchase = self._required_inner_text(Selectors.purchase_totals_value("Total da Compra"))
-        total_bets_in_processing = self._required_inner_text(
-            Selectors.purchase_totals_value("Total de Apostas em Processamento")
-        )
-        total_bets_effective = self._required_inner_text(Selectors.purchase_totals_value("Total de Apostas Efetivadas"))
-        total_bets_not_effective = self._optional_inner_text(
-            Selectors.purchase_totals_value("Total de Apostas Não Efetivadas")
-        )
-        total_refunded = self._required_inner_text(
-            Selectors.purchase_totals_value("Total Devolvido ao Meio de Pagamento")
-        )
-        total_in_refund = self._required_inner_text(
-            Selectors.purchase_totals_value("Em Devolução ao Meio de Pagamento")
-        )
+        purchase_totals = self._get_purchase_totals(self._require_page(), self._timeout_ms)
 
         logger.info(
-            f"Total da compra: {total_purchase}, "
-            f"Total de apostas em processamento: {total_bets_in_processing}, "
-            f"Total de apostas efetivadas: {total_bets_effective}, "
-            f"Total de apostas não efetivadas: {total_bets_not_effective}, "
-            f"Total devolvido ao meio de pagamento: {total_refunded}, "
-            f"Total em devolução ao meio de pagamento: {total_in_refund}",
+            f"Total da compra: {purchase_totals.total_purchase}, "
+            f"Total de apostas em processamento: {purchase_totals.total_bets_in_processing}, "
+            f"Total de apostas efetivadas: {purchase_totals.total_bets_effective}, "
+            f"Total de apostas não efetivadas: {purchase_totals.total_bets_not_effective}, "
+            f"Total devolvido ao meio de pagamento: {purchase_totals.total_refunded}, "
+            f"Total em devolução ao meio de pagamento: {purchase_totals.total_in_refund}",
             extra=Operation.executed_operation(session.executed_operation),
+        )
+
+    @staticmethod
+    def _get_purchase_details(page: Page, timeout_ms: int) -> PurchaseDetails:
+        purchase_number = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_details_value("Número da Compra"), timeout_ms
+        )
+        purchase_status = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_details_value("Situação da Compra"), timeout_ms
+        )
+        purchase_date = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_details_value("Data da Compra"), timeout_ms
+        )
+        purchase_time = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_details_value("Hora da Compra"), timeout_ms
+        )
+        return PurchaseDetails(
+            number=purchase_number,
+            status=purchase_status,
+            date=purchase_date,
+            time=purchase_time,
+        )
+
+    @staticmethod
+    def _get_purchase_totals(page: Page, timeout_ms: int) -> PurchaseTotals:
+        total_purchase = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_totals_value("Total da Compra"), timeout_ms
+        )
+        total_bets_in_processing = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_totals_value("Total de Apostas em Processamento"), timeout_ms
+        )
+        total_bets_effective = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_totals_value("Total de Apostas Efetivadas"), timeout_ms
+        )
+        total_bets_not_effective = PlaywrightBrowserAutomation._optional_inner_text(
+            page, Selectors.purchase_totals_value("Total de Apostas Não Efetivadas")
+        )
+        total_refunded = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_totals_value("Total Devolvido ao Meio de Pagamento"), timeout_ms
+        )
+        total_in_refund = PlaywrightBrowserAutomation._required_inner_text(
+            page, Selectors.purchase_totals_value("Em Devolução ao Meio de Pagamento"), timeout_ms
+        )
+        return PurchaseTotals(
+            total_purchase=total_purchase,
+            total_bets_in_processing=total_bets_in_processing,
+            total_bets_effective=total_bets_effective,
+            total_bets_not_effective=total_bets_not_effective,
+            total_refunded=total_refunded,
+            total_in_refund=total_in_refund,
         )
 
     @staticmethod
@@ -504,23 +537,25 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
         return bets
 
-    def _optional_inner_text(self, selector: Selectors | str) -> str:
-        locator = self._require_page().locator(self._selector_value(selector))
+    @staticmethod
+    def _optional_inner_text(page: Page, selector: Selectors | str) -> str:
+        locator = page.locator(PlaywrightBrowserAutomation._selector_value(selector))
         if locator.count() == 0:
             return ""
         return locator.first.inner_text().strip()
 
-    def _required_inner_text(self, selector: Selectors | str) -> str:
-        locator = self._require_page().locator(self._selector_value(selector)).first
-        locator.wait_for(state="visible", timeout=self._timeout_ms)
+    @staticmethod
+    def _required_inner_text(page: Page, selector: Selectors | str, timeout_ms: int) -> str:
+        locator = page.locator(PlaywrightBrowserAutomation._selector_value(selector)).first
+        locator.wait_for(state="visible", timeout=timeout_ms)
 
-        deadline = monotonic() + (self._timeout_ms / 1000)
+        deadline = monotonic() + (timeout_ms / 1000)
         text = ""
         while monotonic() < deadline:
             text = locator.inner_text().strip()
             if text:
                 return text
-            self._require_page().wait_for_timeout(100)
+            page.wait_for_timeout(100)
 
         return text
 
@@ -550,11 +585,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         return True
 
     @staticmethod
-    def _prepare_for_click(element: Any, timeout_ms: int) -> None:
+    def _prepare_for_click(element: Locator, timeout_ms: int) -> None:
         element.wait_for(state="visible", timeout=timeout_ms)
-        scroll_into_view = getattr(element, "scroll_into_view_if_needed", None)
-        if scroll_into_view is not None:
-            scroll_into_view(timeout=timeout_ms)
+        element.scroll_into_view_if_needed(timeout=timeout_ms)
 
     def _fill(self, selector: Selectors | str, value: str) -> bool:
         return self._fill_if_exists(selector, value, False)
