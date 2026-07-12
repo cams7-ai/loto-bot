@@ -6,7 +6,6 @@ import logging
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 from secrets import token_hex
 from time import monotonic
@@ -36,18 +35,11 @@ from domain import (
     Operation,
     PageRedirectionError,
 )
+from infrastructure.browser.portal_data import Bet
 from infrastructure.config import Settings
 from infrastructure.selectors import Selectors
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class Bet:
-    numbers: list[str]
-    draw: str
-    status: str
-    amount: str
 
 
 class PlaywrightBrowserAutomation(BrowserAutomationPort):
