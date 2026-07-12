@@ -36,7 +36,6 @@ class Selectors(StrEnum):
 #    NEWS_CHECKBOX = "//input[@type='checkbox' and @id='noticias']"
     ACCEPT_TERMS_OF_USE_BUTTON = "//button[contains(@class,'data-finalizarcadastro') and normalize-space()='Aceitar Termos de Uso']"
     # Limpar carrinho de compras
-#    SHOPPING_CART_COUNT = "normalize-space(//div[@id='LoginHeaderView.html']//a[@id='carrinho'])"
     SHOPPING_CART_BUTTON = "//div[@id='LoginHeaderView.html']//a[@id='carrinho']"
     CLEAR_CART_BUTTON = "//button[@id='limparcarrinho']"
     CONFIRM_CLEAR_CART_BUTTON = (

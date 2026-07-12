@@ -427,7 +427,6 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def finish_bet(self, session: AutomationSession) -> None:
         self._run_on_browser_thread(self._finish_bet, session)
 
-    # FIX
     def _finish_bet(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.bet_purchase_path_without_purchase)
         purchase_number = self._required_inner_text(Selectors.purchase_details_value("Número da Compra"))
@@ -451,7 +450,6 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 extra=Operation.executed_operation(session.executed_operation)
             )
 
-        
         total_purchase = self._required_inner_text(Selectors.purchase_totals_value("Total da Compra"))
         total_bets_in_processing = self._required_inner_text(Selectors.purchase_totals_value("Total de Apostas em Processamento"))
         total_bets_effective = self._required_inner_text(Selectors.purchase_totals_value("Total de Apostas Efetivadas"))

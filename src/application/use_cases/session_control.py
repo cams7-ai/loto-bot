@@ -22,10 +22,11 @@ from application.services import (
     handle_custom_failure,
     close_if_open
 )
+from application.use_cases.operation_executor import OperationExecutor
 
 logger = logging.getLogger(__name__)
 
-class SessionControlUseCase:
+class SessionControlUseCase(OperationExecutor):
     def __init__(
         self,
         session: AutomationSession,
@@ -99,11 +100,6 @@ class SessionControlUseCase:
 
     def _submit_validation_code(self, session: AutomationSession) -> None:
         self._browser.submit_validation_code(session, self._session.valid_code or "")
-
-    def _execute(self, operation: Operation, action) -> None:
-        self._session.mark_running(operation)
-        action(self._session)
-        logger.info("Operação concluída", extra=Operation.executed_operation(operation))
 
     def stop(self) -> SessionStatusResult:
         if not self._session.is_open:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from domain import (
     Operation,
     AutomationSession,
@@ -16,13 +14,11 @@ from application.ports import BrowserAutomationPort, NotificationPort
 from application.services import (
     handle_failure,
     handle_custom_failure,
-    close_if_open,
 )
+from application.use_cases.operation_executor import OperationExecutor
 
-logger = logging.getLogger(__name__)
 
-
-class RunBetFlowUseCase:
+class RunBetFlowUseCase(OperationExecutor):
     def __init__(
         self,
         session: AutomationSession,
@@ -46,12 +42,10 @@ class RunBetFlowUseCase:
             self._execute(Operation.CONFIRM_PAYMENT, self._browser.confirm_purchase)
             self._payment_authorization.require_confirmation()
             self._execute(Operation.CONFIRM_PAYMENT, lambda _: self._browser.confirm_payment())
-            logger.info("Operação concluída", extra=Operation.executed_operation(self._session.executed_operation))
             self._execute(Operation.CHECK_BET_PROCESSING, self._browser.check_bet_processing)
             self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
             self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
             self._session.mark_finished(self._session.purchase_number)
-#            close_if_open(self._session, self._browser, self._notifier, None,True)
             return AutomationRunResult(
                 session_id=self._session.id,
                 status="finished",
@@ -64,9 +58,4 @@ class RunBetFlowUseCase:
             handle_custom_failure(self._session, self._browser, self._notifier, exc, False)
         except Exception as exc:
             handle_failure(self._session, self._browser, self._notifier, exc, False)
-
-    def _execute(self, operation: Operation, action) -> None:
-        self._session.mark_running(operation)
-        action(self._session)
-        logger.info("Operação concluída", extra=Operation.executed_operation(operation))
 
