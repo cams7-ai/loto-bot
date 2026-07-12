@@ -1,10 +1,8 @@
-from domain import Operation, ErrorCode
-
-from domain import AutomationError
 from application.notification.error_message_builder import ErrorMessageBuilder
+from domain import AutomationError
+
 
 class NotificationMessageBuilder:
-
     @staticmethod
     def build_email_message(error_message: str) -> str:
         return (
@@ -21,4 +19,3 @@ class NotificationMessageBuilder:
             f"{str(exc)}. "
             "Por favor, verifique e tente novamente."
         )
-

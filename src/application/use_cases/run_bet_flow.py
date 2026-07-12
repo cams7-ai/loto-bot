@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from domain import (
-    Operation,
-    AutomationSession,
-    AutomationError,
-    BrowserSessionClosedError,
-    PaymentAuthorization,
-)
 from application.dto import AutomationRunResult
 from application.ports import BrowserAutomationPort, NotificationPort
 from application.services import (
-    handle_failure,
     handle_custom_failure,
+    handle_failure,
 )
 from application.use_cases.operation_executor import OperationExecutor
+from domain import (
+    AutomationError,
+    AutomationSession,
+    BrowserSessionClosedError,
+    Operation,
+    PaymentAuthorization,
+)
 
 
 class RunBetFlowUseCase(OperationExecutor):
@@ -58,4 +58,3 @@ class RunBetFlowUseCase(OperationExecutor):
             handle_custom_failure(self._session, self._browser, self._notifier, exc, False)
         except Exception as exc:
             handle_failure(self._session, self._browser, self._notifier, exc, False)
-

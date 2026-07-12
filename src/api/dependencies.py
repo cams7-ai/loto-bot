@@ -6,15 +6,9 @@ from dataclasses import dataclass
 
 from application import RunBetFlowUseCase, SessionControlUseCase
 from domain import AutomationSession, PaymentAuthorization
-from infrastructure import (
-    PlaywrightBrowserAutomation, 
-    GmailReaderClient, 
-    MailSenderClient, 
-    NotificationGateway, 
-    WhatsAppNotifyClient, 
-    Settings, 
-    get_settings,
-)
+from infrastructure.browser import PlaywrightBrowserAutomation
+from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
+from infrastructure.config import Settings, get_settings
 
 
 @dataclass

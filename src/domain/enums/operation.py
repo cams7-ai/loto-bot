@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+
 class Operation(StrEnum):
     UNKNOWN_OPERATION = "Operação não identificada"
     START_SESSION = "Inicia sessão"

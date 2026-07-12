@@ -5,17 +5,18 @@ from threading import Event
 import application.use_cases.session_control as session_control_module
 from application import RunBetFlowUseCase, SessionControlUseCase
 from domain import (
-    BROWSER_SESSION_OPEN,
     BROWSER_SESSION_CLOSED,
+    BROWSER_SESSION_OPEN,
     OPERATION_CANNOT_BE_COMPLETED,
-    Operation, 
-    AutomationSession, 
-    AutomationError, 
-    BrowserSessionClosedError, 
-    BrowserSessionOpenError, 
+    AutomationError,
+    AutomationSession,
+    BrowserSessionClosedError,
+    BrowserSessionOpenError,
     ErrorCode,
+    Operation,
     PaymentAuthorization,
 )
+
 
 class FakeBrowser:
     def __init__(self) -> None:

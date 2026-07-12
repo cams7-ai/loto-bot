@@ -29,26 +29,14 @@ class PlaywrightErrorMessageBuilder:
     @classmethod
     def _extract_event(cls, error_message: str) -> str:
         match = re.search(r"^(Locator\.\w+):", error_message)
-        return (
-            match.group(1)
-            if match
-            else cls._UNKNOWN_VALUE
-        )
+        return match.group(1) if match else cls._UNKNOWN_VALUE
 
     @classmethod
     def _extract_element(cls, error_message: str) -> str:
         match = re.search(r"locator\((['\"])(.*?)(?<!\\)\1\)", error_message, re.DOTALL)
-        return (
-            f"{match.group(1)}{match.group(2)}{match.group(1)}"
-            if match
-            else cls._UNKNOWN_VALUE
-        )
+        return f"{match.group(1)}{match.group(2)}{match.group(1)}" if match else cls._UNKNOWN_VALUE
 
     @classmethod
     def _extract_cause(cls, error_message: str) -> str:
         match = re.search(r":\s*(.+?)\.", error_message)
-        return (
-            match.group(1)
-            if match
-            else cls._UNKNOWN_VALUE
-        )
+        return match.group(1) if match else cls._UNKNOWN_VALUE

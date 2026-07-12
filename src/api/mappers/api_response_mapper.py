@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from application import SessionStatusResult
 from api.schemas import SessionControlResponse
+from application import SessionStatusResult
+
 
 class ApiResponseMapper:
     @staticmethod

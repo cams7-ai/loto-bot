@@ -8,12 +8,14 @@ from uuid import UUID, uuid4
 
 from domain.enums import Operation
 
+
 class AutomationStatus(StrEnum):
     CLOSED = "closed"
     OPEN = "open"
     RUNNING = "running"
     FAILED = "failed"
     FINISHED = "finished"
+
 
 @dataclass
 class AutomationSession:

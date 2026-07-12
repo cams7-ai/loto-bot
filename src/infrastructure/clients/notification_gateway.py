@@ -6,19 +6,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from application import (
-    get_error_message,
-    build_email_message,
-    build_whatsapp_message,
-    NotificationPort
-)
-from domain import (
-    Operation,
-    AutomationSession,
-    WhatsAppSessionStatus,
-    WhatsAppMessageStatus,
-    AutomationError
-)
+from application import NotificationPort, build_email_message, build_whatsapp_message, get_error_message
+from domain import AutomationError, AutomationSession, Operation, WhatsAppMessageStatus, WhatsAppSessionStatus
 from infrastructure.clients.mail_sender_client import MailSenderClient
 from infrastructure.clients.whatsapp_notify_client import WhatsAppNotifyClient
 
@@ -51,7 +40,9 @@ class NotificationGateway(NotificationPort):
             logger.info("Sessão do WhatsApp Web iniciada: %s", status, extra=Operation.executed_operation(operation))
         except Exception as exc:
             session.whatsapp_enabled = False
-            logger.warning("Sessão do WhatsApp Web não inicializada: %s", exc, extra=Operation.executed_operation(operation))
+            logger.warning(
+                "Sessão do WhatsApp Web não inicializada: %s", exc, extra=Operation.executed_operation(operation)
+            )
 
     def stop_whatsapp_session(self, session: AutomationSession) -> None:
         operation = session.executed_operation
@@ -61,7 +52,9 @@ class NotificationGateway(NotificationPort):
             self._whatsapp.stop_session(operation)
             logger.info("Sessão do WhatsApp Web encerrada", extra=Operation.executed_operation(operation))
         except Exception as exc:
-            logger.warning("Sessão do WhatsApp Web não encerrada: %s", exc, extra=Operation.executed_operation(operation))
+            logger.warning(
+                "Sessão do WhatsApp Web não encerrada: %s", exc, extra=Operation.executed_operation(operation)
+            )
         finally:
             session.whatsapp_enabled = False
 
@@ -70,7 +63,11 @@ class NotificationGateway(NotificationPort):
         if whatsapp_enabled:
             try:
                 status = self._whatsapp.status(operation)
-                response = self._whatsapp.send_message(operation, build_whatsapp_message(exc)) if status == WhatsAppSessionStatus.SESSION_OPEN.value else None
+                response = (
+                    self._whatsapp.send_message(operation, build_whatsapp_message(exc))
+                    if status == WhatsAppSessionStatus.SESSION_OPEN.value
+                    else None
+                )
                 if response == WhatsAppMessageStatus.SENT.value:
                     logger.info("Notificação enviada pelo WhatsApp", extra=Operation.executed_operation(operation))
                     return True
@@ -85,7 +82,11 @@ class NotificationGateway(NotificationPort):
         try:
             timestamp_timezone = ZoneInfo(self._TIMEZONE)
         except ZoneInfoNotFoundError:  # pragma: no cover - depends on host timezone database.
-            logger.warning("Timezone %s indisponível; usando UTC-03:00", self._TIMEZONE, extra=Operation.executed_operation(operation))
+            logger.warning(
+                "Timezone %s indisponível; usando UTC-03:00",
+                self._TIMEZONE,
+                extra=Operation.executed_operation(operation),
+            )
             timestamp_timezone = timezone(timedelta(hours=-3), name=self._TIMEZONE)
 
         now = datetime.now(timestamp_timezone).strftime("%d/%m/%Y %H:%M:%S")

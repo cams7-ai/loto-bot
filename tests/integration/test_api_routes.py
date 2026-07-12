@@ -6,7 +6,7 @@ import pytest
 from api.dependencies import get_container
 from api.server import app
 from application import AutomationRunResult, SessionStatusResult
-from domain import Operation, BrowserSessionClosedError, BrowserSessionOpenError
+from domain import BrowserSessionClosedError, BrowserSessionOpenError, Operation
 
 
 class FakeSessionControl:
@@ -69,6 +69,35 @@ async def test_health_and_openapi():
     assert health.json() == {"status": "ok", "application": "LotoBot"}
     assert openapi.status_code == 200
     assert "/api/v1/bets/run" in openapi.json()["paths"]
+
+
+@pytest.mark.anyio
+async def test_openapi_error_responses_match_route_failures():
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/openapi.json")
+
+    paths = response.json()["paths"]
+
+    assert set(paths["/api/v1/sessions/start"]["get"]["responses"]) == {"200", "400", "409", "500", "502", "503"}
+    assert set(paths["/api/v1/sessions/stop"]["get"]["responses"]) == {"200", "409", "500"}
+    assert set(paths["/api/v1/sessions/status"]["get"]["responses"]) == {"200", "500"}
+    assert set(paths["/api/v1/bets/run"]["get"]["responses"]) == {"200", "403", "409", "429", "500", "502", "503"}
+
+    start_409_examples = paths["/api/v1/sessions/start"]["get"]["responses"]["409"]["content"][
+        "application/json; charset=utf-8"
+    ]["examples"]
+    run_409_examples = paths["/api/v1/bets/run"]["get"]["responses"]["409"]["content"][
+        "application/json; charset=utf-8"
+    ]["examples"]
+
+    assert set(start_409_examples) == {"SESSAO_JA_ABERTA", "SESSAO_FECHADA"}
+    assert set(run_409_examples) == {
+        "SESSAO_FECHADA",
+        "REGISTRO_APOSTA_INDIVIDUAL_FECHADO",
+        "APOSTA_TEMPORARIAMENTE_DESABILITADA",
+    }
+    assert start_409_examples["SESSAO_JA_ABERTA"]["value"]["error"]["status_code"] == 409
 
 
 @pytest.mark.anyio

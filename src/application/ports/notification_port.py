@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from domain import AutomationSession, AutomationError
+from domain import AutomationError, AutomationSession
+
 
 class NotificationPort(Protocol):
     def start_whatsapp_session(self, session: AutomationSession) -> None:

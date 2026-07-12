@@ -7,14 +7,15 @@ import logging
 from application.ports import BrowserAutomationPort, NotificationPort
 from domain import (
     OPERATION_CANNOT_BE_COMPLETED,
+    AutomationError,
     AutomationSession,
     AutomationStatus,
     Operation,
-    AutomationError,
 )
-from infrastructure import playwright_error_message
+from infrastructure.logging import playwright_error_message
 
 logger = logging.getLogger(__name__)
+
 
 class SessionFailureHandler:
     @classmethod
@@ -109,12 +110,12 @@ class SessionFailureHandler:
 
     @classmethod
     def close_if_open(
-            cls,
-            session: AutomationSession,
-            browser: BrowserAutomationPort,
-            notifier: NotificationPort,
-            operation: Operation | None = None,
-            notification_sent: bool = False,
+        cls,
+        session: AutomationSession,
+        browser: BrowserAutomationPort,
+        notifier: NotificationPort,
+        operation: Operation | None = None,
+        notification_sent: bool = False,
     ) -> None:
         if session.status != AutomationStatus.CLOSED:
             browser.stop()
@@ -134,10 +135,10 @@ class SessionFailureHandler:
 
     @classmethod
     def _failed(
-            cls,
-            session: AutomationSession,
-            operation: Operation,
-            error_message: str,
+        cls,
+        session: AutomationSession,
+        operation: Operation,
+        error_message: str,
     ) -> None:
         session.mark_failed(operation)
 

@@ -19,6 +19,6 @@ class LotteryModalityBuilder:
             LotteryModality.TIMEMANIA: "timemania",
             LotteryModality.DUPLA_SENA: "dupla sena",
             LotteryModality.DIA_DE_SORTE: "dia de sorte",
-            LotteryModality.SUPER_SETE: "super sete"
+            LotteryModality.SUPER_SETE: "super sete",
         }
-        return modality.get(lottery_modality, None)
+        return modality.get(lottery_modality)

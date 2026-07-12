@@ -13,6 +13,45 @@ O código segue Clean Architecture: domínio e casos de uso não dependem de Fas
 - `GET /api/v1/bets/run`: executa o fluxo principal de aposta.
 - Swagger UI em `/docs`, ReDoc em `/redoc` e OpenAPI em `/openapi.json`.
 
+## Respostas de Erro
+
+As exceções de domínio carregam o `status_code` como `http.HTTPStatus`. O `ApiExceptionMapper` usa esse valor para transformar falhas de automação em respostas HTTP padronizadas.
+
+O corpo de erro segue o formato:
+
+```json
+{
+  "error": {
+    "status_code": 409,
+    "code": "SESSAO_FECHADA",
+    "message": "A sessão de navegador já está fechada"
+  }
+}
+```
+
+Quando houver erro de validação de entrada, o campo `fields` pode ser retornado:
+
+```json
+{
+  "error": {
+    "status_code": 400,
+    "code": "REQUISICAO_INVALIDA",
+    "message": "Corpo da requisição inválido.",
+    "fields": ["cpf"]
+  }
+}
+```
+
+O OpenAPI documenta exemplos específicos por código de erro em cada status HTTP, incluindo:
+
+- `400`: `REQUISICAO_INVALIDA`, `CPF_INVALIDO`.
+- `403`: `CONFIRMACAO_PAGAMENTO_DESABILITADA`.
+- `409`: `SESSAO_JA_ABERTA`, `SESSAO_FECHADA`, `REGISTRO_APOSTA_INDIVIDUAL_FECHADO`, `APOSTA_TEMPORARIAMENTE_DESABILITADA`.
+- `429`: `LIMITE_MAXIMO_DIARIO_DE_COMPRAS`.
+- `500`: `FALHA_NA_AUTOMACAO`, `ERRO_INTERNO`.
+- `502`: `ERRO_NO_REDIRECIONAMENTO_DA_PAGINA`.
+- `503`: `SERVICO_EXTERNO_INDISPONIVEL`.
+
 ## Instalação
 
 ```powershell
@@ -49,6 +88,17 @@ python -m pytest
 ```
 
 Os testes usam fakes e `httpx.MockTransport`. Nenhum teste abre o Chromium nem acessa `ONLINE_LOTTERY_URL`.
+
+## Formatação e Qualidade
+
+O projeto usa Ruff para formatação e correções automáticas de lint.
+
+```powershell
+python -m ruff format src tests
+python -m ruff check --fix src tests
+```
+
+A configuração fica em `pyproject.toml`, com Python alvo `py312`, largura de linha `120` e regras básicas de lint para erros, imports, modernização, bugs comuns e simplificações.
 
 ## Integrações Locais
 

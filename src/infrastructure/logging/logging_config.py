@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 
-
 LOG_FORMAT = (
     "%(asctime)s %(levelname)s [%(name)s] "
     "process=%(process)d thread=%(thread)d operation=[%(executed_operation)s] %(message)s"

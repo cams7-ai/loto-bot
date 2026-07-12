@@ -1,5 +1,5 @@
-from application.notification.notification_message_builder import NotificationMessageBuilder
 from application.notification.error_message_builder import ErrorMessageBuilder
+from application.notification.notification_message_builder import NotificationMessageBuilder
 
 build_email_message = NotificationMessageBuilder.build_email_message
 build_whatsapp_message = NotificationMessageBuilder.build_whatsapp_message

@@ -8,11 +8,10 @@ import httpx
 
 from domain import (
     FALLBACK_EMAIL_SEND_FAILED,
-    Operation, 
     ExternalServiceError,
+    Operation,
 )
-from infrastructure import Settings
-
+from infrastructure.config import Settings
 
 logger = logging.getLogger(__name__)
 

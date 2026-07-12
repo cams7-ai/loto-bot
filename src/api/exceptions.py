@@ -2,6 +2,7 @@
 
 from domain import ErrorCode
 
+
 class ApiError(Exception):
     def __init__(
         self,

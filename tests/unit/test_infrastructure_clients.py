@@ -3,16 +3,16 @@ from __future__ import annotations
 import httpx
 
 from domain import (
-    Operation,
-    AutomationSession, 
     AutomationError,
+    AutomationSession,
     ExternalServiceError,
+    Operation,
 )
 from infrastructure import (
-    Settings, 
-    GmailReaderClient, 
-    MailSenderClient, 
-    NotificationGateway, 
+    GmailReaderClient,
+    MailSenderClient,
+    NotificationGateway,
+    Settings,
     WhatsAppNotifyClient,
 )
 from shared import mask_sensitive_value

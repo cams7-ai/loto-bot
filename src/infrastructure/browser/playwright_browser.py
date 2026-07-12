@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import re
 import logging
-from time import monotonic
-from concurrent.futures import ThreadPoolExecutor
-from secrets import token_hex
-from pathlib import Path
-from typing import Any
+import re
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from pathlib import Path
+from secrets import token_hex
+from time import monotonic
+from typing import Any
 from urllib.parse import parse_qs, urlparse
+
 from playwright.sync_api import (
     BrowserContext,
     Page,
@@ -21,23 +22,25 @@ from playwright.sync_api import (
 
 from application import BrowserAutomationPort
 from domain import (
-    BROWSER_SESSION_START_FAILED,
     BROWSER_SESSION_CLOSED,
+    BROWSER_SESSION_START_FAILED,
     CAIXA_AUTHENTICATION_FORBIDDEN,
     LOTTERY_MODALITY_NOT_FOUND,
-    Operation,
-    AutomationSession, 
     AutomationError,
-    PageRedirectionError,
-    InvalidCPFError,
-    InvalidPasswordError,
-    IndividualBetRegistrationClosedError,
+    AutomationSession,
     BetTemporarilyDisabledError,
     DailyPurchaseLimitError,
+    IndividualBetRegistrationClosedError,
+    InvalidCPFError,
+    InvalidPasswordError,
+    Operation,
+    PageRedirectionError,
 )
-from infrastructure import Settings, Selectors, selectors
+from infrastructure.config import Settings
+from infrastructure.selectors import Selectors
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, slots=True)
 class Bet:
@@ -46,8 +49,8 @@ class Bet:
     status: str
     amount: str
 
-class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
+class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._playwright: Playwright | None = None
@@ -86,7 +89,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             return token_hex(4)
         except Exception as exc:
             self._stop()
-            logging.debug("Falha ao iniciar a sessão de navegador; encerrando contexto e Playwright", extra=Operation.executed_operation(session.executed_operation))
+            logging.debug(
+                "Falha ao iniciar a sessão de navegador; encerrando contexto e Playwright",
+                extra=Operation.executed_operation(session.executed_operation),
+            )
             raise AutomationError(BROWSER_SESSION_START_FAILED, operation=session.executed_operation) from exc
 
     @staticmethod
@@ -193,7 +199,8 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             return True
         except Exception:
             logger.debug(
-                "A sessão não está autenticada ou o elemento de login autenticado não ficou visível dentro do tempo limite de %d ms: %s",
+                "A sessão não está autenticada ou o elemento de login autenticado não ficou visível "
+                "dentro do tempo limite de %d ms: %s",
                 timeout_ms,
                 selector,
             )
@@ -247,7 +254,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _is_valid_cpf(self) -> bool:
         timeout_ms = self._timeout_ms
         try:
-            self._require_page().locator(Selectors.RECEIVE_CODE_BUTTON).first.wait_for(state="visible", timeout=timeout_ms)
+            self._require_page().locator(Selectors.RECEIVE_CODE_BUTTON).first.wait_for(
+                state="visible", timeout=timeout_ms
+            )
             return True
         except Exception:
             logger.debug(
@@ -341,10 +350,13 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _select_lottery_modality(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.home_path)
         lottery_modality = self._settings.selected_lottery_modality
-        selector =  Selectors.modality_button(lottery_modality)
+        selector = Selectors.modality_button(lottery_modality)
         if selector is None:
-            raise AutomationError(LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality), operation=Operation.SELECT_LOTTERY_MODALITY)
-        
+            raise AutomationError(
+                LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality),
+                operation=Operation.SELECT_LOTTERY_MODALITY,
+            )
+
         if not self._click_if_exists(selector, True):
             selector = Selectors.disabled_modality_button(lottery_modality)
             if selector is not None and self._click_if_exists(selector, True):
@@ -358,13 +370,14 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _place_bet(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.bet_page_path_with_modality)
-        self._click(Selectors.COMPLETE_GAME_BUTTON) # Complete o Jogo
-        self._click(Selectors.ADD_TO_CART_BUTTON) # Colocar no Carrinho
-        self._click(Selectors.GO_TO_PAYMENT_BUTTON) # Ir para pagamento
+        self._click(Selectors.COMPLETE_GAME_BUTTON)  # Complete o Jogo
+        self._click(Selectors.ADD_TO_CART_BUTTON)  # Colocar no Carrinho
+        self._click(Selectors.GO_TO_PAYMENT_BUTTON)  # Ir para pagamento
         if self._click_if_exists(Selectors.CONFIRM_MODAL_NO_REVIEW_CART_BUTTON, True):
             logger.info(
-                "Foi detectada uma compra recente com o mesmo valor do carrinho nas últimas 24 horas. Não confirmar reversão do carrinho",
-                extra=Operation.executed_operation(session.executed_operation)
+                "Foi detectada uma compra recente com o mesmo valor do carrinho nas últimas 24 horas. "
+                "Não confirmar reversão do carrinho",
+                extra=Operation.executed_operation(session.executed_operation),
             )
 
     def confirm_purchase(self, session: AutomationSession) -> None:
@@ -372,7 +385,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _confirm_purchase(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.payment_method_selection_path_without_container)
-        self._click(Selectors.CONFIRM_PURCHASE_BUTTON) # Confirmar Pagamento
+        self._click(Selectors.CONFIRM_PURCHASE_BUTTON)  # Confirmar Pagamento
         if self._click_if_exists(Selectors.DAILY_PURCHASE_LIMIT_ALERT_CLOSE_BUTTON, True):
             raise DailyPurchaseLimitError()
 
@@ -430,7 +443,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _finish_bet(self, session: AutomationSession) -> None:
         self._check_redirected_page(session, self._settings.bet_purchase_path_without_purchase)
         purchase_number = self._required_inner_text(Selectors.purchase_details_value("Número da Compra"))
-        purchase_status  = self._required_inner_text(Selectors.purchase_details_value("Situação da Compra"))
+        purchase_status = self._required_inner_text(Selectors.purchase_details_value("Situação da Compra"))
         purchase_date = self._required_inner_text(Selectors.purchase_details_value("Data da Compra"))
         purchase_time = self._required_inner_text(Selectors.purchase_details_value("Hora da Compra"))
         logger.info(
@@ -438,7 +451,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             f"Situação da compra: {purchase_status}, "
             f"Data da compra: {purchase_date}, "
             f"Hora da compra: {purchase_time}",
-            extra=Operation.executed_operation(session.executed_operation)
+            extra=Operation.executed_operation(session.executed_operation),
         )
         bets = self._get_bets(self._require_page())
         for bet in bets:
@@ -447,15 +460,23 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 f"Concurso da aposta: {bet.draw}, "
                 f"Situação da aposta: {bet.status}, "
                 f"Valor da aposta: {bet.amount}",
-                extra=Operation.executed_operation(session.executed_operation)
+                extra=Operation.executed_operation(session.executed_operation),
             )
 
         total_purchase = self._required_inner_text(Selectors.purchase_totals_value("Total da Compra"))
-        total_bets_in_processing = self._required_inner_text(Selectors.purchase_totals_value("Total de Apostas em Processamento"))
+        total_bets_in_processing = self._required_inner_text(
+            Selectors.purchase_totals_value("Total de Apostas em Processamento")
+        )
         total_bets_effective = self._required_inner_text(Selectors.purchase_totals_value("Total de Apostas Efetivadas"))
-        total_bets_not_effective = self._optional_inner_text(Selectors.purchase_totals_value("Total de Apostas Não Efetivadas"))
-        total_refunded = self._required_inner_text(Selectors.purchase_totals_value("Total Devolvido ao Meio de Pagamento"))
-        total_in_refund = self._required_inner_text(Selectors.purchase_totals_value("Em Devolução ao Meio de Pagamento"))
+        total_bets_not_effective = self._optional_inner_text(
+            Selectors.purchase_totals_value("Total de Apostas Não Efetivadas")
+        )
+        total_refunded = self._required_inner_text(
+            Selectors.purchase_totals_value("Total Devolvido ao Meio de Pagamento")
+        )
+        total_in_refund = self._required_inner_text(
+            Selectors.purchase_totals_value("Em Devolução ao Meio de Pagamento")
+        )
 
         logger.info(
             f"Total da compra: {total_purchase}, "
@@ -464,7 +485,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             f"Total de apostas não efetivadas: {total_bets_not_effective}, "
             f"Total devolvido ao meio de pagamento: {total_refunded}, "
             f"Total em devolução ao meio de pagamento: {total_in_refund}",
-            extra=Operation.executed_operation(session.executed_operation)
+            extra=Operation.executed_operation(session.executed_operation),
         )
 
     @staticmethod
@@ -477,9 +498,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             cells = row.locator(":scope > td")
 
             numbers = [
-                number.strip()
-                for number in row.locator("span.margemVolante").all_inner_texts()
-                if number.strip()
+                number.strip() for number in row.locator("span.margemVolante").all_inner_texts() if number.strip()
             ]
 
             bets.append(
@@ -527,7 +546,8 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 return True
             except Exception:
                 logger.debug(
-                    "Clique ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
+                    "Clique ignorado porque o elemento não foi encontrado ou não ficou visível "
+                    "dentro do tempo limite de %d ms: %s",
                     timeout_ms,
                     selector_value,
                 )
@@ -573,7 +593,8 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 return True
             except Exception:
                 logger.debug(
-                    "Preenchimento ignorado porque o elemento não foi encontrado ou não ficou visível dentro do tempo limite de %d ms: %s",
+                    "Preenchimento ignorado porque o elemento não foi encontrado ou não ficou visível "
+                    "dentro do tempo limite de %d ms: %s",
                     timeout_ms,
                     selector_value,
                 )
@@ -605,10 +626,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         return values[0] if values else ""
 
     def _check_redirected_page(
-            self,
-            session: AutomationSession,
-            path: str,
-            extract_params: Callable[[str, AutomationSession], None] | None = None,
+        self,
+        session: AutomationSession,
+        path: str,
+        extract_params: Callable[[str, AutomationSession], None] | None = None,
     ) -> None:
         page = self._require_page()
 

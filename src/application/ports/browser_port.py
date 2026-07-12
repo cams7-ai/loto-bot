@@ -6,6 +6,7 @@ from typing import Protocol
 
 from domain import AutomationSession
 
+
 class BrowserAutomationPort(Protocol):
     def start(self, session: AutomationSession) -> str:
         """Abre uma sessão persistente e retorna o tab_id."""
@@ -57,7 +58,7 @@ class BrowserAutomationPort(Protocol):
         """Adiciona a aposta ao carrinho."""
 
     def confirm_purchase(self, session: AutomationSession) -> None:
-        """Confirma a compra."""        
+        """Confirma a compra."""
 
     def confirm_payment(self) -> None:
         """Seleciona a forma de pagamento."""

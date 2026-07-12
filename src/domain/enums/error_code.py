@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+
 class ErrorCode(StrEnum):
     BAD_REQUEST = "REQUISICAO_INVALIDA"
     NOT_FOUND = "ROTA_NAO_ENCONTRADA"

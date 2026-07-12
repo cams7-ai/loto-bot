@@ -7,24 +7,21 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
 from time import monotonic, sleep
 
-from domain import (
-    Operation,
-    AutomationSession,
-    AutomationError,
-    BrowserSessionOpenError,
-    BrowserSessionClosedError,    
-    InvalidCPFError,
-)
 from application.dto import SessionStatusResult
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
-from application.services import (
-    handle_failure,
-    handle_custom_failure,
-    close_if_open
-)
+from application.services import close_if_open, handle_custom_failure, handle_failure
 from application.use_cases.operation_executor import OperationExecutor
+from domain import (
+    AutomationError,
+    AutomationSession,
+    BrowserSessionClosedError,
+    BrowserSessionOpenError,
+    InvalidCPFError,
+    Operation,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class SessionControlUseCase(OperationExecutor):
     def __init__(
@@ -46,11 +43,16 @@ class SessionControlUseCase(OperationExecutor):
         tab_id = self._browser.start(self._session)
         self._session.mark_open(tab_id)
         self._notifier.start_whatsapp_session(self._session)
-        logger.info("Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation))
+        logger.info(
+            "Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation)
+        )
         try:
             if self._authenticate():
                 self._execute(Operation.SHOPPING_CART, self._browser.clear_shopping_cart)
-                logger.info("Sessão de navegador autenticada", extra=Operation.executed_operation(self._session.executed_operation))
+                logger.info(
+                    "Sessão de navegador autenticada",
+                    extra=Operation.executed_operation(self._session.executed_operation),
+                )
         except AutomationError as exc:
             handle_custom_failure(self._session, self._browser, self._notifier, exc)
         except Exception as exc:
@@ -81,7 +83,9 @@ class SessionControlUseCase(OperationExecutor):
 
         return self._browser.is_already_authenticated()
 
-    def _request_validation_code_async(self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation) -> Future[str]:
+    def _request_validation_code_async(
+        self, executor: ThreadPoolExecutor, request_started: Event, operation: Operation
+    ) -> Future[str]:
         if not self._browser.is_valid_cpf():
             raise InvalidCPFError()
 
@@ -109,7 +113,7 @@ class SessionControlUseCase(OperationExecutor):
         return self.status()
 
     def _close(self) -> None:
-        close_if_open(self._session, self._browser, self._notifier, None,True)
+        close_if_open(self._session, self._browser, self._notifier, None, True)
 
     def status(self) -> SessionStatusResult:
         return SessionStatusResult(

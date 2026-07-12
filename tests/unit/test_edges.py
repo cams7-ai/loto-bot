@@ -1,39 +1,38 @@
 from __future__ import annotations
 
-import logging
 import asyncio
-import sys
-import types
+import logging
 from pathlib import Path
 
 import httpx
 import pytest
 from pydantic import ValidationError
-import infrastructure.browser.playwright_browser as playwright_browser_module
 
+import infrastructure.browser.playwright_browser as playwright_browser_module
+from api.dependencies import get_container
+from api.server import app
+from application import RunBetFlowUseCase
 from domain import (
     OPERATION_CANNOT_BE_COMPLETED,
-    Operation,
-    LotteryModality,
-    AutomationSession, 
     AutomationError,
-    ExternalServiceError, 
-    PaymentAuthorization,
+    AutomationSession,
+    ExternalServiceError,
+    LotteryModality,
+    Operation,
     PageRedirectionError,
+    PaymentAuthorization,
 )
-from application import RunBetFlowUseCase
 from infrastructure import (
-    Settings,
-    configure_logging,
     GmailReaderClient,
     MailSenderClient,
     NotificationGateway,
-    WhatsAppNotifyClient,
     PlaywrightBrowserAutomation,
     Selectors,
+    Settings,
+    WhatsAppNotifyClient,
+    configure_logging,
 )
-from api.dependencies import get_container
-from api.server import app
+
 
 class NoopNotifier:
     def start_whatsapp_session(self, session):
@@ -94,8 +93,12 @@ def test_lottery_modality_from_string():
 
 def test_clients_error_edges():
     settings = Settings(GMAIL_READER_URL="http://gmail", MAIL_SENDER_URL="http://mail")
-    empty_gmail = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(200, {"code": ""}))))
-    failing_mail = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}}))))
+    empty_gmail = GmailReaderClient(
+        settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(200, {"code": ""})))
+    )
+    failing_mail = MailSenderClient(
+        settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}})))
+    )
 
     try:
         empty_gmail.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
@@ -235,7 +238,9 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
 
 
 def test_settings_selectors_and_logging(monkeypatch):
-    settings = Settings(ONLINE_LOTTERY_URL="http://online_lottery", HOME_PATH="/home", LOGIN_URL="http://login", EXECUTION_ID="exec")
+    settings = Settings(
+        ONLINE_LOTTERY_URL="http://online_lottery", HOME_PATH="/home", LOGIN_URL="http://login", EXECUTION_ID="exec"
+    )
     assert settings.home_url == "http://online_lottery/silce-web/#/home"
     assert settings.bet_tracking_path_without_purchase == "/acompanhamento/"
     assert "mega-sena" in Selectors.modality_button("mega-sena")
@@ -522,6 +527,7 @@ def test_playwright_browser_checks_authentication_on_browser_thread():
         return action(*args)
 
     browser._run_on_browser_thread = run_on_browser_thread
+
     def fake_is_authenticated(session):
         return True
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from domain.exceptions import PaymentConfirmationDisabledError
 
+
 @dataclass(frozen=True)
 class PaymentAuthorization:
     confirmed: bool

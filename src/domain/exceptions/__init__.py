@@ -1,15 +1,15 @@
 from domain.exceptions.automation_errors import (
     AutomationError,
-    ExternalServiceError,
-    BrowserSessionOpenError,
-    BrowserSessionClosedError,
-    PageRedirectionError,
-    InvalidCPFError,
-    InvalidPasswordError,    
-    PaymentConfirmationDisabledError,
-    IndividualBetRegistrationClosedError,
     BetTemporarilyDisabledError,
+    BrowserSessionClosedError,
+    BrowserSessionOpenError,
     DailyPurchaseLimitError,
+    ExternalServiceError,
+    IndividualBetRegistrationClosedError,
+    InvalidCPFError,
+    InvalidPasswordError,
+    PageRedirectionError,
+    PaymentConfirmationDisabledError,
 )
 
 __all__ = [
@@ -19,7 +19,7 @@ __all__ = [
     "BrowserSessionClosedError",
     "PageRedirectionError",
     "InvalidCPFError",
-    "InvalidPasswordError",    
+    "InvalidPasswordError",
     "PaymentConfirmationDisabledError",
     "IndividualBetRegistrationClosedError",
     "BetTemporarilyDisabledError",
