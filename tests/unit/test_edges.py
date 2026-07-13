@@ -449,7 +449,7 @@ def test_playwright_browser_raises_invalid_password_when_alert_is_visible():
     browser._page = Page()
 
     with pytest.raises(AutomationError, match="A senha") as exc:
-        browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
+        browser._raise_if_invalid_password(browser._page, browser._timeout_ms, browser._short_timeout_ms)
 
     assert exc.value.operation == Operation.SUBMIT_PASSWORD
 
@@ -478,7 +478,7 @@ def test_playwright_browser_raises_invalid_password_when_password_screen_remains
     browser._page = Page()
 
     with pytest.raises(AutomationError, match="A senha") as exc:
-        browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
+        browser._raise_if_invalid_password(browser._page, browser._timeout_ms, browser._short_timeout_ms)
 
     assert exc.value.operation == Operation.SUBMIT_PASSWORD
     assert waits == [
@@ -509,7 +509,7 @@ def test_playwright_browser_accepts_password_when_password_screen_disappears():
 
     browser._page = Page()
 
-    browser._raise_if_invalid_password(Operation.SUBMIT_PASSWORD)
+    browser._raise_if_invalid_password(browser._page, browser._timeout_ms, browser._short_timeout_ms)
 
     assert waits == [
         (Selectors.PASSWORD_INVALID_ALERT, {"state": "visible", "timeout": 2000}),
@@ -560,7 +560,7 @@ def test_playwright_browser_authentication_check_uses_login_marker():
     assert browser._is_authenticated(False) is True
     assert actions == [
         Selectors.LOGGED_IN_LOGIN_BUTTON,
-        ("visible", 5000),
+        ("visible", 2000),
     ]
 
 
@@ -582,7 +582,7 @@ def test_playwright_browser_authentication_check_returns_false_after_timeout():
 
     browser._page = Page()
 
-    assert browser._is_authenticated(AutomationSession()) is False
+    assert browser._is_authenticated(False) is False
 
 
 def test_playwright_browser_scrolls_element_before_optional_click():
@@ -611,7 +611,7 @@ def test_playwright_browser_scrolls_element_before_optional_click():
 
     browser._page = Page()
 
-    assert browser._click_if_exists(Selectors.modality_button("mega-sena"), True) is True
+    assert browser._click(browser._page, browser._short_timeout_ms, Selectors.modality_button("mega-sena")) is True
     assert actions[1:] == [
         ("wait", {"state": "visible", "timeout": 2000}),
         ("scroll", {"timeout": 2000}),
@@ -627,8 +627,9 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     def fail_goto(url):
         raise AssertionError(f"Nao deveria navegar diretamente para {url}")
 
+    browser._page = object()
     browser._goto = fail_goto
-    browser._check_redirected_page = lambda session, path, extract_params=None: (
+    browser._check_redirected_page = lambda page, timeout_ms, session, path, extract_params=None: (
         extract_params(
             "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate?execution=exec-real&tab_id=tab-real",
             session,
@@ -636,10 +637,12 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
         if extract_params
         else None
     )
-    browser._raise_if_forbidden = lambda operation: actions.append(("check", operation))
-    browser._raise_if_invalid_password = lambda operation: actions.append(("password-check", operation))
-    browser._click = lambda selector: actions.append(("click", selector))
-    browser._fill = lambda selector, value: actions.append(("fill", selector, value))
+    browser._raise_if_forbidden = lambda page, operation: actions.append(("check", operation))
+    browser._raise_if_invalid_password = lambda page, timeout_ms, short_timeout_ms: actions.append(
+        ("password-check", timeout_ms, short_timeout_ms)
+    )
+    browser._click = lambda page, timeout_ms, selector: actions.append(("click", selector))
+    browser._fill = lambda page, selector, value: actions.append(("fill", selector, value))
 
     session = AutomationSession(tab_id="tab", execution_id="exec")
     browser._request_validation_code(session)
