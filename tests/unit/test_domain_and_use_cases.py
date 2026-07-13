@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from threading import Event
 
 import application.use_cases.session_control as session_control_module
 from application import RunBetFlowUseCase, SessionControlUseCase
+from application.dto import BetResult, PurchaseResult
 from domain import (
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_OPEN,
@@ -40,6 +43,22 @@ class FakeBrowser:
                 self.authenticated = True
             if name == "check_your_purchases":
                 args[0].purchase_number = "123456"
+            if name == "finish_bet":
+                return PurchaseResult(
+                    lottery_modality="mega-sena",
+                    bets=[
+                        BetResult(
+                            numbers=["01", "02", "03", "04", "05", "06"],
+                            draw="1234",
+                            status="Efetivada",
+                            amount=Decimal("5.00"),
+                        )
+                    ],
+                    purchase_details_number="123456",
+                    purchase_details_datetime=datetime(2026, 7, 12, 18, 8, 14),
+                    total_purchase=Decimal("5.00"),
+                    total_bets_effective=Decimal("5.00"),
+                )
             return None
 
         return method
@@ -66,6 +85,7 @@ class FakeNotifier:
         self.started = False
         self.stopped = False
         self.messages: list[str] = []
+        self.success_notifications: list[PurchaseResult] = []
         self.failure_response = failure_response
 
     def start_whatsapp_session(self, session):
@@ -81,6 +101,9 @@ class FakeNotifier:
         self.error_code = error.code
         self.messages.append(str(error))
         return self.failure_response is not None
+
+    def notify_success(self, session, purchase):
+        self.success_notifications.append(purchase)
 
 
 class FakeValidationCodes:
@@ -313,6 +336,7 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
     assert browser.calls[0] == "access_authenticated_home"
     assert "confirm_payment" in browser.calls
     assert browser.calls[-1] == "finish_bet"
+    assert notifier.success_notifications[0].purchase_details_number == "123456"
 
 
 def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monkeypatch):

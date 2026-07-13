@@ -6,7 +6,15 @@ import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from application import NotificationPort, build_email_message, build_whatsapp_message, get_error_message
+from application import (
+    NotificationPort,
+    build_email_message,
+    build_success_email_message,
+    build_success_whatsapp_message,
+    build_whatsapp_message,
+    get_error_message,
+)
+from application.dto import PurchaseResult
 from domain import AutomationError, AutomationSession, Operation, WhatsAppMessageStatus, WhatsAppSessionStatus
 from infrastructure.clients.mail_sender_client import MailSenderClient
 from infrastructure.clients.whatsapp_notify_client import WhatsAppNotifyClient
@@ -75,6 +83,32 @@ class NotificationGateway(NotificationPort):
 
         self._send_mail_fallback(exc)
         return False
+
+    def notify_success(self, session: AutomationSession, purchase: PurchaseResult) -> None:
+        operation = session.executed_operation
+        if session.whatsapp_enabled:
+            try:
+                status = self._whatsapp.status(operation)
+                if status == WhatsAppSessionStatus.SESSION_OPEN.value:
+                    response = self._whatsapp.send_message(operation, build_success_whatsapp_message(purchase))
+                    if response == WhatsAppMessageStatus.SENT.value:
+                        logger.info(
+                            "Notificação de sucesso enviada pelo WhatsApp",
+                            extra=Operation.executed_operation(operation),
+                        )
+            except Exception as exc:
+                logger.warning(
+                    "Falha ao enviar WhatsApp de sucesso: %s",
+                    exc,
+                    extra=Operation.executed_operation(operation),
+                )
+
+        subject = "LotoBot - aposta finalizada com sucesso"
+        try:
+            self._mail.send(operation, subject, build_success_email_message(purchase))
+            logger.info("E-mail de sucesso enviado", extra=Operation.executed_operation(operation))
+        except Exception as exc:
+            logger.error("Erro ao enviar e-mail de sucesso: %s", exc, extra=Operation.executed_operation(operation))
 
     def _send_mail_fallback(self, exc: AutomationError) -> None:
         operation = exc.operation

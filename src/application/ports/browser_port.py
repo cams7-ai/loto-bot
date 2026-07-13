@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from application.dto import PurchaseResult
 from domain import AutomationSession
 
 
@@ -70,5 +71,5 @@ class BrowserAutomationPort(Protocol):
     def check_your_purchases(self, session: AutomationSession) -> None:
         """Acessa a página de conferência de compras."""
 
-    def finish_bet(self, session: AutomationSession) -> None:
-        """Finaliza a aposta e retorna o código de acompanhamento."""
+    def finish_bet(self, session: AutomationSession) -> PurchaseResult:
+        """Finaliza a aposta e retorna os dados da compra."""

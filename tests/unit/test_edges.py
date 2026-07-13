@@ -46,6 +46,9 @@ class NoopNotifier:
         self.message = str(error)
         return False
 
+    def notify_success(self, session, purchase):
+        pass
+
 
 class BrokenBrowser:
     def start(self, session):

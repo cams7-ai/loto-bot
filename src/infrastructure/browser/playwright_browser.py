@@ -20,6 +20,7 @@ from playwright.sync_api import (
 )
 
 from application import BrowserAutomationPort
+from application.dto import BetResult, PurchaseResult
 from domain import (
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_START_FAILED,
@@ -32,12 +33,13 @@ from domain import (
     IndividualBetRegistrationClosedError,
     InvalidCPFError,
     InvalidPasswordError,
+    LotteryModality,
     Operation,
     PageRedirectionError,
 )
 from infrastructure.browser.portal_data import Bet, PortalDataFormatter, PurchaseDetails, PurchaseTotals
 from infrastructure.config import Settings
-from infrastructure.selectors import Selectors
+from infrastructure.selectors import LotteryModalityBuilder, Selectors
 
 logger = logging.getLogger(__name__)
 
@@ -477,10 +479,10 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         path = urlparse(url).fragment
         return path.rstrip("/").split("/")[-1]
 
-    def finish_bet(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._finish_bet, session)
+    def finish_bet(self, session: AutomationSession) -> PurchaseResult:
+        return self._run_on_browser_thread(self._finish_bet, session)
 
-    def _finish_bet(self, session: AutomationSession) -> None:
+    def _finish_bet(self, session: AutomationSession) -> PurchaseResult:
         self._check_redirected_page(
             self._require_page(), self._timeout_ms, session, self._settings.bet_purchase_path_without_purchase
         )
@@ -511,6 +513,24 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             f"Total devolvido ao meio de pagamento: {format_brl(purchase_totals.total_refunded)}, "
             f"Total em devolução ao meio de pagamento: {format_brl(purchase_totals.total_in_refund)}",
             extra=Operation.executed_operation(session.executed_operation),
+        )
+        return PurchaseResult(
+            lottery_modality=LotteryModalityBuilder.get_lottery_modality(
+                LotteryModality.from_string(self._settings.selected_lottery_modality)
+            ),
+            bets=[
+                BetResult(
+                    numbers=bet.numbers,
+                    draw=bet.draw,
+                    status=bet.status,
+                    amount=bet.amount,
+                )
+                for bet in bets
+            ],
+            purchase_details_number=purchase_details.number,
+            purchase_details_datetime=purchase_details.datetime,
+            total_purchase=purchase_totals.total_purchase,
+            total_bets_effective=purchase_totals.total_bets_effective,
         )
 
     @staticmethod

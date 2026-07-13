@@ -44,7 +44,8 @@ class RunBetFlowUseCase(OperationExecutor):
             self._execute(Operation.CONFIRM_PAYMENT, lambda _: self._browser.confirm_payment())
             self._execute(Operation.CHECK_BET_PROCESSING, self._browser.check_bet_processing)
             self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
-            self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
+            purchase = self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
+            self._notifier.notify_success(self._session, purchase)
             self._session.mark_finished(self._session.purchase_number)
             return AutomationRunResult(
                 session_id=self._session.id,
