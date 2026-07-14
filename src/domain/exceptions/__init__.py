@@ -1,5 +1,6 @@
 from domain.exceptions.automation_errors import (
     AutomationError,
+    BetsNotAvailableForCaptureError,
     BetTemporarilyDisabledError,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
@@ -24,4 +25,5 @@ __all__ = [
     "IndividualBetRegistrationClosedError",
     "BetTemporarilyDisabledError",
     "DailyPurchaseLimitError",
+    "BetsNotAvailableForCaptureError",
 ]

@@ -21,3 +21,4 @@ PAYMENT_CONFIRMATION_DISABLED = (
 INDIVIDUAL_BET_REGISTRATION_CLOSED = "Registro de apostas individuais fechado"
 BET_TEMPORARILY_DISABLED = "Concurso/modalidade '{modality}' não está disponível para captação"
 DAILY_PURCHASE_LIMIT = "Limite máximo diário para compras atingido"
+BETS_NOT_AVAILABLE_FOR_CAPTURE = "O concurso/modalidade não está(ão) disponível(s) para captação"

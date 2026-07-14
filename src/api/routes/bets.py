@@ -53,11 +53,11 @@ async def run_bet(container: AppContainer = CONTAINER_DEPENDENCY) -> BetRunRespo
     try:
         result = container.run_bet_flow.run()
         return BetRunResponse(
-            sessionId=str(result.session_id),
+            session_id=str(result.session_id),
             status=result.status,
             message=result.message,
-            executedOperation=result.executed_operation.value,
-            codigoAcompanhamento=result.tracking_code,
+            executed_operation=result.executed_operation.value,
+            purchase_number=result.purchase_number,
         )
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)

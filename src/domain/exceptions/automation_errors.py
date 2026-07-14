@@ -6,6 +6,7 @@ from http import HTTPStatus
 
 from domain.constants import (
     BET_TEMPORARILY_DISABLED,
+    BETS_NOT_AVAILABLE_FOR_CAPTURE,
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_OPEN,
     DAILY_PURCHASE_LIMIT,
@@ -105,3 +106,14 @@ class DailyPurchaseLimitError(AutomationError):
 
     def __init__(self) -> None:
         super().__init__(message=DAILY_PURCHASE_LIMIT, operation=Operation.CONFIRM_PAYMENT)
+
+
+class BetsNotAvailableForCaptureError(AutomationError):
+    code = ErrorCode.BETS_NOT_AVAILABLE_FOR_CAPTURE_ERROR_CODE
+    status_code = HTTPStatus.CONFLICT
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=BETS_NOT_AVAILABLE_FOR_CAPTURE,
+            operation=Operation.CONFIRM_PAYMENT,
+        )

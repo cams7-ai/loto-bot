@@ -1,17 +1,11 @@
 from application.dto import PurchaseResult
 from application.notification.error_message_builder import ErrorMessageBuilder
-from domain import AutomationError
-
-
-def _format_brl_currency(value) -> str:
-    amount = value or 0
-    formatted_amount = f"{amount:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {formatted_amount}"
+from domain import AutomationError, BrlCurrencyFormatter
 
 
 class NotificationMessageBuilder:
     @staticmethod
-    def build_email_message(error_message: str) -> str:
+    def build_error_email_message(error_message: str) -> str:
         return (
             f"{error_message}.<br><br>"
             "Por favor, verifique e tente novamente.<br><br>"
@@ -19,7 +13,7 @@ class NotificationMessageBuilder:
         )
 
     @staticmethod
-    def build_whatsapp_message(exc: AutomationError) -> str:
+    def build_error_whatsapp_message(exc: AutomationError) -> str:
         return (
             f"❌ {ErrorMessageBuilder.get_error_message(exc.code)}.\n\n"
             f"Etapa: {exc.operation.value}\n\n"
@@ -34,7 +28,7 @@ class NotificationMessageBuilder:
             f"Números: {', '.join(bet.numbers)} | "
             f"Concurso: {bet.draw} | "
             f"Situação: {bet.status} | "
-            f"Valor: {_format_brl_currency(bet.amount)}"
+            f"Valor: {BrlCurrencyFormatter.format_brl_currency(bet.amount)}"
             "</li>"
             for bet in purchase.bets
         )
@@ -42,11 +36,12 @@ class NotificationMessageBuilder:
             "<html><body>"
             "<h1>Aposta finalizada com sucesso</h1>"
             f"<p><strong>Modalidade:</strong> {purchase.lottery_modality or '-'}</p>"
-            f"<p><strong>Número da compra:</strong> {purchase.purchase_details_number}</p>"
-            f"<p><strong>Data/hora da compra:</strong> {purchase.purchase_details_datetime.isoformat()}</p>"
-            f"<p><strong>Total da compra:</strong> {_format_brl_currency(purchase.total_purchase)}</p>"
+            f"<p><strong>Número da compra:</strong> {purchase.purchase_number}</p>"
+            f"<p><strong>Data/hora da compra:</strong> {purchase.purchase_datetime.strftime('%d/%m/%Y %H:%M:%S')}</p>"
+            f"<p><strong>Total da compra:</strong> "
+            f"{BrlCurrencyFormatter.format_brl_currency(purchase.total_purchase)}</p>"
             "<p><strong>Total de apostas efetivadas:</strong> "
-            f"{_format_brl_currency(purchase.total_bets_effective)}</p>"
+            f"{BrlCurrencyFormatter.format_brl_currency(purchase.total_bets_effective)}</p>"
             f"<h2>Apostas</h2><ul>{bets}</ul>"
             "</body></html>"
         )
@@ -60,14 +55,14 @@ class NotificationMessageBuilder:
                 f"\nNúmeros: {', '.join(first_bet.numbers)}"
                 f"\nConcurso: {first_bet.draw}"
                 f"\nSituação: {first_bet.status}"
-                f"\nValor: {_format_brl_currency(first_bet.amount)}"
+                f"\nValor: {BrlCurrencyFormatter.format_brl_currency(first_bet.amount)}"
             )
 
         return (
             "✅ Aposta finalizada com sucesso.\n\n"
             f"Modalidade: {purchase.lottery_modality or '-'}"
             f"{bet_summary}\n"
-            f"Número da compra: {purchase.purchase_details_number}\n"
-            f"Total da compra: {_format_brl_currency(purchase.total_purchase)}\n"
-            f"Total efetivado: {_format_brl_currency(purchase.total_bets_effective)}"
+            f"Número da compra: {purchase.purchase_number}\n"
+            f"Total da compra: {BrlCurrencyFormatter.format_brl_currency(purchase.total_purchase)}\n"
+            f"Total efetivado: {BrlCurrencyFormatter.format_brl_currency(purchase.total_bets_effective)}"
         )

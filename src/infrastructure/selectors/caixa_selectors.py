@@ -71,6 +71,11 @@ class Selectors(StrEnum):
         "//button[contains(@class,'close')]/ancestor::div[@id='mensagem_alert']"
         "//div[@id='div_alertas'][contains(normalize-space(.), 'limite máximo diário para compras')]"
     )
+    BETS_NOT_AVAILABLE_FOR_CAPTURE_ALERT_CLOSE_BUTTON = (
+        "//button[contains(@class,'close')]/ancestor::div[@id='mensagem_alert']"
+        "//div[@id='div_alertas']"
+        "[contains(normalize-space(.), 'o concurso/modalidade não está(ão) disponível(s) para captação')]"
+    )
     CONTINUE_PAYMENT_BUTTON = "//div[@id='divMeioPagamento']//button[@id='pay']"
     SECURITY_CODE_FIELD = "//div[@id='confirm-cancel-cvv']//input[@id='securityCode']"
     CONFIRM_PAYMENT_BUTTON = "//div[@id='confirm-cancel-cvv']//button[@id='confirmarModalConfirmacao']"

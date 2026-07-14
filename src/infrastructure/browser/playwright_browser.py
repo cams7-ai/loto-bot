@@ -7,9 +7,8 @@ import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from secrets import token_hex
 from time import monotonic
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from playwright.sync_api import (
     BrowserContext,
@@ -30,6 +29,8 @@ from domain import (
     AutomationSession,
     BetTemporarilyDisabledError,
     DailyPurchaseLimitError,
+    BetsNotAvailableForCaptureError,
+    BrlCurrencyFormatter,
     IndividualBetRegistrationClosedError,
     InvalidCPFError,
     InvalidPasswordError,
@@ -37,7 +38,7 @@ from domain import (
     Operation,
     PageRedirectionError,
 )
-from infrastructure.browser.portal_data import Bet, PortalDataFormatter, PurchaseDetails, PurchaseTotals
+from infrastructure.browser.portal_data import Bet, PurchaseDetails, PurchaseTotals
 from infrastructure.config import Settings
 from infrastructure.selectors import LotteryModalityBuilder, Selectors
 
@@ -52,16 +53,16 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._page: Page | None = None
         self._executor: ThreadPoolExecutor | None = None
 
-    def start(self, session: AutomationSession) -> str:
+    def start(self, session: AutomationSession) -> None:
         try:
-            return self._run_on_browser_thread(self._start, session)
+            self._run_on_browser_thread(self._start, session)
         except Exception:
             if self._executor is not None:
                 self._executor.shutdown(wait=True)
                 self._executor = None
             raise
 
-    def _start(self, session: AutomationSession) -> str:
+    def _start(self, session: AutomationSession) -> None:
         try:
             self._ensure_profile_dir(self._settings.browser_profile_dir)
             self._playwright = sync_playwright().start()
@@ -80,7 +81,6 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
             self._context.set_default_timeout(self._timeout_ms)
             self._add_init_script(self._context)
             self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
-            return token_hex(4)
         except Exception as exc:
             self._stop()
             logging.debug(
@@ -280,29 +280,9 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
 
     def _request_validation_code(self, session: AutomationSession) -> None:
         page = self._require_page()
-        self._check_redirected_page(
-            page, self._timeout_ms, session, self._settings.authenticate_path, self._extract_execution_and_tab_params
-        )
+        self._check_redirected_page(page, self._timeout_ms, session, self._settings.authenticate_path)
         self._raise_if_forbidden(page, session.executed_operation)
         self._click(page, self._short_timeout_ms, Selectors.RECEIVE_CODE_BUTTON)
-
-    @staticmethod
-    def _extract_execution_and_tab_params(url: str, session: AutomationSession) -> None:
-        params = parse_qs(urlparse(url).query)
-
-        execution_id = PlaywrightBrowserAutomation._first_query_param(params, "execution")
-        tab_id = PlaywrightBrowserAutomation._first_query_param(params, "tab_id")
-
-        if execution_id:
-            session.execution_id = execution_id
-
-        if tab_id:
-            session.tab_id = tab_id
-
-    @staticmethod
-    def _first_query_param(params: dict[str, list[str]], name: str) -> str:
-        values = params.get(name) or []
-        return values[0] if values else ""
 
     def submit_validation_code(self, session: AutomationSession, code: str) -> None:
         self._run_on_browser_thread(self._submit_validation_code, session, code)
@@ -423,6 +403,8 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         self._click(page, short_timeout_ms, Selectors.CONFIRM_PURCHASE_BUTTON)  # Confirmar Pagamento
         if self._click(page, short_timeout_ms, Selectors.DAILY_PURCHASE_LIMIT_ALERT_CLOSE_BUTTON):
             raise DailyPurchaseLimitError()
+        if self._click(page, short_timeout_ms, Selectors.BETS_NOT_AVAILABLE_FOR_CAPTURE_ALERT_CLOSE_BUTTON):
+            raise BetsNotAvailableForCaptureError()
 
     def confirm_payment(self) -> None:
         self._run_on_browser_thread(self._confirm_payment)
@@ -441,21 +423,22 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
     def _check_bet_processing(self, session: AutomationSession) -> None:
         self._check_redirected_page(self._require_page(), self._timeout_ms, session, self._settings.bet_processing_path)
 
-    def check_your_purchases(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._check_your_purchases, session)
+    def check_your_purchases(self, session: AutomationSession) -> str:
+        return self._run_on_browser_thread(self._check_your_purchases, session)
 
-    def _check_your_purchases(self, session: AutomationSession) -> None:
+    def _check_your_purchases(self, session: AutomationSession) -> str:
         page = self._require_page()
-        self._wait_for_purchase_tracking(
+        purchase_number = self._wait_for_purchase_tracking(
             page,
             self._settings.bet_tracking_timeout_seconds * 1000,
             self._settings.bet_tracking_path_without_purchase,
             session,
         )
         self._click(page, self._short_timeout_ms, Selectors.TRACK_YOUR_PURCHASES_BUTTON)
+        return purchase_number
 
     @staticmethod
-    def _wait_for_purchase_tracking(page: Page, timeout_ms: int, path: str, session: AutomationSession) -> None:
+    def _wait_for_purchase_tracking(page: Page, timeout_ms: int, path: str, session: AutomationSession) -> str:
         try:
             page.wait_for_function(
                 """trackingPath => window.location.href.includes(trackingPath)""",
@@ -465,14 +448,7 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         except Exception as exc:
             raise PageRedirectionError(path, session.executed_operation) from exc
 
-        PlaywrightBrowserAutomation._extract_purchase(page.url, session)
-
-    @staticmethod
-    def _extract_purchase(url: str, session: AutomationSession) -> None:
-        purchase_number = PlaywrightBrowserAutomation.extract_purchase_number(url)
-
-        if purchase_number:
-            session.purchase_number = purchase_number
+        return PlaywrightBrowserAutomation.extract_purchase_number(page.url)
 
     @staticmethod
     def extract_purchase_number(url: str) -> str:
@@ -488,30 +464,38 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
         )
         purchase_details = self._get_purchase_details(self._require_page(), self._timeout_ms)
         logger.info(
-            f"Número da compra: {purchase_details.number}, "
-            f"Situação da compra: {purchase_details.status}, "
-            f"Data/hora da compra: {purchase_details.datetime.isoformat()}",
+            "Número da compra: %s, Situação da compra: %s, Data/hora da compra: %s",
+            purchase_details.number,
+            purchase_details.status,
+            purchase_details.datetime.isoformat(),
             extra=Operation.executed_operation(session.executed_operation),
         )
         bets = self._get_bets(self._require_page())
         for bet in bets:
             logger.info(
-                f"Números da aposta: {bet.numbers}, "
-                f"Concurso da aposta: {bet.draw}, "
-                f"Situação da aposta: {bet.status}, "
-                f"Valor da aposta: {PortalDataFormatter.format_brl_currency(bet.amount)}",
+                "Números da aposta: %s, Concurso da aposta: %s, Situação da aposta: %s, Valor da aposta: %s",
+                bet.numbers,
+                bet.draw,
+                bet.status,
+                BrlCurrencyFormatter.format_brl_currency(bet.amount),
                 extra=Operation.executed_operation(session.executed_operation),
             )
         purchase_totals = self._get_purchase_totals(self._require_page(), self._timeout_ms)
-        format_brl = PortalDataFormatter.format_brl_currency
+        format_brl = BrlCurrencyFormatter.format_brl_currency
 
         logger.info(
-            f"Total da compra: {format_brl(purchase_totals.total_purchase)}, "
-            f"Total de apostas em processamento: {format_brl(purchase_totals.total_bets_in_processing)}, "
-            f"Total de apostas efetivadas: {format_brl(purchase_totals.total_bets_effective)}, "
-            f"Total de apostas não efetivadas: {format_brl(purchase_totals.total_bets_not_effective)}, "
-            f"Total devolvido ao meio de pagamento: {format_brl(purchase_totals.total_refunded)}, "
-            f"Total em devolução ao meio de pagamento: {format_brl(purchase_totals.total_in_refund)}",
+            "Total da compra: %s, "
+            "Total de apostas em processamento: %s, "
+            "Total de apostas efetivadas: %s, "
+            "Total de apostas não efetivadas: %s, "
+            "Total devolvido ao meio de pagamento: %s, "
+            "Total em devolução ao meio de pagamento: %s",
+            format_brl(purchase_totals.total_purchase),
+            format_brl(purchase_totals.total_bets_in_processing),
+            format_brl(purchase_totals.total_bets_effective),
+            format_brl(purchase_totals.total_bets_not_effective),
+            format_brl(purchase_totals.total_refunded),
+            format_brl(purchase_totals.total_in_refund),
             extra=Operation.executed_operation(session.executed_operation),
         )
         return PurchaseResult(
@@ -527,8 +511,8 @@ class PlaywrightBrowserAutomation(BrowserAutomationPort):
                 )
                 for bet in bets
             ],
-            purchase_details_number=purchase_details.number,
-            purchase_details_datetime=purchase_details.datetime,
+            purchase_number=purchase_details.number,
+            purchase_datetime=purchase_details.datetime,
             total_purchase=purchase_totals.total_purchase,
             total_bets_effective=purchase_totals.total_bets_effective,
         )

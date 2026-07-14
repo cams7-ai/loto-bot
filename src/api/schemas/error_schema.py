@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from domain import (
     BET_TEMPORARILY_DISABLED,
+    BETS_NOT_AVAILABLE_FOR_CAPTURE,
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_OPEN,
     DAILY_PURCHASE_LIMIT,
@@ -75,6 +76,11 @@ ERROR_EXAMPLES = {
         HTTPStatus.TOO_MANY_REQUESTS,
         ErrorCode.DAILY_PURCHASE_LIMIT_ERROR_CODE,
         DAILY_PURCHASE_LIMIT,
+    ),
+    ErrorCode.BETS_NOT_AVAILABLE_FOR_CAPTURE_ERROR_CODE: error_example(
+        HTTPStatus.CONFLICT,
+        ErrorCode.BETS_NOT_AVAILABLE_FOR_CAPTURE_ERROR_CODE,
+        BETS_NOT_AVAILABLE_FOR_CAPTURE,
     ),
     ErrorCode.PAGE_REDIRECTION_ERROR_CODE: error_example(
         HTTPStatus.BAD_GATEWAY,

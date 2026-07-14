@@ -1,5 +1,6 @@
 from domain.constants import (
     BET_TEMPORARILY_DISABLED,
+    BETS_NOT_AVAILABLE_FOR_CAPTURE,
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_OPEN,
     BROWSER_SESSION_START_FAILED,
@@ -30,6 +31,7 @@ from domain.enums import (
 )
 from domain.exceptions import (
     AutomationError,
+    BetsNotAvailableForCaptureError,
     BetTemporarilyDisabledError,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
@@ -41,7 +43,7 @@ from domain.exceptions import (
     PageRedirectionError,
     PaymentConfirmationDisabledError,
 )
-from domain.value_objects import PaymentAuthorization
+from domain.value_objects import BrlCurrencyFormatter, PaymentAuthorization
 
 __all__ = [
     "Operation",
@@ -66,6 +68,7 @@ __all__ = [
     "INDIVIDUAL_BET_REGISTRATION_CLOSED",
     "BET_TEMPORARILY_DISABLED",
     "DAILY_PURCHASE_LIMIT",
+    "BETS_NOT_AVAILABLE_FOR_CAPTURE",
     "AutomationSession",
     "AutomationStatus",
     "AutomationError",
@@ -79,5 +82,7 @@ __all__ = [
     "IndividualBetRegistrationClosedError",
     "BetTemporarilyDisabledError",
     "DailyPurchaseLimitError",
+    "BetsNotAvailableForCaptureError",
+    "BrlCurrencyFormatter",
     "PaymentAuthorization",
 ]

@@ -40,8 +40,8 @@ class SessionControlUseCase(OperationExecutor):
         if self._session.is_open:
             raise BrowserSessionOpenError(self._session.executed_operation)
 
-        tab_id = self._browser.start(self._session)
-        self._session.mark_open(tab_id)
+        self._browser.start(self._session)
+        self._session.mark_open()
         self._notifier.start_whatsapp_session(self._session)
         logger.info(
             "Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation)
@@ -58,7 +58,7 @@ class SessionControlUseCase(OperationExecutor):
         except Exception as exc:
             handle_failure(self._session, self._browser, self._notifier, exc)
 
-        self._session.mark_open(self._session.tab_id)
+        self._session.mark_open()
         return self.status()
 
     def _authenticate(self) -> bool:

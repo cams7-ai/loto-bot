@@ -43,16 +43,16 @@ class RunBetFlowUseCase(OperationExecutor):
             self._payment_authorization.require_confirmation()
             self._execute(Operation.CONFIRM_PAYMENT, lambda _: self._browser.confirm_payment())
             self._execute(Operation.CHECK_BET_PROCESSING, self._browser.check_bet_processing)
-            self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
+            purchase_number = self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
             purchase = self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
             self._notifier.notify_success(self._session, purchase)
-            self._session.mark_finished(self._session.purchase_number)
+            self._session.mark_finished()
             return AutomationRunResult(
                 session_id=self._session.id,
                 status="finished",
                 message="Aposta finalizada com sucesso.",
                 executed_operation=self._session.executed_operation,
-                tracking_code=self._session.purchase_number,
+                purchase_number=purchase_number,
             )
 
         except AutomationError as exc:

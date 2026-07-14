@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     openid_connect_auth_path: str = Field(
         default="/auth/realms/internet/protocol/openid-connect/auth", alias="OPENID_CONNECT_AUTH_PATH"
     )
-    execution_id: str = Field(default="<EXECUTION_ID_DA_SESSAO>", alias="EXECUTION_ID")
 
     gmail_reader_url: str = Field(default="http://localhost:8001", alias="GMAIL_READER_URL")
     mail_sender_url: str = Field(default="http://localhost:8002", alias="MAIL_SENDER_URL")

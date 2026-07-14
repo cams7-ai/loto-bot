@@ -1,9 +1,9 @@
 from application.dto import AutomationRunResult, BetResult, PurchaseResult, SessionStatusResult
 from application.notification import (
-    build_email_message,
+    build_error_email_message,
+    build_error_whatsapp_message,
     build_success_email_message,
     build_success_whatsapp_message,
-    build_whatsapp_message,
     get_error_message,
 )
 from application.ports import BrowserAutomationPort, NotificationPort, ValidationCodePort
@@ -18,10 +18,10 @@ __all__ = [
     "BrowserAutomationPort",
     "NotificationPort",
     "ValidationCodePort",
-    "build_email_message",
+    "build_error_email_message",
     "build_success_email_message",
     "build_success_whatsapp_message",
-    "build_whatsapp_message",
+    "build_error_whatsapp_message",
     "get_error_message",
     "handle_failure",
     "handle_custom_failure",

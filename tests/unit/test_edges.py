@@ -72,7 +72,7 @@ def response(status_code: int, payload: dict | None = None) -> httpx.Response:
 
 def test_run_bet_flow_handles_unexpected_exception():
     session = AutomationSession()
-    session.mark_open("tab")
+    session.mark_open()
     browser = BrokenBrowser()
     notifier = NoopNotifier()
     use_case = RunBetFlowUseCase(session, browser, notifier, PaymentAuthorization(True))
@@ -357,13 +357,12 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
     session = AutomationSession()
 
     async def start_inside_asyncio_loop():
-        return browser.start(session)
+        browser.start(session)
 
-    tab_id = asyncio.run(start_inside_asyncio_loop())
+    asyncio.run(start_inside_asyncio_loop())
     browser.stop()
 
     kwargs = captured["kwargs"]
-    assert tab_id
     assert settings.browser_profile_dir.exists()
     assert kwargs["user_data_dir"] == str(settings.browser_profile_dir)
     assert kwargs["headless"] is True
@@ -375,34 +374,6 @@ def test_playwright_browser_uses_lotobot_browser_constants(tmp_path, monkeypatch
     assert "navigator" in captured["script"]
     assert captured["closed"] is True
     assert captured["stopped"] is True
-
-
-def test_playwright_browser_extracts_dynamic_login_execution_params():
-    browser = PlaywrightBrowserAutomation(Settings())
-    session = AutomationSession()
-    session.mark_running(Operation.SUBMIT_CPF)
-
-    browser._extract_execution_and_tab_params(
-        "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate"
-        "?session_code=abc&execution=exec-real&client_id=cli-web-lce&tab_id=tab-real",
-        session,
-    )
-
-    assert session.execution_id == "exec-real"
-    assert session.tab_id == "tab-real"
-
-
-def test_playwright_browser_extracts_dynamic_login_ignores_missing_query_params():
-    browser = PlaywrightBrowserAutomation(Settings())
-    session = AutomationSession(tab_id="tab-original", execution_id="exec-original")
-
-    browser._extract_execution_and_tab_params(
-        "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate",
-        session,
-    )
-
-    assert session.execution_id == "exec-original"
-    assert session.tab_id == "tab-original"
 
 
 def test_playwright_browser_raises_page_redirect_when_cpf_page_redirect_times_out():
@@ -632,14 +603,7 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
 
     browser._page = object()
     browser._goto = fail_goto
-    browser._check_redirected_page = lambda page, timeout_ms, session, path, extract_params=None: (
-        extract_params(
-            "https://login.caixa.gov.br/auth/realms/internet/login-actions/authenticate?execution=exec-real&tab_id=tab-real",
-            session,
-        )
-        if extract_params
-        else None
-    )
+    browser._check_redirected_page = lambda page, timeout_ms, session, path, extract_params=None: None
     browser._raise_if_forbidden = lambda page, operation: actions.append(("check", operation))
     browser._raise_if_invalid_password = lambda page, timeout_ms, short_timeout_ms: actions.append(
         ("password-check", timeout_ms, short_timeout_ms)
@@ -647,7 +611,7 @@ def test_playwright_browser_continues_login_without_direct_authenticate_goto():
     browser._click = lambda page, timeout_ms, selector: actions.append(("click", selector))
     browser._fill = lambda page, selector, value: actions.append(("fill", selector, value))
 
-    session = AutomationSession(tab_id="tab", execution_id="exec")
+    session = AutomationSession()
     browser._request_validation_code(session)
     browser._submit_validation_code(session, "123456")
     browser._submit_password(session)
@@ -693,7 +657,11 @@ def test_playwright_browser_confirms_purchase_after_payment_page_redirect():
             clicks.append(("url", pattern.pattern, timeout))
 
         def locator(self, selector):
-            return missing_alert if selector == Selectors.DAILY_PURCHASE_LIMIT_ALERT_CLOSE_BUTTON else confirmation
+            alert_selectors = {
+                Selectors.DAILY_PURCHASE_LIMIT_ALERT_CLOSE_BUTTON,
+                Selectors.BETS_NOT_AVAILABLE_FOR_CAPTURE_ALERT_CLOSE_BUTTON,
+            }
+            return missing_alert if selector in alert_selectors else confirmation
 
     browser._page = Page()
 

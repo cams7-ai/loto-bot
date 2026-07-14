@@ -9,8 +9,8 @@ from domain import AutomationSession
 
 
 class BrowserAutomationPort(Protocol):
-    def start(self, session: AutomationSession) -> str:
-        """Abre uma sessão persistente e retorna o tab_id."""
+    def start(self, session: AutomationSession) -> None:
+        """Abre uma sessão persistente."""
 
     def stop(self) -> None:
         """Fecha a sessão ativa."""
@@ -68,7 +68,7 @@ class BrowserAutomationPort(Protocol):
     def check_bet_processing(self, session: AutomationSession) -> None:
         """Acessa a página de conferência de processamento da aposta."""
 
-    def check_your_purchases(self, session: AutomationSession) -> None:
+    def check_your_purchases(self, session: AutomationSession) -> str:
         """Acessa a página de conferência de compras."""
 
     def finish_bet(self, session: AutomationSession) -> PurchaseResult:

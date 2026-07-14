@@ -42,7 +42,7 @@ class FakeBrowser:
             if name == "submit_password":
                 self.authenticated = True
             if name == "check_your_purchases":
-                args[0].purchase_number = "123456"
+                return "123456"
             if name == "finish_bet":
                 return PurchaseResult(
                     lottery_modality="mega-sena",
@@ -54,8 +54,8 @@ class FakeBrowser:
                             amount=Decimal("5.00"),
                         )
                     ],
-                    purchase_details_number="123456",
-                    purchase_details_datetime=datetime(2026, 7, 12, 18, 8, 14),
+                    purchase_number="123456",
+                    purchase_datetime=datetime(2026, 7, 12, 18, 8, 14),
                     total_purchase=Decimal("5.00"),
                     total_bets_effective=Decimal("5.00"),
                 )
@@ -167,7 +167,7 @@ def test_session_control_lifecycle(monkeypatch):
     started = use_case.start()
     assert started.is_open is True
     assert started.status == "open"
-    assert session.tab_id == "tab123"
+    assert browser.calls[0] == "start"
     assert notifier.started is True
 
     stopped = use_case.stop()
@@ -319,7 +319,7 @@ def test_session_control_rejects_invalid_lifecycle(monkeypatch):
 
 def test_run_bet_flow_finishes_when_payment_is_authorized():
     session = AutomationSession()
-    session.mark_open("tab123")
+    session.mark_open()
     browser = FakeBrowser()
     notifier = FakeNotifier()
     use_case = RunBetFlowUseCase(
@@ -332,16 +332,16 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
     result = use_case.run()
 
     assert result.status == "finished"
-    assert result.tracking_code == "123456"
+    assert result.purchase_number == "123456"
     assert browser.calls[0] == "access_authenticated_home"
     assert "confirm_payment" in browser.calls
     assert browser.calls[-1] == "finish_bet"
-    assert notifier.success_notifications[0].purchase_details_number == "123456"
+    assert notifier.success_notifications[0].purchase_number == "123456"
 
 
 def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monkeypatch):
     session = AutomationSession()
-    session.mark_open("tab123")
+    session.mark_open()
     code_requested = Event()
     browser = ValidationCodeRequestBrowser(code_requested)
     notifier = FakeNotifier()
@@ -361,7 +361,7 @@ def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monke
 
 def test_run_bet_flow_blocks_payment_without_authorization():
     session = AutomationSession()
-    session.mark_open("tab123")
+    session.mark_open()
     browser = FakeBrowser()
     notifier = FakeNotifier()
     use_case = RunBetFlowUseCase(

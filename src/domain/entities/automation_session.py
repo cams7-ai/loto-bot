@@ -20,33 +20,25 @@ class AutomationStatus(StrEnum):
 @dataclass
 class AutomationSession:
     id: UUID = field(default_factory=uuid4)
-    state: UUID = field(default_factory=uuid4)
-    nonce: UUID = field(default_factory=uuid4)
-    tab_id: str = ""
-    execution_id: str = ""
-    purchase_number: str = ""
     executed_operation: Operation = Operation.UNKNOWN_OPERATION
     status: AutomationStatus = AutomationStatus.CLOSED
     valid_code: str | None = None
     whatsapp_enabled: bool = False
-    tracking_code: str | None = None
 
     @property
     def is_open(self) -> bool:
         return self.status != AutomationStatus.CLOSED
 
-    def mark_open(self, tab_id: str) -> None:
+    def mark_open(self) -> None:
         self.executed_operation = Operation.START_SESSION
         self.status = AutomationStatus.OPEN
-        self.tab_id = tab_id
 
     def mark_running(self, operation: Operation) -> None:
         self.executed_operation = operation
         self.status = AutomationStatus.RUNNING
 
-    def mark_finished(self, tracking_code: str | None = None) -> None:
+    def mark_finished(self) -> None:
         self.status = AutomationStatus.FINISHED
-        self.tracking_code = tracking_code
 
     def mark_failed(self, operation: Operation) -> None:
         self.executed_operation = operation

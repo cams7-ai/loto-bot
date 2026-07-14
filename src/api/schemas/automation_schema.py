@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class HealthResponse(BaseModel):
@@ -11,10 +11,10 @@ class HealthResponse(BaseModel):
 class SessionStatusResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    session_id: str = Field(alias="sessionId")
+    session_id: str
     status: str
-    executed_operation: str = Field(alias="executedOperation")
-    is_open: bool = Field(alias="isOpen")
+    executed_operation: str
+    is_open: bool
 
 
 class SessionControlResponse(SessionStatusResponse):
@@ -24,8 +24,8 @@ class SessionControlResponse(SessionStatusResponse):
 class BetRunResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    session_id: str = Field(alias="sessionId")
+    session_id: str
     status: str
     message: str
-    executed_operation: str = Field(alias="executedOperation")
-    tracking_code: str | None = Field(default=None, alias="codigoAcompanhamento")
+    executed_operation: str
+    purchase_number: str

@@ -15,7 +15,6 @@ env/
 # Perfil persistente do navegador
 .whatsapp-profile/
 .lotobot-profile/
-.lotobot-profile-*/
 
 # Python
 __pycache__/

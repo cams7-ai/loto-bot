@@ -33,6 +33,7 @@ class FakeRunBetFlow:
             status="failed",
             message="A confirmação de pagamento real está desabilitada.",
             executed_operation=Operation.CONFIRM_PAYMENT,
+            purchase_number="",
         )
 
 
@@ -109,10 +110,10 @@ async def test_session_routes_delegate_to_use_case(override_container):
         stop = await client.get("/api/v1/sessions/stop")
 
     assert start.status_code == 200
-    assert start.json()["isOpen"] is True
+    assert start.json()["is_open"] is True
     assert start.json()["message"] == "Sessão de navegador iniciada com sucesso"
     assert status.json()["status"] == "closed"
-    assert stop.json()["isOpen"] is False
+    assert stop.json()["is_open"] is False
     assert override_container.session_control.started is True
     assert override_container.session_control.stopped is True
 
@@ -125,7 +126,7 @@ async def test_run_bet_route_returns_failed_flow_without_real_network():
 
     assert response.status_code == 200
     assert response.json()["status"] == "failed"
-    assert response.json()["executedOperation"] == "Confirma o pagamento"
+    assert response.json()["executed_operation"] == "Confirma o pagamento"
 
 
 @pytest.mark.anyio

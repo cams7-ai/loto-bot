@@ -8,6 +8,7 @@ from api.exceptions import ApiError
 from api.mappers.api_exception_mapper import ApiExceptionMapper
 from domain import (
     AutomationError,
+    BetsNotAvailableForCaptureError,
     BetTemporarilyDisabledError,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
@@ -35,6 +36,7 @@ from domain import (
         (IndividualBetRegistrationClosedError(), HTTPStatus.CONFLICT),
         (BetTemporarilyDisabledError("Mega-Sena"), HTTPStatus.CONFLICT),
         (DailyPurchaseLimitError(), HTTPStatus.TOO_MANY_REQUESTS),
+        (BetsNotAvailableForCaptureError(), HTTPStatus.CONFLICT),
     ],
 )
 def test_api_exception_mapper_uses_status_code_from_domain_exception(

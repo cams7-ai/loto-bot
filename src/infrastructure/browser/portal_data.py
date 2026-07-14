@@ -5,6 +5,7 @@ from datetime import datetime as DateTime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+from domain import BrlCurrencyFormatter
 from shared import SAO_PAULO_TIMEZONE
 
 
@@ -18,20 +19,6 @@ class PortalDataFormatter:
             f"{date_value} {time_value}",
             "%d/%m/%Y %H:%M:%S",
         ).replace(tzinfo=ZoneInfo(SAO_PAULO_TIMEZONE))
-
-    @staticmethod
-    def parse_brl_currency(value: str) -> Decimal | None:
-        if not value.strip():
-            return None
-
-        normalized_value = value.replace("R$", "").replace(".", "").replace(",", ".").strip()
-        return Decimal(normalized_value)
-
-    @staticmethod
-    def format_brl_currency(value: Decimal | None) -> str:
-        amount = value or Decimal("0")
-        formatted_amount = f"{amount:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-        return f"R$ {formatted_amount}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +39,7 @@ class Bet:
         object.__setattr__(self, "numbers", numbers)
         object.__setattr__(self, "draw", draw)
         object.__setattr__(self, "status", status)
-        object.__setattr__(self, "amount", PortalDataFormatter.parse_brl_currency(amount))
+        object.__setattr__(self, "amount", BrlCurrencyFormatter.parse_brl_currency(amount))
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -93,17 +80,17 @@ class PurchaseTotals:
         total_refunded: str,
         total_in_refund: str,
     ) -> None:
-        object.__setattr__(self, "total_purchase", PortalDataFormatter.parse_brl_currency(total_purchase))
+        object.__setattr__(self, "total_purchase", BrlCurrencyFormatter.parse_brl_currency(total_purchase))
         object.__setattr__(
             self,
             "total_bets_in_processing",
-            PortalDataFormatter.parse_brl_currency(total_bets_in_processing),
+            BrlCurrencyFormatter.parse_brl_currency(total_bets_in_processing),
         )
-        object.__setattr__(self, "total_bets_effective", PortalDataFormatter.parse_brl_currency(total_bets_effective))
+        object.__setattr__(self, "total_bets_effective", BrlCurrencyFormatter.parse_brl_currency(total_bets_effective))
         object.__setattr__(
             self,
             "total_bets_not_effective",
-            PortalDataFormatter.parse_brl_currency(total_bets_not_effective),
+            BrlCurrencyFormatter.parse_brl_currency(total_bets_not_effective),
         )
-        object.__setattr__(self, "total_refunded", PortalDataFormatter.parse_brl_currency(total_refunded))
-        object.__setattr__(self, "total_in_refund", PortalDataFormatter.parse_brl_currency(total_in_refund))
+        object.__setattr__(self, "total_refunded", BrlCurrencyFormatter.parse_brl_currency(total_refunded))
+        object.__setattr__(self, "total_in_refund", BrlCurrencyFormatter.parse_brl_currency(total_in_refund))

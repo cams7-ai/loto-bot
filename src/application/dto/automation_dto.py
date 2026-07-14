@@ -24,7 +24,7 @@ class AutomationRunResult:
     status: str
     message: str
     executed_operation: Operation
-    tracking_code: str | None = None
+    purchase_number: str | None = None
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class BetResult:
 class PurchaseResult:
     lottery_modality: str | None
     bets: list[BetResult]
-    purchase_details_number: str
-    purchase_details_datetime: datetime
+    purchase_number: str
+    purchase_datetime: datetime
     total_purchase: Decimal | None
     total_bets_effective: Decimal | None

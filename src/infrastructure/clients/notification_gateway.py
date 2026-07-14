@@ -8,10 +8,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from application import (
     NotificationPort,
-    build_email_message,
+    build_error_email_message,
+    build_error_whatsapp_message,
     build_success_email_message,
     build_success_whatsapp_message,
-    build_whatsapp_message,
     get_error_message,
 )
 from application.dto import PurchaseResult
@@ -71,7 +71,7 @@ class NotificationGateway(NotificationPort):
             try:
                 status = self._whatsapp.status(operation)
                 response = (
-                    self._whatsapp.send_message(operation, build_whatsapp_message(exc))
+                    self._whatsapp.send_message(operation, build_error_whatsapp_message(exc))
                     if status == WhatsAppSessionStatus.SESSION_OPEN.value
                     else None
                 )
@@ -129,7 +129,7 @@ class NotificationGateway(NotificationPort):
             f"<h1>{get_error_message(exc.code)}</h1>"
             f"<p><strong>Operação:</strong> {operation.value}</p>"
             f"<p><strong>Data/hora:</strong> {now}</p>"
-            f"<p>{build_email_message(str(exc))}</p>"
+            f"<p>{build_error_email_message(str(exc))}</p>"
             "</body></html>"
         )
         try:
