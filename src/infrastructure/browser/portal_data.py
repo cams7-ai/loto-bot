@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime as DateTime
+from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -14,8 +14,8 @@ class PortalDataFormatter:
     def parse_purchase_datetime(
         date_value: str,
         time_value: str,
-    ) -> DateTime:
-        return DateTime.strptime(
+    ) -> datetime:
+        return datetime.strptime(
             f"{date_value} {time_value}",
             "%d/%m/%Y %H:%M:%S",
         ).replace(tzinfo=ZoneInfo(SAO_PAULO_TIMEZONE))
@@ -46,7 +46,7 @@ class Bet:
 class PurchaseDetails:
     number: str
     status: str
-    datetime: DateTime
+    bet_date: datetime
 
     def __init__(
         self,
@@ -58,7 +58,7 @@ class PurchaseDetails:
     ) -> None:
         object.__setattr__(self, "number", number)
         object.__setattr__(self, "status", status)
-        object.__setattr__(self, "datetime", PortalDataFormatter.parse_purchase_datetime(date, time))
+        object.__setattr__(self, "bet_date", PortalDataFormatter.parse_purchase_datetime(date, time))
 
 
 @dataclass(frozen=True, slots=True)

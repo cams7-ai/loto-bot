@@ -28,7 +28,7 @@ def test_purchase_details_converts_date_and_time_to_datetime() -> None:
 
     assert details.number == "123456"
     assert details.status == "Efetivada"
-    assert details.datetime == datetime(2026, 7, 12, 18, 8, 14, tzinfo=ZoneInfo("America/Sao_Paulo"))
+    assert details.bet_date == datetime(2026, 7, 12, 18, 8, 14, tzinfo=ZoneInfo("America/Sao_Paulo"))
     assert not hasattr(details, "date")
     assert not hasattr(details, "time")
 

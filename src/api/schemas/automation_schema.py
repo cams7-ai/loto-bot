@@ -46,7 +46,7 @@ class PlacedBetResponse(BaseModel):
                 "status": "Efetivada",
                 "bet_amount": "123.45",
                 "purchase_number": "123456",
-                "bet_date": "2026-07-12T18:08:14",
+                "bet_date": "2026-07-12T18:08:14-03:00",
             }
         },
     )

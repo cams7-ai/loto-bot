@@ -90,7 +90,7 @@ def placed_bet_result(
         status="Efetivada",
         bet_amount=bet_amount,
         purchase_number="123456",
-        bet_date=datetime(2026, 7, 12, 18, 8, 14),
+        bet_date=datetime(2026, 7, 12, 18, 8, 14, 457000),
     )
 
 
@@ -207,7 +207,7 @@ async def test_list_placed_bets_route_returns_serialized_bets(override_container
             "status": "Efetivada",
             "bet_amount": "6.00",
             "purchase_number": "123456",
-            "bet_date": "2026-07-12T18:08:14",
+            "bet_date": "2026-07-12T18:08:14-03:00",
         }
     ]
     assert override_container.list_placed_bets.calls[0] == {

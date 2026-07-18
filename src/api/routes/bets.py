@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 
@@ -10,6 +11,7 @@ from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.schemas import BetRunResponse, ErrorResponse, PlacedBetResponse, error_response_examples
 from domain import AutomationError, ErrorCode
+from shared import SAO_PAULO_TIMEZONE
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
@@ -137,8 +139,15 @@ def _placed_bet_response(result) -> PlacedBetResponse:
         status=result.status,
         bet_amount=result.bet_amount.quantize(Decimal("0.01")),
         purchase_number=result.purchase_number,
-        bet_date=result.bet_date,
+        bet_date=_bet_date_with_timezone(result.bet_date),
     )
+
+
+def _bet_date_with_timezone(bet_date: datetime) -> datetime:
+    timezone = ZoneInfo(SAO_PAULO_TIMEZONE)
+    if bet_date.tzinfo is None:
+        return bet_date.replace(tzinfo=timezone, microsecond=0)
+    return bet_date.astimezone(timezone).replace(microsecond=0)
 
 
 def _raise_bad_request(exc: ValueError) -> None:
