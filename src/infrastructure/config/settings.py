@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
     credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
     confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
+    mongodb_enabled: bool = Field(default=False, alias="MONGODB_ENABLED")
+    mongodb_uri: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URI")
+    mongodb_database: str = Field(default="loto_bot", alias="MONGODB_DATABASE")
     bet_processing_path: str = Field(default="/processamento", alias="BET_PROCESSING_PATH")
     bet_tracking_path: str = Field(default="/acompanhamento/{purchase_number}", alias="BET_TRACKING_PATH")
     bet_purchase_path: str = Field(default="/compras/{purchase_number}", alias="BET_PURCHASE_PATH")
@@ -63,7 +66,14 @@ class Settings(BaseSettings):
     browser_timeout_seconds: int = Field(default=5, alias="BROWSER_TIMEOUT_SECONDS")
     validation_code_lookup_lead_seconds: int = Field(default=1, alias="VALIDATION_CODE_LOOKUP_LEAD_SECONDS")
 
-    @field_validator("whatsapp_headless", "whatsapp_enabled", "confirm_payment", "browser_headless", mode="before")
+    @field_validator(
+        "whatsapp_headless",
+        "whatsapp_enabled",
+        "confirm_payment",
+        "mongodb_enabled",
+        "browser_headless",
+        mode="before",
+    )
     @classmethod
     def parse_bool(cls, value: object) -> object:
         if not isinstance(value, str):

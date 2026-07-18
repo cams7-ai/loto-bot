@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from application.dto import AutomationRunResult
+import logging
+
+from application.dto import AutomationRunResult, PurchaseResult
 from application.ports import BrowserAutomationPort, NotificationPort
 from application.services import (
+    PlacedBetService,
     handle_custom_failure,
     handle_failure,
 )
@@ -17,6 +20,8 @@ from domain import (
     PaymentAuthorization,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class RunBetFlowUseCase(OperationExecutor):
     def __init__(
@@ -25,11 +30,13 @@ class RunBetFlowUseCase(OperationExecutor):
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
         payment_authorization: PaymentAuthorization,
+        bet_persistence: PlacedBetService | None = None,
     ) -> None:
         self._session = session
         self._browser = browser
         self._notifier = notifier
         self._payment_authorization = payment_authorization
+        self._bet_persistence = bet_persistence
 
     def run(self) -> AutomationRunResult | None:
         if not self._session.is_open:
@@ -45,6 +52,7 @@ class RunBetFlowUseCase(OperationExecutor):
             self._execute(Operation.CHECK_BET_PROCESSING, self._browser.check_bet_processing)
             purchase_number = self._execute(Operation.CHECK_YOUR_PURCHASES, self._browser.check_your_purchases)
             purchase = self._execute(Operation.COMPLETE_BET, self._browser.finish_bet)
+            self._persist_purchase(purchase)
             self._notifier.notify_success(self._session, purchase)
             self._session.mark_finished()
             return AutomationRunResult(
@@ -59,3 +67,12 @@ class RunBetFlowUseCase(OperationExecutor):
             handle_custom_failure(self._session, self._browser, self._notifier, exc, False)
         except Exception as exc:
             handle_failure(self._session, self._browser, self._notifier, exc, False)
+
+    def _persist_purchase(self, purchase: PurchaseResult) -> None:
+        if self._bet_persistence is None:
+            return
+
+        try:
+            self._bet_persistence.save(purchase)
+        except Exception:
+            logger.exception("Falha ao persistir aposta finalizada.")

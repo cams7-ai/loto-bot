@@ -4,9 +4,17 @@ from datetime import datetime
 from decimal import Decimal
 from threading import Event
 
+from bson.decimal128 import Decimal128
+
 import application.use_cases.session_control as session_control_module
-from application import RunBetFlowUseCase, SessionControlUseCase
-from application.dto import BetResult, PurchaseResult
+from application import (
+    GetPlacedBetUseCase,
+    ListPlacedBetsUseCase,
+    PlacedBetService,
+    RunBetFlowUseCase,
+    SessionControlUseCase,
+)
+from application.dto import BetResult, BetSearchFilters, PlacedBetResult, PurchaseResult
 from domain import (
     BROWSER_SESSION_CLOSED,
     BROWSER_SESSION_OPEN,
@@ -16,9 +24,11 @@ from domain import (
     BrowserSessionClosedError,
     BrowserSessionOpenError,
     ErrorCode,
+    LotteryModality,
     Operation,
     PaymentAuthorization,
 )
+from infrastructure.database.models import BetModel
 
 
 class FakeBrowser:
@@ -113,6 +123,39 @@ class FakeValidationCodes:
     def get_validation_code(self, operation):
         self.calls.append(operation)
         return "654321"
+
+
+class FakeBetRepository:
+    def __init__(self, save_error: Exception | None = None) -> None:
+        self.saved: list[tuple[LotteryModality, PurchaseResult]] = []
+        self.filters: BetSearchFilters | None = None
+        self.requested_bet_id: str | None = None
+        self.save_error = save_error
+        self.search_results = [
+            PlacedBetResult(
+                bet_id="64ef8f7a6f9a8f0f8f0f8f0f",
+                lottery_modality=LotteryModality.MEGA_SENA,
+                selected_numbers=["01", "02", "03", "04", "05", "06"],
+                draw_number="1234",
+                status="Efetivada",
+                bet_amount=Decimal("5.00"),
+                purchase_number="123456",
+                bet_date=datetime(2026, 7, 12, 18, 8, 14),
+            )
+        ]
+
+    def save(self, lottery_modality, purchase):
+        if self.save_error is not None:
+            raise self.save_error
+        self.saved.append((lottery_modality, purchase))
+
+    def find_all(self, filters):
+        self.filters = filters
+        return self.search_results
+
+    def find_by_id(self, bet_id):
+        self.requested_bet_id = bet_id
+        return self.search_results[0]
 
 
 class WaitingValidationCodes:
@@ -339,6 +382,51 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
     assert notifier.success_notifications[0].purchase_number == "123456"
 
 
+def test_run_bet_flow_persists_purchase_when_service_is_configured():
+    session = AutomationSession()
+    session.mark_open()
+    browser = FakeBrowser()
+    notifier = FakeNotifier()
+    repository = FakeBetRepository()
+    persistence = PlacedBetService(repository=repository, selected_lottery_modality="mega-sena")
+    use_case = RunBetFlowUseCase(
+        session=session,
+        browser=browser,
+        notifier=notifier,
+        payment_authorization=PaymentAuthorization(True),
+        bet_persistence=persistence,
+    )
+
+    result = use_case.run()
+
+    assert result.status == "finished"
+    assert repository.saved[0][0] == LotteryModality.MEGA_SENA
+    assert repository.saved[0][1].purchase_number == "123456"
+    assert notifier.success_notifications[0].purchase_number == "123456"
+
+
+def test_run_bet_flow_does_not_fail_when_persistence_fails_after_purchase():
+    session = AutomationSession()
+    session.mark_open()
+    browser = FakeBrowser()
+    notifier = FakeNotifier()
+    repository = FakeBetRepository(save_error=ValueError("mongo indisponível"))
+    persistence = PlacedBetService(repository=repository, selected_lottery_modality="mega-sena")
+    use_case = RunBetFlowUseCase(
+        session=session,
+        browser=browser,
+        notifier=notifier,
+        payment_authorization=PaymentAuthorization(True),
+        bet_persistence=persistence,
+    )
+
+    result = use_case.run()
+
+    assert result.status == "finished"
+    assert notifier.success_notifications[0].purchase_number == "123456"
+    assert session.status.value == "finished"
+
+
 def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monkeypatch):
     session = AutomationSession()
     session.mark_open()
@@ -383,3 +471,82 @@ def test_run_bet_flow_blocks_payment_without_authorization():
     assert notifier.messages
     assert "confirm_payment" not in browser.calls
     assert session.status.value == "failed"
+
+
+def test_placed_bet_service_delegates_purchase_with_resolved_modality():
+    repository = FakeBetRepository()
+    service = PlacedBetService(repository=repository, selected_lottery_modality="mega-sena")
+    purchase = FakeBrowser().finish_bet()
+
+    service.save(purchase)
+
+    assert repository.saved == [(LotteryModality.MEGA_SENA, purchase)]
+
+
+def test_placed_bet_service_rejects_invalid_modality():
+    service = PlacedBetService(repository=FakeBetRepository(), selected_lottery_modality="invalida")
+
+    try:
+        service.save(FakeBrowser().finish_bet())
+    except ValueError as exc:
+        assert "Modalidade" in str(exc)
+    else:
+        raise AssertionError("Modalidade inválida deveria ser recusada")
+
+
+def test_list_placed_bets_use_case_builds_filters():
+    repository = FakeBetRepository()
+    use_case = ListPlacedBetsUseCase(repository=repository)
+    start_date = datetime(2026, 7, 1)
+    end_date = datetime(2026, 7, 31)
+
+    results = use_case.run(
+        lottery_modality="mega-sena",
+        draw_number="1234",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+    assert results == repository.search_results
+    assert repository.filters == BetSearchFilters(
+        lottery_modality=LotteryModality.MEGA_SENA,
+        draw_number="1234",
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def test_list_placed_bets_use_case_rejects_invalid_date_range():
+    use_case = ListPlacedBetsUseCase(repository=FakeBetRepository())
+
+    try:
+        use_case.run(start_date=datetime(2026, 7, 31), end_date=datetime(2026, 7, 1))
+    except ValueError as exc:
+        assert "data inicial" in str(exc)
+    else:
+        raise AssertionError("Intervalo inválido deveria ser recusado")
+
+
+def test_get_placed_bet_use_case_delegates_search_by_bet_id():
+    repository = FakeBetRepository()
+    use_case = GetPlacedBetUseCase(repository=repository)
+
+    result = use_case.run(bet_id="64ef8f7a6f9a8f0f8f0f8f0f")
+
+    assert result == repository.search_results[0]
+    assert repository.requested_bet_id == "64ef8f7a6f9a8f0f8f0f8f0f"
+
+
+def test_get_placed_bet_use_case_rejects_empty_bet_id():
+    use_case = GetPlacedBetUseCase(repository=FakeBetRepository())
+
+    try:
+        use_case.run(bet_id="   ")
+    except ValueError as exc:
+        assert "obrigatório" in str(exc)
+    else:
+        raise AssertionError("Identificador vazio deveria ser recusado")
+
+
+def test_bet_model_converts_mongodb_decimal128_to_decimal():
+    assert BetModel.parse_decimal128(Decimal128("123.45")) == Decimal("123.45")

@@ -15,7 +15,7 @@ from api.exception_handlers import (
 from api.exceptions import ApiError
 from api.openapi import OPENAPI_TAGS
 from api.responses import Utf8JSONResponse
-from api.routes import bets_router, health_router, sessions_router
+from api.routes import bets_router, health_router, placed_bets_router, sessions_router
 
 app = FastAPI(
     title="LotoBot API",
@@ -35,6 +35,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(health_router)
 app.include_router(sessions_router)
 app.include_router(bets_router)
+app.include_router(placed_bets_router)
 
 
 def custom_openapi() -> dict[str, object]:

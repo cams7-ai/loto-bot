@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from domain import Operation
+from domain import LotteryModality, Operation
 
 
 @dataclass(frozen=True)
@@ -43,3 +43,23 @@ class PurchaseResult:
     purchase_datetime: datetime
     total_purchase: Decimal | None
     total_bets_effective: Decimal | None
+
+
+@dataclass(frozen=True)
+class BetSearchFilters:
+    lottery_modality: LotteryModality | None = None
+    draw_number: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+@dataclass(frozen=True)
+class PlacedBetResult:
+    bet_id: str
+    lottery_modality: LotteryModality
+    selected_numbers: list[str]
+    draw_number: str
+    status: str
+    bet_amount: Decimal
+    purchase_number: str
+    bet_date: datetime

@@ -42,6 +42,11 @@ ERROR_EXAMPLES = {
         "Corpo da requisição inválido.",
         ["cpf"],
     ),
+    ErrorCode.NOT_FOUND: error_example(
+        HTTPStatus.NOT_FOUND,
+        ErrorCode.NOT_FOUND,
+        "Aposta não encontrada.",
+    ),
     ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE,

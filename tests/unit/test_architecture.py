@@ -34,10 +34,10 @@ def test_infrastructure_does_not_depend_on_api() -> None:
 
 def test_forbidden_framework_imports_by_layer() -> None:
     rules = {
-        "domain": {"fastapi", "httpx", "playwright", "pydantic", "pydantic_settings"},
-        "application": {"fastapi", "httpx", "playwright", "pydantic_settings"},
+        "domain": {"beanie", "fastapi", "httpx", "motor", "playwright", "pydantic", "pydantic_settings", "pymongo"},
+        "application": {"beanie", "fastapi", "httpx", "motor", "playwright", "pydantic_settings", "pymongo"},
         "infrastructure": {"fastapi"},
-        "api": {"httpx", "playwright"},
+        "api": {"beanie", "httpx", "motor", "playwright", "pymongo"},
     }
     violations = [
         f"{source_file.relative_to(PROJECT_ROOT)} imports {imported_module}"
