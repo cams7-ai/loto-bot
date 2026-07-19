@@ -33,14 +33,14 @@ class PlaywrightBrowserBase:
 
     @staticmethod
     def _optional_inner_text(page: Page, selector: Selectors) -> str:
-        locator = page.locator(PlaywrightBrowserBase._selector_value(selector))
+        locator = page.locator(selector)
         if locator.count() == 0:
             return ""
         return locator.first.inner_text().strip()
 
     @staticmethod
     def _required_inner_text(page: Page, timeout_ms: int, selector: Selectors) -> str:
-        locator = page.locator(PlaywrightBrowserBase._selector_value(selector)).first
+        locator = page.locator(selector).first
         locator.wait_for(state="visible", timeout=timeout_ms)
 
         deadline = monotonic() + (timeout_ms / 1000)
@@ -55,8 +55,7 @@ class PlaywrightBrowserBase:
 
     @staticmethod
     def _click(page: Page, timeout_ms: int, selector: Selectors) -> bool:
-        selector_value = PlaywrightBrowserBase._selector_value(selector)
-        element = page.locator(selector_value).first
+        element = page.locator(selector).first
         try:
             PlaywrightBrowserBase._prepare_for_click(element, timeout_ms)
             element.click()
@@ -66,28 +65,26 @@ class PlaywrightBrowserBase:
                 "Clique ignorado porque o elemento não foi encontrado ou não ficou visível "
                 "dentro do tempo limite de %d ms: %s",
                 timeout_ms,
-                selector_value,
+                selector,
             )
         return False
 
     @staticmethod
     def _fill(page: Page, selector: Selectors, value: str) -> bool:
-        selector_value = PlaywrightBrowserBase._selector_value(selector)
-        element = page.locator(selector_value)
+        element = page.locator(selector)
         try:
             element.fill(value)
             return True
         except Exception:
             logger.debug(
                 "Preenchimento ignorado porque o elemento não foi encontrado: %s",
-                selector_value,
+                selector,
             )
         return False
 
     @staticmethod
     def _type(page: Page, timeout_ms: int, selector: Selectors, value: str) -> bool:
-        selector_value = PlaywrightBrowserBase._selector_value(selector)
-        element = page.locator(selector_value).first
+        element = page.locator(selector).first
         PlaywrightBrowserBase._prepare_for_click(element, timeout_ms)
         element.click()
         element.fill("")
@@ -104,10 +101,6 @@ class PlaywrightBrowserBase:
     def _prepare_for_click(element: Locator, timeout_ms: int) -> None:
         element.wait_for(state="visible", timeout=timeout_ms)
         element.scroll_into_view_if_needed(timeout=timeout_ms)
-
-    @staticmethod
-    def _selector_value(selector: Selectors) -> str:
-        return selector
 
     def _require_page(self) -> Page:
         if self._page is None:
