@@ -2,32 +2,20 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 
 from api.dependencies import AppContainer, get_container
 from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
-from api.schemas import BetRunResponse, ErrorResponse, PlacedBetResponse, error_response_examples
+from api.responses import error_response
+from api.schemas import BetRunResponse, PlacedBetResponse
 from domain import AutomationError, ErrorCode
-from shared import SAO_PAULO_TIMEZONE
+from shared import with_sao_paulo_timezone
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
 CONTAINER_DEPENDENCY = Depends(get_container)
-
-
-def error_response(description: str, *codes: ErrorCode) -> dict:
-    return {
-        "model": ErrorResponse,
-        "description": description,
-        "content": {
-            "application/json; charset=utf-8": {
-                "examples": error_response_examples(*codes),
-            }
-        },
-    }
 
 
 ERROR_RESPONSES = {
@@ -144,10 +132,7 @@ def _placed_bet_response(result) -> PlacedBetResponse:
 
 
 def _bet_date_with_timezone(bet_date: datetime) -> datetime:
-    timezone = ZoneInfo(SAO_PAULO_TIMEZONE)
-    if bet_date.tzinfo is None:
-        return bet_date.replace(tzinfo=timezone, microsecond=0)
-    return bet_date.astimezone(timezone).replace(microsecond=0)
+    return with_sao_paulo_timezone(bet_date, remove_microseconds=True)
 
 
 def _raise_bad_request(exc: ValueError) -> None:

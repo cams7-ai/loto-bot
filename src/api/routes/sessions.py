@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends
 
 from api.dependencies import AppContainer, get_container
 from api.mappers import ApiExceptionMapper, ApiResponseMapper
+from api.responses import error_response
 from api.schemas import (
-    ErrorResponse,
     SessionControlResponse,
     SessionStatusResponse,
-    error_response_examples,
 )
 from domain import (
     AutomationError,
@@ -17,18 +16,6 @@ from domain import (
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 CONTAINER_DEPENDENCY = Depends(get_container)
-
-
-def error_response(description: str, *codes: ErrorCode) -> dict:
-    return {
-        "model": ErrorResponse,
-        "description": description,
-        "content": {
-            "application/json; charset=utf-8": {
-                "examples": error_response_examples(*codes),
-            }
-        },
-    }
 
 
 ERROR_RESPONSE_BY_STATUS = {

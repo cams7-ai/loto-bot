@@ -3,10 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from domain import BrlCurrencyFormatter
-from shared import SAO_PAULO_TIMEZONE
+from shared import parse_sao_paulo_datetime
 
 
 class PortalDataFormatter:
@@ -15,10 +14,7 @@ class PortalDataFormatter:
         date_value: str,
         time_value: str,
     ) -> datetime:
-        return datetime.strptime(
-            f"{date_value} {time_value}",
-            "%d/%m/%Y %H:%M:%S",
-        ).replace(tzinfo=ZoneInfo(SAO_PAULO_TIMEZONE))
+        return parse_sao_paulo_datetime(date_value, time_value)
 
 
 @dataclass(frozen=True, slots=True)

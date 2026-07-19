@@ -1,7 +1,7 @@
-from enum import StrEnum
+from enum import Enum
 
 
-class WhatsAppSessionStatus(StrEnum):
+class WhatsAppSessionStatus(Enum):
     SESSION_CLOSED = "SESSAO_FECHADA"
     STARTING_SESSION = "INICIANDO_SESSAO"
     WAITING_FOR_AUTHENTICATION = "AGUARDANDO_AUTENTICACAO"

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 from uuid import UUID, uuid4
 
 from domain.enums import Operation
 
 
-class AutomationStatus(StrEnum):
+class AutomationStatus(Enum):
     CLOSED = "closed"
     OPEN = "open"
     RUNNING = "running"

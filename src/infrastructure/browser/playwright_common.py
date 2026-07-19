@@ -32,14 +32,14 @@ class PlaywrightBrowserBase:
         self._executor: ThreadPoolExecutor | None = None
 
     @staticmethod
-    def _optional_inner_text(page: Page, selector: Selectors | str) -> str:
+    def _optional_inner_text(page: Page, selector: Selectors) -> str:
         locator = page.locator(PlaywrightBrowserBase._selector_value(selector))
         if locator.count() == 0:
             return ""
         return locator.first.inner_text().strip()
 
     @staticmethod
-    def _required_inner_text(page: Page, timeout_ms: int, selector: Selectors | str) -> str:
+    def _required_inner_text(page: Page, timeout_ms: int, selector: Selectors) -> str:
         locator = page.locator(PlaywrightBrowserBase._selector_value(selector)).first
         locator.wait_for(state="visible", timeout=timeout_ms)
 
@@ -54,7 +54,7 @@ class PlaywrightBrowserBase:
         return text
 
     @staticmethod
-    def _click(page: Page, timeout_ms: int, selector: Selectors | str) -> bool:
+    def _click(page: Page, timeout_ms: int, selector: Selectors) -> bool:
         selector_value = PlaywrightBrowserBase._selector_value(selector)
         element = page.locator(selector_value).first
         try:
@@ -71,7 +71,7 @@ class PlaywrightBrowserBase:
         return False
 
     @staticmethod
-    def _fill(page: Page, selector: Selectors | str, value: str) -> bool:
+    def _fill(page: Page, selector: Selectors, value: str) -> bool:
         selector_value = PlaywrightBrowserBase._selector_value(selector)
         element = page.locator(selector_value)
         try:
@@ -85,7 +85,7 @@ class PlaywrightBrowserBase:
         return False
 
     @staticmethod
-    def _type(page: Page, timeout_ms: int, selector: Selectors | str, value: str) -> bool:
+    def _type(page: Page, timeout_ms: int, selector: Selectors, value: str) -> bool:
         selector_value = PlaywrightBrowserBase._selector_value(selector)
         element = page.locator(selector_value).first
         PlaywrightBrowserBase._prepare_for_click(element, timeout_ms)
@@ -106,9 +106,7 @@ class PlaywrightBrowserBase:
         element.scroll_into_view_if_needed(timeout=timeout_ms)
 
     @staticmethod
-    def _selector_value(selector: Selectors | str) -> str:
-        if isinstance(selector, Selectors):
-            return selector.value
+    def _selector_value(selector: Selectors) -> str:
         return selector
 
     def _require_page(self) -> Page:

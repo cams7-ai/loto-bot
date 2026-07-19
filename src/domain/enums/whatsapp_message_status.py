@@ -1,5 +1,5 @@
-from enum import StrEnum
+from enum import Enum
 
 
-class WhatsAppMessageStatus(StrEnum):
+class WhatsAppMessageStatus(Enum):
     SENT = "enviado"

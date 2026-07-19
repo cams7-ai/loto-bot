@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 
-class LotteryModality(StrEnum):
+class LotteryModality(Enum):
     MEGA_SENA = "mega-sena"
     QUINA = "quina"
     QUINA_ESPECIAL = "quina/especial"

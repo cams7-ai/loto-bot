@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 
-class ErrorCode(StrEnum):
+class ErrorCode(Enum):
     BAD_REQUEST = "REQUISICAO_INVALIDA"
     NOT_FOUND = "ROTA_NAO_ENCONTRADA"
     METHOD_NOT_ALLOWED = "METODO_NAO_PERMITIDO"

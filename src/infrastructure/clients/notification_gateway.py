@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfoNotFoundError
 
 from application import (
     NotificationPort,
@@ -18,7 +18,7 @@ from application.dto import PurchaseResult
 from domain import AutomationError, AutomationSession, Operation, WhatsAppMessageStatus, WhatsAppSessionStatus
 from infrastructure.clients.mail_sender_client import MailSenderClient
 from infrastructure.clients.whatsapp_notify_client import WhatsAppNotifyClient
-from shared import SAO_PAULO_TIMEZONE
+from shared import SAO_PAULO_TIMEZONE, sao_paulo_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class NotificationGateway(NotificationPort):
     def _send_mail_fallback(self, exc: AutomationError) -> None:
         operation = exc.operation
         try:
-            timestamp_timezone = ZoneInfo(SAO_PAULO_TIMEZONE)
+            timestamp_timezone = sao_paulo_timezone()
         except ZoneInfoNotFoundError:  # pragma: no cover - depends on host timezone database.
             logger.warning(
                 "Timezone %s indisponível; usando UTC-03:00",
