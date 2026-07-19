@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from application.dto import PurchaseResult
-from domain import AutomationSession
+from domain import AutomationSession, LotteryModality
 
 
 class BrowserAutomationPort(Protocol):
@@ -51,10 +51,10 @@ class BrowserAutomationPort(Protocol):
     def clear_shopping_cart(self, session: AutomationSession) -> None:
         """Limpa carrinho no portal."""
 
-    def select_lottery_modality(self, session: AutomationSession) -> None:
+    def select_lottery_modality(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
         """Seleciona a modalidade."""
 
-    def place_bet(self, session: AutomationSession) -> None:
+    def place_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
         """Completa o jogo com números aleatórios."""
         """Adiciona a aposta ao carrinho."""
 
@@ -71,5 +71,5 @@ class BrowserAutomationPort(Protocol):
     def check_your_purchases(self, session: AutomationSession) -> str:
         """Acessa a página de conferência de compras."""
 
-    def finish_bet(self, session: AutomationSession) -> PurchaseResult:
+    def finish_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> PurchaseResult:
         """Finaliza a aposta e retorna os dados da compra."""

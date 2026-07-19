@@ -12,8 +12,8 @@ class PlacedBetService:
         self._repository = repository
         self._selected_lottery_modality = selected_lottery_modality
 
-    def save(self, purchase: PurchaseResult) -> None:
-        lottery_modality = LotteryModality.from_string(self._selected_lottery_modality)
+    def save(self, purchase: PurchaseResult, selected_lottery_modality: LotteryModality | None = None) -> None:
+        lottery_modality = selected_lottery_modality or LotteryModality.from_string(self._selected_lottery_modality)
         if lottery_modality is None:
             raise ValueError("Modalidade de loteria inválida.")
 

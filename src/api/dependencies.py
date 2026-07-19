@@ -55,6 +55,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         notifier=notifier,
         payment_authorization=PaymentAuthorization(resolved_settings.confirm_payment),
         bet_persistence=bet_persistence,
+        selected_lottery_modality=resolved_settings.selected_lottery_modality,
     )
     return AppContainer(
         settings=resolved_settings,

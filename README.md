@@ -10,7 +10,7 @@ O código segue Clean Architecture: domínio e casos de uso não dependem de Fas
 - `GET /api/v1/sessions/start`: inicia a sessão do navegador e tenta iniciar o WhatsApp Web.
 - `GET /api/v1/sessions/stop`: encerra o navegador e o WhatsApp Web.
 - `GET /api/v1/sessions/status`: consulta o estado da sessão.
-- `GET /api/v1/bets/run`: executa o fluxo principal de aposta.
+- `POST /api/v1/bets/run`: executa o fluxo principal de aposta.
 - `GET /api/v1/history/bets`: lista apostas persistidas no MongoDB, com filtros opcionais.
 - `GET /api/v1/history/bets/{bet_id}`: consulta uma aposta persistida pelo identificador.
 - Swagger UI em `/docs`, ReDoc em `/redoc` e OpenAPI em `/openapi.json`.
@@ -58,7 +58,15 @@ Resposta:
 ### Executar Fluxo de Aposta
 
 ```powershell
-curl http://localhost:8000/api/v1/bets/run
+curl -X POST http://localhost:8000/api/v1/bets/run
+```
+
+Opcionalmente, informe a modalidade no corpo da requisição. Quando omitida, a API usa `SELECTED_LOTTERY_MODALITY`.
+
+```powershell
+curl -X POST http://localhost:8000/api/v1/bets/run `
+  -H "Content-Type: application/json" `
+  -d '{"selected_lottery_modality":"MEGA_SENA"}'
 ```
 
 Resposta:

@@ -14,6 +14,7 @@ class LotteryModalityBuilder:
             LotteryModality.LOTECA: "loteca",
             LotteryModality.LOTECA_ESPECIAL: "loteca especial",
             LotteryModality.LOTOFACIL: "lotofácil",
+            LotteryModality.LOTOFACIL_ESPECIAL: "lotofácil da independência",
             LotteryModality.MAIS_MILIONARIA: "+milionária",
             LotteryModality.LOTOMANIA: "lotomania",
             LotteryModality.TIMEMANIA: "timemania",

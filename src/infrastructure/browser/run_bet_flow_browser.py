@@ -29,36 +29,36 @@ logger = logging.getLogger(__name__)
 
 
 class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
-    def select_lottery_modality(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._select_lottery_modality, session)
+    def select_lottery_modality(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
+        self._run_on_browser_thread(self._select_lottery_modality, session, lottery_modality)
 
-    def _select_lottery_modality(self, session: AutomationSession) -> None:
+    def _select_lottery_modality(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
         page = self._require_page()
         short_timeout_ms = self._short_timeout_ms
         self._check_redirected_page(page, self._timeout_ms, session, self._settings.home_path)
-        lottery_modality = self._settings.selected_lottery_modality
-        selector = Selectors.modality_button(lottery_modality)
+        selector = Selectors.modality_button(lottery_modality.value)
         if selector is None:
             raise AutomationError(
-                LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality),
+                LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality.value),
                 operation=Operation.SELECT_LOTTERY_MODALITY,
             )
 
         if not self._click(page, short_timeout_ms, selector):
-            selector = Selectors.disabled_modality_button(lottery_modality)
+            selector = Selectors.disabled_modality_button(lottery_modality.value)
             if selector is not None and self._click(page, short_timeout_ms, selector):
-                raise BetTemporarilyDisabledError(lottery_modality)
+                raise BetTemporarilyDisabledError(lottery_modality.value)
 
         if self._click(page, short_timeout_ms, Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON):
             raise IndividualBetRegistrationClosedError()
 
-    def place_bet(self, session: AutomationSession) -> None:
-        self._run_on_browser_thread(self._place_bet, session)
+    def place_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
+        self._run_on_browser_thread(self._place_bet, session, lottery_modality)
 
-    def _place_bet(self, session: AutomationSession) -> None:
+    def _place_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
         page = self._require_page()
         short_timeout_ms = self._short_timeout_ms
-        self._check_redirected_page(page, self._timeout_ms, session, self._settings.bet_page_path_with_modality)
+        bet_page_path = self._settings.bet_page_path.format(lottery_modality=lottery_modality.value)
+        self._check_redirected_page(page, self._timeout_ms, session, bet_page_path)
         self._click(page, short_timeout_ms, Selectors.COMPLETE_GAME_BUTTON)
         self._click(page, short_timeout_ms, Selectors.ADD_TO_CART_BUTTON)
         self._click(page, short_timeout_ms, Selectors.GO_TO_PAYMENT_BUTTON)
@@ -132,10 +132,10 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
         path = urlparse(url).fragment
         return path.rstrip("/").split("/")[-1]
 
-    def finish_bet(self, session: AutomationSession) -> PurchaseResult:
-        return self._run_on_browser_thread(self._finish_bet, session)
+    def finish_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> PurchaseResult:
+        return self._run_on_browser_thread(self._finish_bet, session, lottery_modality)
 
-    def _finish_bet(self, session: AutomationSession) -> PurchaseResult:
+    def _finish_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> PurchaseResult:
         self._check_redirected_page(
             self._require_page(), self._timeout_ms, session, self._settings.bet_purchase_path_without_purchase
         )
@@ -176,9 +176,7 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
             extra=Operation.executed_operation(session.executed_operation),
         )
         return PurchaseResult(
-            lottery_modality=get_lottery_modality(
-                LotteryModality.from_string(self._settings.selected_lottery_modality)
-            ),
+            lottery_modality=get_lottery_modality(lottery_modality),
             bets=[
                 BetResult(
                     numbers=bet.numbers,

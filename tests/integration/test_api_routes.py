@@ -30,7 +30,11 @@ class FakeSessionControl:
 
 
 class FakeRunBetFlow:
-    def run(self):
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def run(self, **kwargs):
+        self.calls.append(kwargs)
         return AutomationRunResult(
             session_id="00000000-0000-0000-0000-000000000001",
             status="failed",
@@ -135,8 +139,9 @@ async def test_openapi_error_responses_match_route_failures():
     }
     assert set(paths["/api/v1/sessions/stop"]["get"]["responses"]) == {"200", "409", "500"}
     assert set(paths["/api/v1/sessions/status"]["get"]["responses"]) == {"200", "500"}
-    assert set(paths["/api/v1/bets/run"]["get"]["responses"]) == {
+    assert set(paths["/api/v1/bets/run"]["post"]["responses"]) == {
         "200",
+        "400",
         "403",
         "409",
         "429",
@@ -150,7 +155,7 @@ async def test_openapi_error_responses_match_route_failures():
     start_409_examples = paths["/api/v1/sessions/start"]["get"]["responses"]["409"]["content"][
         "application/json; charset=utf-8"
     ]["examples"]
-    run_409_examples = paths["/api/v1/bets/run"]["get"]["responses"]["409"]["content"][
+    run_409_examples = paths["/api/v1/bets/run"]["post"]["responses"]["409"]["content"][
         "application/json; charset=utf-8"
     ]["examples"]
 
@@ -181,14 +186,35 @@ async def test_session_routes_delegate_to_use_case(override_container):
 
 
 @pytest.mark.anyio
-async def test_run_bet_route_returns_failed_flow_without_real_network():
+async def test_run_bet_route_returns_failed_flow_without_real_network(override_container):
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/api/v1/bets/run")
+        response = await client.post("/api/v1/bets/run")
 
     assert response.status_code == 200
     assert response.json()["status"] == "failed"
     assert response.json()["executed_operation"] == "Confirma o pagamento"
+    assert override_container.run_bet_flow.calls[0] == {"selected_lottery_modality": None}
+
+
+@pytest.mark.anyio
+async def test_run_bet_route_forwards_selected_lottery_modality(override_container):
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/bets/run", json={"selected_lottery_modality": "QUINA"})
+
+    assert response.status_code == 200
+    assert override_container.run_bet_flow.calls[0] == {"selected_lottery_modality": LotteryModality.QUINA}
+
+
+@pytest.mark.anyio
+async def test_run_bet_route_rejects_unsupported_lottery_modality():
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/bets/run", json={"selected_lottery_modality": "LOTECA"})
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "REQUISICAO_INVALIDA"
 
 
 @pytest.mark.anyio

@@ -28,7 +28,7 @@ FastAPI, rotas, schemas, tratamento padronizado de erros e composição de depen
 
 ## Fluxo Principal
 
-`GET /api/v1/bets/run` chama `RunBetFlowUseCase`, que:
+`POST /api/v1/bets/run` chama `RunBetFlowUseCase`, que:
 
 1. inicia sessão caso necessário;
 2. acessa o portal;

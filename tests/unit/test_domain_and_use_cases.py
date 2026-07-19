@@ -34,6 +34,7 @@ from infrastructure.database.models import BetModel
 class FakeBrowser:
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.call_args: list[tuple[str, tuple[object, ...]]] = []
         self.open = False
         self.authenticated = False
 
@@ -49,6 +50,7 @@ class FakeBrowser:
     def __getattr__(self, name):
         def method(*args):
             self.calls.append(name)
+            self.call_args.append((name, args))
             if name == "submit_password":
                 self.authenticated = True
             if name == "check_your_purchases":
@@ -397,11 +399,12 @@ def test_run_bet_flow_persists_purchase_when_service_is_configured():
         bet_persistence=persistence,
     )
 
-    result = use_case.run()
+    result = use_case.run(selected_lottery_modality=LotteryModality.QUINA)
 
     assert result.status == "finished"
-    assert repository.saved[0][0] == LotteryModality.MEGA_SENA
+    assert repository.saved[0][0] == LotteryModality.QUINA
     assert repository.saved[0][1].purchase_number == "123456"
+    assert ("select_lottery_modality", (session, LotteryModality.QUINA)) in browser.call_args
     assert notifier.success_notifications[0].purchase_number == "123456"
 
 

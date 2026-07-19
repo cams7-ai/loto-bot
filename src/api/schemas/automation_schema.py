@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from domain import SUPPORTED_BET_RUN_LOTTERY_MODALITIES, LotteryModality
 
 
 class HealthResponse(BaseModel):
@@ -32,6 +34,40 @@ class BetRunResponse(BaseModel):
     message: str
     executed_operation: str
     purchase_number: str
+
+
+class BetRunRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "selected_lottery_modality": LotteryModality.MEGA_SENA.name,
+            }
+        },
+    )
+
+    selected_lottery_modality: LotteryModality | None = Field(
+        default=None,
+        description=(
+            "Modalidade opcional para executar a aposta. Quando omitida, a aplicação usa SELECTED_LOTTERY_MODALITY."
+        ),
+        examples=[LotteryModality.MEGA_SENA.name],
+    )
+
+    @field_validator("selected_lottery_modality", mode="before")
+    @classmethod
+    def parse_lottery_modality_name(cls, value: object) -> object:
+        if isinstance(value, str) and value in LotteryModality.__members__:
+            return LotteryModality[value]
+        return value
+
+    @field_validator("selected_lottery_modality")
+    @classmethod
+    def validate_supported_lottery_modality(cls, value: LotteryModality | None) -> LotteryModality | None:
+        if value is not None and value not in SUPPORTED_BET_RUN_LOTTERY_MODALITIES:
+            supported = ", ".join(lottery_modality.name for lottery_modality in SUPPORTED_BET_RUN_LOTTERY_MODALITIES)
+            raise ValueError(f"Modalidade de loteria inválida. Use uma das seguintes: {supported}.")
+        return value
 
 
 class PlacedBetResponse(BaseModel):

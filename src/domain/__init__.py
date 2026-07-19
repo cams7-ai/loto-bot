@@ -23,6 +23,7 @@ from domain.entities import (
     AutomationStatus,
 )
 from domain.enums import (
+    SUPPORTED_BET_RUN_LOTTERY_MODALITIES,
     ErrorCode,
     LotteryModality,
     Operation,
@@ -51,6 +52,7 @@ __all__ = [
     "WhatsAppSessionStatus",
     "WhatsAppMessageStatus",
     "LotteryModality",
+    "SUPPORTED_BET_RUN_LOTTERY_MODALITIES",
     "OPERATION_CANNOT_BE_COMPLETED",
     "FALLBACK_EMAIL_SEND_FAILED",
     "VALIDATION_CODE_FETCH_TIMEOUT",

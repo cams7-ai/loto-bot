@@ -3,22 +3,24 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 
 from api.dependencies import AppContainer, get_container
 from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.responses import error_response
-from api.schemas import BetRunResponse, PlacedBetResponse
+from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse
 from domain import AutomationError, ErrorCode
 from shared import with_sao_paulo_timezone
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
 CONTAINER_DEPENDENCY = Depends(get_container)
+RUN_BET_REQUEST_BODY = Body(default=None)
 
 
 ERROR_RESPONSES = {
+    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
     403: error_response(
         "Confirmação de pagamento real desabilitada", ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE
     ),
@@ -50,14 +52,19 @@ PLACED_BET_DETAIL_ERROR_RESPONSES = {
 }
 
 
-@router.get(
+@router.post(
     "/bets/run",
     response_model=BetRunResponse,
     responses=ERROR_RESPONSES,
 )
-def run_bet(container: AppContainer = CONTAINER_DEPENDENCY) -> BetRunResponse | None:
+def run_bet(
+    request: BetRunRequest | None = RUN_BET_REQUEST_BODY,
+    container: AppContainer = CONTAINER_DEPENDENCY,
+) -> BetRunResponse | None:
     try:
-        result = container.run_bet_flow.run()
+        result = container.run_bet_flow.run(
+            selected_lottery_modality=request.selected_lottery_modality if request is not None else None
+        )
         return BetRunResponse(
             session_id=str(result.session_id),
             status=result.status,

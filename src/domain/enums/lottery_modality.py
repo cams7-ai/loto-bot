@@ -10,6 +10,7 @@ class LotteryModality(Enum):
     LOTECA = "loteca"
     LOTECA_ESPECIAL = "loteca/especial"
     LOTOFACIL = "lotofacil"
+    LOTOFACIL_ESPECIAL = "lotofacil/especial"
     MAIS_MILIONARIA = "mais-milionaria"
     LOTOMANIA = "lotomania"
     TIMEMANIA = "timemania"
@@ -24,3 +25,15 @@ class LotteryModality(Enum):
             if lottery_modality.value == normalized_value:
                 return lottery_modality
         return None
+
+
+SUPPORTED_BET_RUN_LOTTERY_MODALITIES = (
+    LotteryModality.MEGA_SENA,
+    LotteryModality.QUINA,
+    LotteryModality.QUINA_ESPECIAL,
+    LotteryModality.LOTOFACIL,
+    LotteryModality.LOTOFACIL_ESPECIAL,
+    LotteryModality.LOTOMANIA,
+    LotteryModality.DUPLA_SENA,
+    LotteryModality.SUPER_SETE,
+)

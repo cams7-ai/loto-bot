@@ -1,4 +1,5 @@
 from api.schemas.automation_schema import (
+    BetRunRequest,
     BetRunResponse,
     HealthResponse,
     PlacedBetResponse,
@@ -9,6 +10,7 @@ from api.schemas.error_schema import ErrorResponse, error_response_examples
 
 __all__ = [
     "BetRunResponse",
+    "BetRunRequest",
     "ErrorResponse",
     "error_response_examples",
     "HealthResponse",
