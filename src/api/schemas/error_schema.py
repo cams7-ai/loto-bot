@@ -23,25 +23,47 @@ def error_example(
     status_code: HTTPStatus,
     code: ErrorCode,
     message: str,
-    fields: list[str] | None = None,
 ) -> dict[str, Any]:
     error: dict[str, Any] = {
         "status_code": status_code.value,
         "code": code.value,
         "message": message,
     }
-    if fields is not None:
-        error["fields"] = fields
     return {"error": error}
 
 
 ERROR_EXAMPLES = {
-    ErrorCode.BAD_REQUEST: error_example(
-        HTTPStatus.BAD_REQUEST,
-        ErrorCode.BAD_REQUEST,
-        "Corpo da requisição inválido.",
-        ["cpf"],
-    ),
+    ErrorCode.BAD_REQUEST: {
+        "error": {
+            "timestamp": "2026-06-16T10:00:00-03:00",
+            "status_code": HTTPStatus.BAD_REQUEST.value,
+            "code": ErrorCode.BAD_REQUEST.value,
+            "message": "Parâmetros inválidos",
+            "details": [
+                {
+                    "field": "lottery_modality",
+                    "rejected_value": "abc",
+                    "allowed_values": [
+                        "all",
+                        "MEGA_SENA",
+                        "QUINA",
+                        "QUINA_ESPECIAL",
+                        "LOTECA",
+                        "LOTECA_ESPECIAL",
+                        "LOTOFACIL",
+                        "LOTOFACIL_ESPECIAL",
+                        "MAIS_MILIONARIA",
+                        "LOTOMANIA",
+                        "TIMEMANIA",
+                        "DUPLA_SENA",
+                        "DIA_DE_SORTE",
+                        "SUPER_SETE",
+                    ],
+                    "message": "Valor inválido.",
+                }
+            ],
+        }
+    },
     ErrorCode.NOT_FOUND: error_example(
         HTTPStatus.NOT_FOUND,
         ErrorCode.NOT_FOUND,
@@ -121,11 +143,11 @@ def error_response_examples(*codes: ErrorCode) -> dict[str, dict[str, Any]]:
 
 
 class ErrorDetail(BaseModel):
+    timestamp: str | None = None
     status_code: int
     code: str
     message: str | None = None
-    messages: list[str] | None = None
-    fields: list[str] | None = None
+    details: list[dict[str, Any]] | None = None
 
 
 class ErrorResponse(BaseModel):

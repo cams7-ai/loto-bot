@@ -47,7 +47,7 @@ class BeanieBetRepository(BetRepositoryPort):
         if filters.lottery_modality is not None:
             expressions.append(BetModel.lottery_modality == filters.lottery_modality)
         if filters.draw_number is not None:
-            expressions.append(BetModel.draw_number == filters.draw_number)
+            expressions.append(BetModel.draw_number == str(filters.draw_number))
         if filters.start_date is not None:
             expressions.append(BetModel.bet_date >= filters.start_date)
         if filters.end_date is not None:

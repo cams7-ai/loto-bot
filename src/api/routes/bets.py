@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, time
 from decimal import Decimal
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -10,8 +11,15 @@ from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.responses import error_response
 from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
-from application import PortalBetFiltersValidationError
-from application.services.portal_bet_filter_catalog import current_and_previous_months
+from application import PortalBetFiltersValidationError, ValidationErrorDetail
+from application.services.portal_bet_filter_catalog import (
+    INVALID_DATE_MESSAGE,
+    INVALID_DRAW_NUMBER_MESSAGE,
+    current_and_previous_months,
+    invalid_lottery_modality_detail,
+    parse_positive_int,
+    parse_public_lottery_modality,
+)
 from domain import AutomationError, ErrorCode, LotteryModality
 from domain.enums import (
     PortalBetRelativePeriod,
@@ -71,8 +79,9 @@ def run_bet(
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> BetRunResponse | None:
     try:
+        selected_lottery_modality = _parse_selected_lottery_modality(request)
         result = container.run_bet_flow.run(
-            selected_lottery_modality=request.selected_lottery_modality if request is not None else None
+            selected_lottery_modality=selected_lottery_modality,
         )
         return BetRunResponse(
             session_id=str(result.session_id),
@@ -141,7 +150,7 @@ def list_portal_bets(
             sort_by=sort_by,
         )
     except PortalBetFiltersValidationError as exc:
-        _raise_bad_request_messages(exc.messages)
+        _raise_invalid_parameters(exc.details)
     except ValueError as exc:
         _raise_bad_request(exc)
     except AutomationError as exc:
@@ -150,7 +159,7 @@ def list_portal_bets(
     return [
         PortalBetResponse(
             purchase_datetime=with_sao_paulo_timezone(result.purchase_datetime, remove_microseconds=True),
-            lottery_modality=result.lottery_modality,
+            lottery_modality=_resolve_response_lottery_modality(result.lottery_modality),
             selected_numbers=result.selected_numbers,
             draw_number=result.draw_number,
             status=result.status,
@@ -167,17 +176,25 @@ def list_portal_bets(
 def list_placed_bets(
     lottery_modality: str | None = None,
     draw_number: str | None = None,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> list[PlacedBetResponse]:
     try:
-        results = container.list_placed_bets.run(
+        parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date = _parse_placed_bet_filters(
             lottery_modality=lottery_modality,
             draw_number=draw_number,
             start_date=start_date,
             end_date=end_date,
         )
+        results = container.list_placed_bets.run(
+            lottery_modality=parsed_lottery_modality,
+            draw_number=parsed_draw_number,
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        )
+    except PortalBetFiltersValidationError as exc:
+        _raise_invalid_parameters(exc.details)
     except ValueError as exc:
         _raise_bad_request(exc)
 
@@ -211,7 +228,7 @@ def get_placed_bet(
 def _placed_bet_response(result) -> PlacedBetResponse:
     return PlacedBetResponse(
         bet_id=result.bet_id,
-        lottery_modality=result.lottery_modality.value,
+        lottery_modality=result.lottery_modality,
         selected_numbers=result.selected_numbers,
         draw_number=result.draw_number,
         status=result.status,
@@ -233,9 +250,117 @@ def _raise_bad_request(exc: ValueError) -> None:
     ) from exc
 
 
-def _raise_bad_request_messages(messages: list[str]) -> None:
+def _raise_invalid_parameters(details: list[ValidationErrorDetail]) -> None:
     raise ApiError(
         status_code=400,
         code=ErrorCode.BAD_REQUEST,
-        messages=messages,
+        message="Parâmetros inválidos",
+        details=[detail.to_dict() for detail in details],
     )
+
+
+def _raise_invalid_fields(details: list[ValidationErrorDetail]) -> None:
+    raise ApiError(
+        status_code=400,
+        code=ErrorCode.BAD_REQUEST,
+        message="Campos inválidos",
+        details=[detail.to_dict() for detail in details],
+    )
+
+
+def _parse_selected_lottery_modality(request: BetRunRequest | None) -> LotteryModality | None:
+    if request is None or request.selected_lottery_modality is None:
+        return None
+    try:
+        return parse_public_lottery_modality(request.selected_lottery_modality)
+    except ValueError:
+        _raise_invalid_fields(
+            [invalid_lottery_modality_detail("selected_lottery_modality", request.selected_lottery_modality)]
+        )
+        return None
+
+
+def _parse_placed_bet_filters(
+    *,
+    lottery_modality: str | None,
+    draw_number: str | None,
+    start_date: str | None,
+    end_date: str | None,
+) -> tuple[LotteryModality | None, int | None, datetime | None, datetime | None]:
+    details: list[ValidationErrorDetail] = []
+    parsed_lottery_modality = _parse_filter(
+        details,
+        lottery_modality,
+        lambda: parse_public_lottery_modality(lottery_modality),
+        lambda value: invalid_lottery_modality_detail("lottery_modality", value),
+    )
+    parsed_draw_number = _parse_filter(
+        details,
+        draw_number,
+        lambda: parse_positive_int(draw_number),
+        lambda value: ValidationErrorDetail(
+            field="draw_number", rejected_value=value, message=INVALID_DRAW_NUMBER_MESSAGE
+        ),
+    )
+    parsed_start_date = _parse_filter(
+        details,
+        start_date,
+        lambda: _parse_history_date(start_date, end_of_day=False),
+        lambda value: ValidationErrorDetail(field="start_date", rejected_value=value, message=INVALID_DATE_MESSAGE),
+    )
+    parsed_end_date = _parse_filter(
+        details,
+        end_date,
+        lambda: _parse_history_date(end_date, end_of_day=True),
+        lambda value: ValidationErrorDetail(field="end_date", rejected_value=value, message=INVALID_DATE_MESSAGE),
+    )
+    if (
+        not details
+        and parsed_start_date is not None
+        and parsed_end_date is not None
+        and parsed_start_date > parsed_end_date
+    ):
+        details.append(
+            ValidationErrorDetail(
+                field="start_date",
+                rejected_value=start_date or "",
+                message="Valor inválido. A data inicial não pode ser maior que a data final.",
+            )
+        )
+    if details:
+        raise PortalBetFiltersValidationError(details)
+    return parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date
+
+
+def _parse_filter[T](
+    details: list[ValidationErrorDetail],
+    raw_value: str | None,
+    parser,
+    detail_factory,
+) -> T | None:
+    if raw_value is None:
+        return None
+    try:
+        return parser()
+    except ValueError:
+        details.append(detail_factory(raw_value))
+        return None
+
+
+def _parse_history_date(value: str | None, *, end_of_day: bool) -> datetime | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stripped) is None:
+        raise ValueError(INVALID_DATE_MESSAGE)
+    parsed_date = datetime.strptime(stripped, "%Y-%m-%d").date()
+    if end_of_day:
+        return datetime.combine(parsed_date, time(23, 59, 59))
+    return datetime.combine(parsed_date, time.min)
+
+
+def _resolve_response_lottery_modality(value: str) -> LotteryModality:
+    resolved = parse_public_lottery_modality(value)
+    if resolved is None:
+        raise ValueError("Modalidade de loteria inválida.")
+    return resolved

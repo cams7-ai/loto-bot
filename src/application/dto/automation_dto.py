@@ -56,7 +56,7 @@ class PurchaseResult:
 @dataclass(frozen=True)
 class BetSearchFilters:
     lottery_modality: LotteryModality | None = None
-    draw_number: str | None = None
+    draw_number: int | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
 

@@ -7,25 +7,46 @@ import pytest
 
 from api.dependencies import get_container
 from api.server import app
-from application import PortalBetFiltersValidationError
+from application import PortalBetFiltersValidationError, ValidationErrorDetail
+from domain.enums import Operation
 
-EXPECTED_FILTER_MESSAGES = [
-    "Parâmetro bet_type inválido. Valores permitidos: all, individual, pool.",
-    (
-        "Parâmetro lottery_modality inválido. Valores permitidos: all, MEGA_SENA, QUINA, "
-        "QUINA_ESPECIAL, LOTECA, LOTECA_ESPECIAL, LOTOFACIL, LOTOFACIL_ESPECIAL, "
-        "MAIS_MILIONARIA, LOTOMANIA, TIMEMANIA, DUPLA_SENA, DIA_DE_SORTE, SUPER_SETE."
+EXPECTED_FILTER_DETAILS = [
+    ValidationErrorDetail("bet_type", "all1", "Valor inválido.", ["all", "individual", "pool"]),
+    ValidationErrorDetail(
+        "lottery_modality",
+        "all1",
+        "Valor inválido.",
+        [
+            "all",
+            "MEGA_SENA",
+            "QUINA",
+            "QUINA_ESPECIAL",
+            "LOTECA",
+            "LOTECA_ESPECIAL",
+            "LOTOFACIL",
+            "LOTOFACIL_ESPECIAL",
+            "MAIS_MILIONARIA",
+            "LOTOMANIA",
+            "TIMEMANIA",
+            "DUPLA_SENA",
+            "DIA_DE_SORTE",
+            "SUPER_SETE",
+        ],
     ),
-    "Parâmetro draw_type inválido. Valores permitidos: all, normal, special.",
-    "Parâmetro month_year inválido. Use YYYY-MM ou um período relativo permitido.",
-    "Parâmetro status inválido. Valores permitidos: all, paid, expired.",
-    "Parâmetro sort_by inválido. Valores permitidos: date-asc, date-desc.",
+    ValidationErrorDetail("draw_type", "all1", "Valor inválido.", ["all", "normal", "special"]),
+    ValidationErrorDetail(
+        "month_year",
+        "last-91-days",
+        "Valor inválido. Utilize o formato YYYY-MM ou um período relativo válido.",
+    ),
+    ValidationErrorDetail("status", "all1", "Valor inválido.", ["all", "paid", "expired"]),
+    ValidationErrorDetail("sort_by", "date-desc1", "Valor inválido.", ["date-asc", "date-desc"]),
 ]
 
 
 class InvalidPortalBetFiltersUseCase:
     def run(self, **filters):
-        raise PortalBetFiltersValidationError(EXPECTED_FILTER_MESSAGES)
+        raise PortalBetFiltersValidationError(EXPECTED_FILTER_DETAILS)
 
 
 @pytest.mark.anyio
@@ -51,10 +72,45 @@ async def test_list_portal_bets_returns_all_filter_validation_messages():
         app.dependency_overrides.clear()
 
     assert response.status_code == 400
-    assert response.json() == {
-        "error": {
-            "status_code": 400,
-            "code": "REQUISICAO_INVALIDA",
-            "messages": EXPECTED_FILTER_MESSAGES,
-        }
-    }
+    error = response.json()["error"]
+    assert error["status_code"] == 400
+    assert error["code"] == "REQUISICAO_INVALIDA"
+    assert error["message"] == "Parâmetros inválidos"
+    assert error["details"] == [detail.to_dict() for detail in EXPECTED_FILTER_DETAILS]
+    assert "timestamp" in error
+    assert "messages" not in error
+    assert "fields" not in error
+
+
+@pytest.mark.anyio
+async def test_list_portal_bets_validates_query_before_closed_browser_session():
+    container = get_container()
+    container.session.mark_closed(Operation.END_SESSION)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(
+            "/api/v1/bets",
+            params={
+                "bet_type": "abc",
+                "lottery_modality": "abc",
+                "draw_type": "abc",
+                "month_year": "abc",
+                "status": "abc",
+                "sort_by": "abc",
+            },
+        )
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["status_code"] == 400
+    assert error["code"] == "REQUISICAO_INVALIDA"
+    assert error["message"] == "Parâmetros inválidos"
+    assert [detail["field"] for detail in error["details"]] == [
+        "bet_type",
+        "lottery_modality",
+        "draw_type",
+        "month_year",
+        "status",
+        "sort_by",
+    ]

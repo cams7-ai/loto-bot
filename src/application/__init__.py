@@ -8,7 +8,7 @@ from application.dto import (
     PurchaseResult,
     SessionStatusResult,
 )
-from application.exceptions import PortalBetFiltersValidationError
+from application.exceptions import PortalBetFiltersValidationError, ValidationErrorDetail
 from application.notification import (
     build_error_email_message,
     build_error_whatsapp_message,
@@ -43,6 +43,7 @@ __all__ = [
     "PurchaseResult",
     "SessionStatusResult",
     "PortalBetFiltersValidationError",
+    "ValidationErrorDetail",
     "BetRepositoryPort",
     "BrowserAutomationPort",
     "ClockPort",

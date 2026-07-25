@@ -7,17 +7,57 @@ import pytest
 from application import ListPortalBetsUseCase, PortalBetFiltersValidationError
 from domain import AutomationSession
 
-EXPECTED_FILTER_MESSAGES = [
-    "Parâmetro bet_type inválido. Valores permitidos: all, individual, pool.",
-    (
-        "Parâmetro lottery_modality inválido. Valores permitidos: all, MEGA_SENA, QUINA, "
-        "QUINA_ESPECIAL, LOTECA, LOTECA_ESPECIAL, LOTOFACIL, LOTOFACIL_ESPECIAL, "
-        "MAIS_MILIONARIA, LOTOMANIA, TIMEMANIA, DUPLA_SENA, DIA_DE_SORTE, SUPER_SETE."
-    ),
-    "Parâmetro draw_type inválido. Valores permitidos: all, normal, special.",
-    "Parâmetro month_year inválido. Use YYYY-MM ou um período relativo permitido.",
-    "Parâmetro status inválido. Valores permitidos: all, paid, expired.",
-    "Parâmetro sort_by inválido. Valores permitidos: date-asc, date-desc.",
+EXPECTED_FILTER_DETAILS = [
+    {
+        "field": "bet_type",
+        "rejected_value": "all1",
+        "allowed_values": ["all", "individual", "pool"],
+        "message": "Valor inválido.",
+    },
+    {
+        "field": "lottery_modality",
+        "rejected_value": "all1",
+        "allowed_values": [
+            "all",
+            "MEGA_SENA",
+            "QUINA",
+            "QUINA_ESPECIAL",
+            "LOTECA",
+            "LOTECA_ESPECIAL",
+            "LOTOFACIL",
+            "LOTOFACIL_ESPECIAL",
+            "MAIS_MILIONARIA",
+            "LOTOMANIA",
+            "TIMEMANIA",
+            "DUPLA_SENA",
+            "DIA_DE_SORTE",
+            "SUPER_SETE",
+        ],
+        "message": "Valor inválido.",
+    },
+    {
+        "field": "draw_type",
+        "rejected_value": "all1",
+        "allowed_values": ["all", "normal", "special"],
+        "message": "Valor inválido.",
+    },
+    {
+        "field": "month_year",
+        "rejected_value": "last-91-days",
+        "message": "Valor inválido. Utilize o formato YYYY-MM ou um período relativo válido.",
+    },
+    {
+        "field": "status",
+        "rejected_value": "all1",
+        "allowed_values": ["all", "paid", "expired"],
+        "message": "Valor inválido.",
+    },
+    {
+        "field": "sort_by",
+        "rejected_value": "date-desc1",
+        "allowed_values": ["date-asc", "date-desc"],
+        "message": "Valor inválido.",
+    },
 ]
 
 
@@ -51,5 +91,24 @@ def test_list_portal_bets_accumulates_all_filter_validation_messages():
             sort_by="date-desc1",
         )
 
-    assert captured.value.messages == EXPECTED_FILTER_MESSAGES
+    assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS
+    assert portal_bets.called is False
+
+
+def test_list_portal_bets_validates_filters_before_browser_session_state():
+    session = AutomationSession()
+    portal_bets = RecordingPortalBetQuery()
+    use_case = ListPortalBetsUseCase(session=session, portal_bets=portal_bets, clock=FixedClock())
+
+    with pytest.raises(PortalBetFiltersValidationError) as captured:
+        use_case.run(
+            bet_type="all1",
+            lottery_modality="all1",
+            draw_type="all1",
+            month_year="last-91-days",
+            status="all1",
+            sort_by="date-desc1",
+        )
+
+    assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS
     assert portal_bets.called is False

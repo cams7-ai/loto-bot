@@ -208,13 +208,41 @@ async def test_run_bet_route_forwards_selected_lottery_modality(override_contain
 
 
 @pytest.mark.anyio
-async def test_run_bet_route_rejects_unsupported_lottery_modality():
+async def test_run_bet_route_rejects_invalid_lottery_modality():
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/bets/run", json={"selected_lottery_modality": "LOTECA"})
+        response = await client.post("/api/v1/bets/run", json={"selected_lottery_modality": "abc"})
 
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "REQUISICAO_INVALIDA"
+    error = response.json()["error"]
+    assert error["code"] == "REQUISICAO_INVALIDA"
+    assert error["message"] == "Campos inválidos"
+    assert error["details"] == [
+        {
+            "field": "selected_lottery_modality",
+            "rejected_value": "abc",
+            "allowed_values": [
+                "all",
+                "MEGA_SENA",
+                "QUINA",
+                "QUINA_ESPECIAL",
+                "LOTECA",
+                "LOTECA_ESPECIAL",
+                "LOTOFACIL",
+                "LOTOFACIL_ESPECIAL",
+                "MAIS_MILIONARIA",
+                "LOTOMANIA",
+                "TIMEMANIA",
+                "DUPLA_SENA",
+                "DIA_DE_SORTE",
+                "SUPER_SETE",
+            ],
+            "message": "Valor inválido.",
+        }
+    ]
+    assert "timestamp" in error
+    assert "fields" not in error
+    assert "messages" not in error
 
 
 @pytest.mark.anyio
@@ -253,18 +281,79 @@ async def test_list_placed_bets_route_forwards_query_filters(override_container)
             params={
                 "lottery_modality": "mega-sena",
                 "draw_number": "1234",
-                "start_date": "2026-07-01T00:00:00",
-                "end_date": "2026-07-31T23:59:59",
+                "start_date": "2026-07-01",
+                "end_date": "2026-07-31",
             },
         )
 
     assert response.status_code == 200
     assert override_container.list_placed_bets.calls[0] == {
-        "lottery_modality": "mega-sena",
-        "draw_number": "1234",
+        "lottery_modality": LotteryModality.MEGA_SENA,
+        "draw_number": 1234,
         "start_date": datetime(2026, 7, 1, 0, 0, 0),
         "end_date": datetime(2026, 7, 31, 23, 59, 59),
     }
+
+
+@pytest.mark.anyio
+async def test_list_placed_bets_route_returns_structured_filter_errors():
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(
+            "/api/v1/history/bets",
+            params={
+                "lottery_modality": "abc",
+                "draw_number": "abc",
+                "start_date": "abc",
+                "end_date": "abc",
+            },
+        )
+
+    assert response.status_code == 400
+    error = response.json()["error"]
+    assert error["code"] == "REQUISICAO_INVALIDA"
+    assert error["message"] == "Parâmetros inválidos"
+    assert error["details"] == [
+        {
+            "field": "lottery_modality",
+            "rejected_value": "abc",
+            "allowed_values": [
+                "all",
+                "MEGA_SENA",
+                "QUINA",
+                "QUINA_ESPECIAL",
+                "LOTECA",
+                "LOTECA_ESPECIAL",
+                "LOTOFACIL",
+                "LOTOFACIL_ESPECIAL",
+                "MAIS_MILIONARIA",
+                "LOTOMANIA",
+                "TIMEMANIA",
+                "DUPLA_SENA",
+                "DIA_DE_SORTE",
+                "SUPER_SETE",
+            ],
+            "message": "Valor inválido.",
+        },
+        {
+            "field": "draw_number",
+            "rejected_value": "abc",
+            "message": "Valor inválido. Informe número maior que zero.",
+        },
+        {
+            "field": "start_date",
+            "rejected_value": "abc",
+            "message": "Valor inválido. Utilize o formato YYYY-MM-DD.",
+        },
+        {
+            "field": "end_date",
+            "rejected_value": "abc",
+            "message": "Valor inválido. Utilize o formato YYYY-MM-DD.",
+        },
+    ]
+    assert "timestamp" in error
+    assert "fields" not in error
+    assert "messages" not in error
 
 
 @pytest.mark.anyio

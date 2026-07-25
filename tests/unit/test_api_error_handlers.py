@@ -29,10 +29,19 @@ def make_validation_error() -> RequestValidationError:
 
 async def test_api_error_handler(anyio_backend):
     response = await api_error_handler(
-        None, ApiError(status_code=400, code=ErrorCode.BAD_REQUEST, message="Mensagem", fields=["name"])
+        None,
+        ApiError(
+            status_code=400,
+            code=ErrorCode.BAD_REQUEST,
+            message="Mensagem",
+            details=[{"field": "name", "rejected_value": "x", "message": "Valor inválido."}],
+        ),
     )
     assert response.status_code == 400
-    assert '"status_code":400' in response.body.decode("utf-8")
+    body = response.body.decode("utf-8")
+    assert '"status_code":400' in body
+    assert '"details"' in body
+    assert '"timestamp"' in body
 
 
 async def test_request_validation_error_handler(anyio_backend):

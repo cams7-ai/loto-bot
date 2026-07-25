@@ -5,6 +5,7 @@ import unicodedata
 from datetime import date
 from enum import Enum
 
+from application.exceptions import ValidationErrorDetail
 from domain import LotteryModality
 from domain.enums import (
     PortalBetRelativePeriod,
@@ -27,6 +28,12 @@ MONTH_NAMES = {
 }
 
 ALL = "all"
+INVALID_VALUE_MESSAGE = "Valor inválido."
+INVALID_MONTH_YEAR_MESSAGE = "Valor inválido. Utilize o formato YYYY-MM ou um período relativo válido."
+INVALID_DATE_MESSAGE = "Valor inválido. Utilize o formato YYYY-MM-DD."
+INVALID_DRAW_NUMBER_MESSAGE = "Valor inválido. Informe número maior que zero."
+
+LOTTERY_MODALITY_ALLOWED_VALUES = [ALL, *LotteryModality.__members__]
 
 
 PORTAL_RELATIVE_PERIOD_ALIASES = {
@@ -82,6 +89,19 @@ def parse_catalog_value[T: Enum](parameter: str, value: str | None, enum_type: t
         raise ValueError(f"Parâmetro {parameter} inválido. Valores permitidos: {allowed}.") from None
 
 
+def allowed_catalog_values(enum_type: type[Enum]) -> list[str]:
+    return [str(member.value) for member in enum_type]
+
+
+def invalid_catalog_detail(parameter: str, value: str, enum_type: type[Enum]) -> ValidationErrorDetail:
+    return ValidationErrorDetail(
+        field=parameter,
+        rejected_value=value,
+        allowed_values=allowed_catalog_values(enum_type),
+        message=INVALID_VALUE_MESSAGE,
+    )
+
+
 def parse_portal_lottery_modality(value: str | None) -> LotteryModality | None:
     if value is None:
         return None
@@ -93,8 +113,36 @@ def parse_portal_lottery_modality(value: str | None) -> LotteryModality | None:
     normalized = normalize_public_value(value)
     if normalized == ALL:
         return None
-    allowed = ", ".join((ALL, *LotteryModality.__members__))
+    if normalized in PORTAL_LOTTERY_MODALITY_ALIASES:
+        return PORTAL_LOTTERY_MODALITY_ALIASES[normalized]
+    allowed = ", ".join(LOTTERY_MODALITY_ALLOWED_VALUES)
     raise ValueError(f"Parâmetro lottery_modality inválido. Valores permitidos: {allowed}.")
+
+
+def parse_public_lottery_modality(value: str | None) -> LotteryModality | None:
+    if value is None:
+        return None
+    if value in LotteryModality.__members__:
+        return LotteryModality[value]
+    normalized = normalize_public_value(value)
+    if normalized == ALL:
+        return None
+    resolved_by_value = LotteryModality.from_string(normalized)
+    if resolved_by_value is not None:
+        return resolved_by_value
+    if normalized in PORTAL_LOTTERY_MODALITY_ALIASES:
+        return PORTAL_LOTTERY_MODALITY_ALIASES[normalized]
+    allowed = ", ".join(LOTTERY_MODALITY_ALLOWED_VALUES)
+    raise ValueError(f"Parâmetro lottery_modality inválido. Valores permitidos: {allowed}.")
+
+
+def invalid_lottery_modality_detail(parameter: str, value: str) -> ValidationErrorDetail:
+    return ValidationErrorDetail(
+        field=parameter,
+        rejected_value=value,
+        allowed_values=list(LOTTERY_MODALITY_ALLOWED_VALUES),
+        message=INVALID_VALUE_MESSAGE,
+    )
 
 
 def parse_portal_month_year(value: str | None, today: date) -> PortalBetRelativePeriod | PortalYearMonth | None:
@@ -106,6 +154,37 @@ def parse_portal_month_year(value: str | None, today: date) -> PortalBetRelative
     year_month = _parse_year_month(value)
     _validate_year_month_window(year_month, today)
     return year_month
+
+
+def invalid_month_year_detail(value: str, today: date) -> ValidationErrorDetail:
+    try:
+        year_month = _parse_year_month(value)
+        _validate_year_month_window(year_month, today)
+    except ValueError as exc:
+        if "fora da janela" in str(exc):
+            return ValidationErrorDetail(
+                field="month_year",
+                rejected_value=value,
+                allowed_values=[month.canonical_value for month in current_and_previous_months(today)],
+                message=INVALID_VALUE_MESSAGE,
+            )
+    return ValidationErrorDetail(
+        field="month_year",
+        rejected_value=value,
+        message=INVALID_MONTH_YEAR_MESSAGE,
+    )
+
+
+def parse_positive_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped.isdecimal():
+        raise ValueError(INVALID_DRAW_NUMBER_MESSAGE)
+    parsed = int(stripped)
+    if parsed <= 0:
+        raise ValueError(INVALID_DRAW_NUMBER_MESSAGE)
+    return parsed
 
 
 def portal_year_month_label(year_month: PortalYearMonth) -> str:

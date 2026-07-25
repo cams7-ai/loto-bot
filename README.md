@@ -81,6 +81,27 @@ Resposta:
 }
 ```
 
+Quando `selected_lottery_modality` for inválido, a API retorna `400` com detalhes estruturados:
+
+```json
+{
+  "error": {
+    "timestamp": "2026-06-16T10:00:00-03:00",
+    "status_code": 400,
+    "code": "REQUISICAO_INVALIDA",
+    "message": "Campos inválidos",
+    "details": [
+      {
+        "field": "selected_lottery_modality",
+        "rejected_value": "abc",
+        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "message": "Valor inválido."
+      }
+    ]
+  }
+}
+```
+
 ### Listar Histórico de Apostas
 
 ```powershell
@@ -107,15 +128,51 @@ Resposta:
 Filtros opcionais:
 
 ```powershell
-curl "http://localhost:8000/api/v1/history/bets?lottery_modality=mega-sena&draw_number=1234&start_date=2026-07-01T00:00:00&end_date=2026-07-31T23:59:59"
+curl "http://localhost:8000/api/v1/history/bets?lottery_modality=MEGA_SENA&draw_number=1234&start_date=2026-07-01&end_date=2026-07-31"
 ```
 
 Parâmetros aceitos:
 
-- `lottery_modality`: modalidade da loteria, por exemplo `mega-sena`.
-- `draw_number`: número do concurso.
-- `start_date`: início do intervalo de `bet_date`.
-- `end_date`: fim do intervalo de `bet_date`.
+- `lottery_modality`: modalidade da loteria, por exemplo `MEGA_SENA`.
+- `draw_number`: número inteiro do concurso, maior que zero.
+- `start_date`: início do intervalo de `bet_date`, no formato `YYYY-MM-DD`.
+- `end_date`: fim do intervalo de `bet_date`, no formato `YYYY-MM-DD`.
+
+Quando filtros forem inválidos, a API retorna `400` com todos os detalhes acumulados:
+
+```json
+{
+  "error": {
+    "timestamp": "2026-06-16T10:00:00-03:00",
+    "status_code": 400,
+    "code": "REQUISICAO_INVALIDA",
+    "message": "Parâmetros inválidos",
+    "details": [
+      {
+        "field": "lottery_modality",
+        "rejected_value": "abc",
+        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "message": "Valor inválido."
+      },
+      {
+        "field": "draw_number",
+        "rejected_value": "abc",
+        "message": "Valor inválido. Informe número maior que zero."
+      },
+      {
+        "field": "start_date",
+        "rejected_value": "abc",
+        "message": "Valor inválido. Utilize o formato YYYY-MM-DD."
+      },
+      {
+        "field": "end_date",
+        "rejected_value": "abc",
+        "message": "Valor inválido. Utilize o formato YYYY-MM-DD."
+      }
+    ]
+  }
+}
+```
 
 ### Consultar Aposta por Identificador
 
@@ -156,18 +213,28 @@ O corpo de erro segue o formato:
 }
 ```
 
-Quando houver erro de validação de entrada, o campo `fields` pode ser retornado:
+Quando houver erro de validação acumulada de parâmetros ou campos, a API retorna `details`:
 
 ```json
 {
   "error": {
+    "timestamp": "2026-06-16T10:00:00-03:00",
     "status_code": 400,
     "code": "REQUISICAO_INVALIDA",
-    "message": "Corpo da requisição inválido.",
-    "fields": ["cpf"]
+    "message": "Parâmetros inválidos",
+    "details": [
+      {
+        "field": "lottery_modality",
+        "rejected_value": "abc",
+        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "message": "Valor inválido."
+      }
+    ]
   }
 }
 ```
+
+O campo `timestamp` é gerado no momento da resposta com timezone `America/Sao_Paulo`.
 
 O OpenAPI documenta exemplos específicos por código de erro em cada status HTTP, incluindo:
 
@@ -259,7 +326,7 @@ curl "http://localhost:8000/api/v1/bets?bet_type=individual&lottery_modality=MEG
 Parâmetros opcionais:
 
 - `bet_type`: `all`, `individual` ou `pool`.
-- `lottery_modality`: `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
+- `lottery_modality`: `all`, `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
 - `draw_type`: `all`, `normal` ou `special`.
 - `month_year`: `last-7-days`, `last-15-days`, `last-30-days`, `last-45-days`, `last-90-days` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
 - `status`: `all`, `paid` ou `expired`.
@@ -267,18 +334,20 @@ Parâmetros opcionais:
 
 Resposta:
 
-Na resposta, `lottery_modality` preserva o nome exibido pelo portal, como `Mega-Sena`.
+Na resposta, `lottery_modality` é serializado como `LotteryModality`, por exemplo `mega-sena`.
 
 ```json
 [
   {
     "purchase_datetime": "2026-07-19T12:33:09-03:00",
-    "lottery_modality": "Mega-Sena",
+    "lottery_modality": "mega-sena",
     "selected_numbers": ["09", "18", "33", "40", "47", "53"],
     "draw_number": "3034",
     "status": "Aposta não premiada"
   }
 ]
 ```
+
+Quando filtros forem inválidos, a API retorna `400` com `details` e sem `fields` ou `messages`.
 
 Diferença de escopo: `/api/v1/bets` consulta ao vivo a sessão autenticada do portal; `/api/v1/history/bets` consulta somente o histórico persistido no MongoDB.

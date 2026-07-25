@@ -24,13 +24,30 @@ def _valid_bet_row() -> Mock:
     row = _row_with_cells(6)
     cells = row.locator.return_value
     cell_items = [Mock() for _ in range(6)]
-    cells.nth.side_effect = cell_items
+    cells.nth.side_effect = lambda index: cell_items[index]
     cell_items[1].locator.return_value.all_inner_texts.return_value = ["24/07/2026", "21:30:00"]
     cell_items[2].inner_text.return_value = "Mega-Sena"
     cell_items[3].locator.return_value.all_inner_texts.return_value = ["01", "02", "03", "04", "05", "06"]
     cell_items[4].inner_text.return_value = "2890"
     cell_items[5].inner_text.return_value = "Aposta\nPaga"
     return row
+
+
+def _portal_bet_result(
+    *,
+    purchase_datetime: datetime | None = None,
+    lottery_modality: str = "Mega-Sena",
+    selected_numbers: list[str] | None = None,
+    draw_number: str = "2890",
+    status: str = "Aposta Paga",
+) -> Mock:
+    return Mock(
+        purchase_datetime=purchase_datetime or datetime(2026, 7, 24, 21, 30),
+        lottery_modality=lottery_modality,
+        selected_numbers=selected_numbers or ["01", "02", "03", "04", "05", "06"],
+        draw_number=draw_number,
+        status=status,
+    )
 
 
 def test_parse_portal_bet_rows_ignores_auxiliary_colspan_row_and_keeps_bet():
@@ -64,7 +81,7 @@ def test_parse_portal_bet_rows_when_stable_retries_transient_malformed_row(monke
     browser = object.__new__(PortalBetsBrowserMixin)
     browser._settings = Mock(browser_timeout_seconds=1)
     page = Mock()
-    expected_results = [Mock()]
+    expected_results = [_portal_bet_result()]
     parse = Mock(side_effect=[AutomationError("Linha de aposta malformada na tabela do portal."), expected_results])
     monkeypatch.setattr(PortalBetsBrowserMixin, "_parse_portal_bet_rows", parse)
 
@@ -79,7 +96,7 @@ def test_parse_portal_bet_rows_when_stable_retries_transient_locator_timeout(mon
     browser = object.__new__(PortalBetsBrowserMixin)
     browser._settings = Mock(browser_timeout_seconds=1)
     page = Mock()
-    expected_results = [Mock()]
+    expected_results = [_portal_bet_result()]
     parse = Mock(side_effect=[TimeoutError("Locator.inner_text: Timeout exceeded"), expected_results])
     monkeypatch.setattr(PortalBetsBrowserMixin, "_parse_portal_bet_rows", parse)
 
@@ -94,8 +111,8 @@ def test_parse_portal_bet_rows_when_stable_retries_until_month_filter_matches(mo
     browser = object.__new__(PortalBetsBrowserMixin)
     browser._settings = Mock(browser_timeout_seconds=1)
     page = Mock()
-    stale_result = Mock(purchase_datetime=datetime(2026, 5, 31, 13, 57, 34))
-    expected_result = Mock(purchase_datetime=datetime(2026, 6, 14, 20, 7, 52))
+    stale_result = _portal_bet_result(purchase_datetime=datetime(2026, 5, 31, 13, 57, 34))
+    expected_result = _portal_bet_result(purchase_datetime=datetime(2026, 6, 14, 20, 7, 52))
     parse = Mock(side_effect=[[stale_result], [expected_result], [expected_result]])
     monkeypatch.setattr(PortalBetsBrowserMixin, "_parse_portal_bet_rows", parse)
 
@@ -113,8 +130,8 @@ def test_parse_portal_bet_rows_when_stable_retries_until_sort_filter_matches(mon
     browser = object.__new__(PortalBetsBrowserMixin)
     browser._settings = Mock(browser_timeout_seconds=1)
     page = Mock()
-    newer_result = Mock(purchase_datetime=datetime(2026, 7, 24, 14, 23, 57))
-    older_result = Mock(purchase_datetime=datetime(2026, 7, 18, 16, 23, 34))
+    newer_result = _portal_bet_result(purchase_datetime=datetime(2026, 7, 24, 14, 23, 57), draw_number="3036")
+    older_result = _portal_bet_result(purchase_datetime=datetime(2026, 7, 18, 16, 23, 34), draw_number="3034")
     parse = Mock(side_effect=[[newer_result, older_result], [older_result, newer_result], [older_result, newer_result]])
     monkeypatch.setattr(PortalBetsBrowserMixin, "_parse_portal_bet_rows", parse)
 
@@ -132,14 +149,14 @@ def test_parse_portal_bet_rows_when_stable_retries_until_result_count_settles(mo
     browser = object.__new__(PortalBetsBrowserMixin)
     browser._settings = Mock(browser_timeout_seconds=1)
     page = Mock()
-    first_result = Mock(
+    first_result = _portal_bet_result(
         purchase_datetime=datetime(2026, 7, 24, 14, 23, 57),
         lottery_modality="Mega-Sena",
         selected_numbers=["01", "06", "30", "32", "45", "54"],
         draw_number="3036",
         status="Concurso nao apurado",
     )
-    second_result = Mock(
+    second_result = _portal_bet_result(
         purchase_datetime=datetime(2026, 7, 19, 12, 33, 9),
         lottery_modality="Mega-Sena",
         selected_numbers=["09", "18", "33", "40", "47", "53"],
@@ -198,7 +215,7 @@ def test_filters_are_selected_compares_draw_type_when_filter_exists(monkeypatch)
     draw_type = Mock()
     draw_type.count.return_value = 1
 
-    def selected_label(_: Mock, selector: str) -> str:
+    def selected_label(_: PortalBetsBrowserMixin, __: Mock, selector: str) -> str:
         return {
             "//select[@id='tipoAposta']": "Aposta Individual",
             "//select[@id='modalidades']": "Mega-Sena",

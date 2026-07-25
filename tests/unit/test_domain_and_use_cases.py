@@ -504,8 +504,8 @@ def test_list_placed_bets_use_case_builds_filters():
     end_date = datetime(2026, 7, 31)
 
     results = use_case.run(
-        lottery_modality="mega-sena",
-        draw_number="1234",
+        lottery_modality=LotteryModality.MEGA_SENA,
+        draw_number=1234,
         start_date=start_date,
         end_date=end_date,
     )
@@ -513,7 +513,7 @@ def test_list_placed_bets_use_case_builds_filters():
     assert results == repository.search_results
     assert repository.filters == BetSearchFilters(
         lottery_modality=LotteryModality.MEGA_SENA,
-        draw_number="1234",
+        draw_number=1234,
         start_date=start_date,
         end_date=end_date,
     )
