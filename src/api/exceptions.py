@@ -9,11 +9,13 @@ class ApiError(Exception):
         *,
         status_code: int,
         code: ErrorCode,
-        message: str,
+        message: str | None = None,
+        messages: list[str] | None = None,
         fields: list[str] | None = None,
     ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.messages = list(messages) if messages is not None else None
         self.fields = fields
-        super().__init__(message)
+        super().__init__(message or "; ".join(self.messages or []))

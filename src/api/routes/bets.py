@@ -10,6 +10,7 @@ from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.responses import error_response
 from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
+from application import PortalBetFiltersValidationError
 from application.services.portal_bet_filter_catalog import current_and_previous_months
 from domain import AutomationError, ErrorCode, LotteryModality
 from domain.enums import (
@@ -139,6 +140,8 @@ def list_portal_bets(
             status=status,
             sort_by=sort_by,
         )
+    except PortalBetFiltersValidationError as exc:
+        _raise_bad_request_messages(exc.messages)
     except ValueError as exc:
         _raise_bad_request(exc)
     except AutomationError as exc:
@@ -228,3 +231,11 @@ def _raise_bad_request(exc: ValueError) -> None:
         code=ErrorCode.BAD_REQUEST,
         message=str(exc),
     ) from exc
+
+
+def _raise_bad_request_messages(messages: list[str]) -> None:
+    raise ApiError(
+        status_code=400,
+        code=ErrorCode.BAD_REQUEST,
+        messages=messages,
+    )

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from application.dto import PortalBetResult, PortalBetSearchFilters
+from application.exceptions import PortalBetFiltersValidationError
 from application.ports import ClockPort, PortalBetQueryPort
 from application.services.portal_bet_filter_catalog import (
     parse_catalog_value,
@@ -34,13 +37,41 @@ class ListPortalBetsUseCase:
         if not self._session.is_open:
             raise BrowserSessionClosedError(self._session.executed_operation)
 
+        validation_messages: list[str] = []
+        parsed_bet_type = _parse_filter(
+            validation_messages,
+            lambda: parse_catalog_value("bet_type", bet_type, PortalBetType),
+        )
+        parsed_lottery_modality = _parse_filter(
+            validation_messages,
+            lambda: parse_portal_lottery_modality(lottery_modality),
+        )
+        parsed_draw_type = _parse_filter(
+            validation_messages,
+            lambda: parse_catalog_value("draw_type", draw_type, PortalDrawType),
+        )
+        parsed_month_year = _parse_filter(
+            validation_messages,
+            lambda: parse_portal_month_year(month_year, self._clock.today()),
+        )
+        parsed_status = _parse_filter(
+            validation_messages,
+            lambda: parse_catalog_value("status", status, PortalBetStatus),
+        )
+        parsed_sort_by = _parse_filter(
+            validation_messages,
+            lambda: parse_catalog_value("sort_by", sort_by, PortalBetSortOrder),
+        )
+        if validation_messages:
+            raise PortalBetFiltersValidationError(validation_messages)
+
         filters = PortalBetSearchFilters(
-            bet_type=parse_catalog_value("bet_type", bet_type, PortalBetType),
-            lottery_modality=parse_portal_lottery_modality(lottery_modality),
-            draw_type=parse_catalog_value("draw_type", draw_type, PortalDrawType),
-            month_year=parse_portal_month_year(month_year, self._clock.today()),
-            status=parse_catalog_value("status", status, PortalBetStatus),
-            sort_by=parse_catalog_value("sort_by", sort_by, PortalBetSortOrder),
+            bet_type=parsed_bet_type,
+            lottery_modality=parsed_lottery_modality,
+            draw_type=parsed_draw_type,
+            month_year=parsed_month_year,
+            status=parsed_status,
+            sort_by=parsed_sort_by,
             has_explicit_filters=any(
                 value is not None for value in (bet_type, lottery_modality, draw_type, month_year, status, sort_by)
             ),
@@ -60,3 +91,11 @@ class ListPortalBetsUseCase:
             raise AutomationError(str(exc), operation=Operation.LIST_PORTAL_BETS) from exc
         self._session.mark_ready()
         return results
+
+
+def _parse_filter[T](messages: list[str], parser: Callable[[], T]) -> T | None:
+    try:
+        return parser()
+    except ValueError as exc:
+        messages.append(str(exc))
+        return None

@@ -123,7 +123,8 @@ def error_response_examples(*codes: ErrorCode) -> dict[str, dict[str, Any]]:
 class ErrorDetail(BaseModel):
     status_code: int
     code: str
-    message: str
+    message: str | None = None
+    messages: list[str] | None = None
     fields: list[str] | None = None
 
 

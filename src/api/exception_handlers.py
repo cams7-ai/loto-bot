@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 async def api_error_handler(_: Request, exc: ApiError) -> Utf8JSONResponse:
-    return _error_response(status_code=exc.status_code, code=exc.code, message=exc.message, fields=exc.fields)
+    return _error_response(
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.message,
+        messages=exc.messages,
+        fields=exc.fields,
+    )
 
 
 async def request_validation_error_handler(_: Request, exc: RequestValidationError) -> Utf8JSONResponse:
@@ -52,14 +58,18 @@ def _error_response(
     *,
     status_code: int,
     code: ErrorCode,
-    message: str,
+    message: str | None = None,
+    messages: list[str] | None = None,
     fields: list[str] | None = None,
 ) -> Utf8JSONResponse:
     error: dict[str, int | str | list[str]] = {
         "status_code": status_code,
         "code": code.value,
-        "message": message,
     }
+    if message is not None:
+        error["message"] = message
+    if messages:
+        error["messages"] = messages
     if fields:
         error["fields"] = fields
     return Utf8JSONResponse(status_code=status_code, content={"error": error})
