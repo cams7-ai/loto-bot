@@ -3,6 +3,8 @@ from application.dto.automation_dto import (
     BetResult,
     BetSearchFilters,
     PlacedBetResult,
+    PortalBetResult,
+    PortalBetSearchFilters,
     PurchaseResult,
     SessionStatusResult,
 )
@@ -12,6 +14,8 @@ __all__ = [
     "BetResult",
     "BetSearchFilters",
     "PlacedBetResult",
+    "PortalBetResult",
+    "PortalBetSearchFilters",
     "PurchaseResult",
     "SessionStatusResult",
 ]

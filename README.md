@@ -245,3 +245,40 @@ A configuração fica em `pyproject.toml`, com Python alvo `py312`, largura de l
 - WhatsApp Notify: endpoints `/whatsapp/session/*` e `/whatsapp/messages/send`
 
 Falhas operacionais tentam notificar pelo WhatsApp Web e usam e-mail como fallback.
+
+## Consulta Ao Vivo de Apostas no Portal
+
+`GET /api/v1/bets` consulta as apostas exibidas no portal Loterias Online CAIXA usando a sessão persistente já autenticada. Antes de chamar essa rota, execute `GET /api/v1/sessions/start`. A rota não inicia, autentica, reinicia, fecha ou persiste dados automaticamente.
+
+Exemplo:
+
+```powershell
+curl "http://localhost:8000/api/v1/bets?bet_type=individual&lottery_modality=MEGA_SENA&draw_type=normal&month_year=last-7-days&status=paid&sort_by=date-desc"
+```
+
+Parâmetros opcionais:
+
+- `bet_type`: `all`, `individual` ou `pool`.
+- `lottery_modality`: `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
+- `draw_type`: `all`, `normal` ou `special`.
+- `month_year`: `last-7-days`, `last-15-days`, `last-30-days`, `last-45-days`, `last-90-days` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
+- `status`: `all`, `paid` ou `expired`.
+- `sort_by`: `date-asc` ou `date-desc`.
+
+Resposta:
+
+Na resposta, `lottery_modality` preserva o nome exibido pelo portal, como `Mega-Sena`.
+
+```json
+[
+  {
+    "purchase_datetime": "2026-07-19T12:33:09-03:00",
+    "lottery_modality": "Mega-Sena",
+    "selected_numbers": ["09", "18", "33", "40", "47", "53"],
+    "draw_number": "3034",
+    "status": "Aposta não premiada"
+  }
+]
+```
+
+Diferença de escopo: `/api/v1/bets` consulta ao vivo a sessão autenticada do portal; `/api/v1/history/bets` consulta somente o histórico persistido no MongoDB.

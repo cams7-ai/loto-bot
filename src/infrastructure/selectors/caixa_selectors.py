@@ -83,6 +83,15 @@ class Selectors(StrEnum):
     TRACK_YOUR_PURCHASES_BUTTON = "//div[@id='containerProcessamento']//button[@id='pay']"
     # Finalizar aposta
     BET_TABLE_ROWS = "//table[contains(@class,'tab-apostas')]//tbody/tr"
+    PORTAL_BET_TYPE_FILTER = "//select[@id='tipoAposta']"
+    PORTAL_LOTTERY_MODALITY_FILTER = "//select[@id='modalidades']"
+    PORTAL_DRAW_TYPE_FILTER = "//select[@id='tipoConcurso']"
+    PORTAL_PERIOD_FILTER = "//select[@id='periodos']"
+    PORTAL_STATUS_FILTER = "//select[@id='situacoes']"
+    PORTAL_SORT_FILTER = "//select[@id='ordenacoes']"
+    PORTAL_APPLY_FILTER_BUTTON = "//button[@id='aplicarFiltro']"
+    PORTAL_BETS_TABLE = "//table[@id='tabelaApostas']"
+    PORTAL_BETS_TABLE_ROWS = "//table[@id='tabelaApostas']/tbody/tr[td]"
 
     #    FINISHED_ORDER_TEXT = "//div[@id='containerProcessamento']//h3[contains(.,'Seu pedido foi realizado')]"
     #    LOGOUT_BUTTON = "//*[@id='sair']"

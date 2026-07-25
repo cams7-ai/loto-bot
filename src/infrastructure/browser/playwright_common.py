@@ -32,14 +32,14 @@ class PlaywrightBrowserBase:
         self._executor: ThreadPoolExecutor | None = None
 
     @staticmethod
-    def _optional_inner_text(page: Page, selector: Selectors) -> str:
+    def _optional_inner_text(page: Page, selector: Selectors | str) -> str:
         locator = page.locator(selector)
         if locator.count() == 0:
             return ""
         return locator.first.inner_text().strip()
 
     @staticmethod
-    def _required_inner_text(page: Page, timeout_ms: int, selector: Selectors) -> str:
+    def _required_inner_text(page: Page, timeout_ms: int, selector: Selectors | str) -> str:
         locator = page.locator(selector).first
         locator.wait_for(state="visible", timeout=timeout_ms)
 
@@ -54,7 +54,7 @@ class PlaywrightBrowserBase:
         return text
 
     @staticmethod
-    def _click(page: Page, timeout_ms: int, selector: Selectors) -> bool:
+    def _click(page: Page, timeout_ms: int, selector: Selectors | str) -> bool:
         element = page.locator(selector).first
         try:
             PlaywrightBrowserBase._prepare_for_click(element, timeout_ms)
@@ -70,7 +70,7 @@ class PlaywrightBrowserBase:
         return False
 
     @staticmethod
-    def _fill(page: Page, selector: Selectors, value: str) -> bool:
+    def _fill(page: Page, selector: Selectors | str, value: str) -> bool:
         element = page.locator(selector)
         try:
             element.fill(value)
@@ -83,7 +83,7 @@ class PlaywrightBrowserBase:
         return False
 
     @staticmethod
-    def _type(page: Page, timeout_ms: int, selector: Selectors, value: str) -> bool:
+    def _type(page: Page, timeout_ms: int, selector: Selectors | str, value: str) -> bool:
         element = page.locator(selector).first
         PlaywrightBrowserBase._prepare_for_click(element, timeout_ms)
         element.click()

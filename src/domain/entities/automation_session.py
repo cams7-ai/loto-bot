@@ -40,6 +40,9 @@ class AutomationSession:
     def mark_finished(self) -> None:
         self.status = AutomationStatus.FINISHED
 
+    def mark_ready(self) -> None:
+        self.status = AutomationStatus.OPEN
+
     def mark_failed(self, operation: Operation) -> None:
         self.executed_operation = operation
         self.status = AutomationStatus.FAILED

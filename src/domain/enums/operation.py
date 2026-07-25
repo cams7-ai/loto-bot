@@ -21,6 +21,7 @@ class Operation(Enum):
     CHECK_BET_PROCESSING = "Processamento da aposta"
     CHECK_YOUR_PURCHASES = "Confira a suas compras"
     COMPLETE_BET = "Finaliza a aposta"
+    LIST_PORTAL_BETS = "Busca apostas no portal"
 
     @staticmethod
     def executed_operation(operation: Operation) -> dict[str, str]:

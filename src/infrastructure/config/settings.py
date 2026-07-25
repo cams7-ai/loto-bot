@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     online_lottery_path: str = Field(default="/silce-web/#", alias="ONLINE_LOTTERY_PATH")
     terms_of_use_path: str = Field(default="/termos-de-uso", alias="TERMS_OF_USE_PATH")
     home_path: str = Field(default="/home", alias="HOME_PATH")
+    portal_bets_path: str = Field(default="/apostas", alias="PORTAL_BETS_PATH")
     client_id: str = Field(default="cli-web-lce", alias="CLIENT_ID")
     login_url: str = Field(default="https://login.caixa.gov.br", alias="LOGIN_URL")
     authenticate_path: str = Field(
@@ -116,6 +117,10 @@ class Settings(BaseSettings):
     @property
     def home_url(self) -> str:
         return f"{self._lottery_url}{self.home_path}"
+
+    @property
+    def portal_bets_url(self) -> str:
+        return f"{self._lottery_url}{self.portal_bets_path}"
 
     @property
     def bet_page_path_with_modality(self) -> str:

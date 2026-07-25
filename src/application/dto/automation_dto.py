@@ -8,6 +8,14 @@ from decimal import Decimal
 from uuid import UUID
 
 from domain import LotteryModality, Operation
+from domain.enums import (
+    PortalBetRelativePeriod,
+    PortalBetSortOrder,
+    PortalBetStatus,
+    PortalBetType,
+    PortalDrawType,
+    PortalYearMonth,
+)
 
 
 @dataclass(frozen=True)
@@ -63,3 +71,28 @@ class PlacedBetResult:
     bet_amount: Decimal
     purchase_number: str
     bet_date: datetime
+
+
+@dataclass(frozen=True)
+class PortalBetSearchFilters:
+    bet_type: PortalBetType | None = None
+    lottery_modality: LotteryModality | None = None
+    draw_type: PortalDrawType | None = None
+    month_year: PortalBetRelativePeriod | PortalYearMonth | None = None
+    status: PortalBetStatus | None = None
+    sort_by: PortalBetSortOrder | None = None
+    has_explicit_filters: bool = False
+
+    @property
+    def has_filters(self) -> bool:
+        """Indica se ao menos um filtro foi explicitamente informado."""
+        return self.has_explicit_filters
+
+
+@dataclass(frozen=True)
+class PortalBetResult:
+    purchase_datetime: datetime
+    lottery_modality: str
+    selected_numbers: list[str]
+    draw_number: str
+    status: str

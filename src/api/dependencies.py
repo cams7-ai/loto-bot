@@ -7,12 +7,13 @@ from dataclasses import dataclass
 from application import (
     GetPlacedBetUseCase,
     ListPlacedBetsUseCase,
+    ListPortalBetsUseCase,
     PlacedBetService,
     RunBetFlowUseCase,
     SessionControlUseCase,
 )
 from domain import AutomationSession, PaymentAuthorization
-from infrastructure.browser import PlaywrightBrowserAutomation
+from infrastructure.browser import PlaywrightBrowserAutomation, SaoPauloClock
 from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
 from infrastructure.config import Settings, get_settings
 from infrastructure.database import BeanieBetRepository, MongoDatabase
@@ -25,6 +26,7 @@ class AppContainer:
     session_control: SessionControlUseCase
     run_bet_flow: RunBetFlowUseCase
     list_placed_bets: ListPlacedBetsUseCase
+    list_portal_bets: ListPortalBetsUseCase
     get_placed_bet: GetPlacedBetUseCase
 
 
@@ -40,6 +42,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     database = MongoDatabase(uri=resolved_settings.mongodb_uri, database_name=resolved_settings.mongodb_database)
     bet_repository = BeanieBetRepository(database=database)
     list_placed_bets = ListPlacedBetsUseCase(repository=bet_repository)
+    list_portal_bets = ListPortalBetsUseCase(session=session, portal_bets=browser, clock=SaoPauloClock())
     get_placed_bet = GetPlacedBetUseCase(repository=bet_repository)
     bet_persistence = (
         PlacedBetService(
@@ -63,6 +66,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         session_control=session_control,
         run_bet_flow=run_bet_flow,
         list_placed_bets=list_placed_bets,
+        list_portal_bets=list_portal_bets,
         get_placed_bet=get_placed_bet,
     )
 

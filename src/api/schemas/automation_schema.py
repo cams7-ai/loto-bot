@@ -95,3 +95,24 @@ class PlacedBetResponse(BaseModel):
     bet_amount: Decimal = Field(examples=["123.45"])
     purchase_number: str
     bet_date: datetime
+
+
+class PortalBetResponse(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_schema_extra={
+            "example": {
+                "purchase_datetime": "2026-07-19T12:33:09-03:00",
+                "lottery_modality": "Mega-Sena",
+                "selected_numbers": ["09", "18", "33", "40", "47", "53"],
+                "draw_number": "3034",
+                "status": "Aposta não premiada",
+            }
+        },
+    )
+
+    purchase_datetime: datetime
+    lottery_modality: str
+    selected_numbers: list[str]
+    draw_number: str
+    status: str

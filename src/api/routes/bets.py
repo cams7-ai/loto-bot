@@ -3,15 +3,23 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 
 from api.dependencies import AppContainer, get_container
 from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.responses import error_response
-from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse
-from domain import AutomationError, ErrorCode
-from shared import with_sao_paulo_timezone
+from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
+from application.services.portal_bet_filter_catalog import current_and_previous_months
+from domain import AutomationError, ErrorCode, LotteryModality
+from domain.enums import (
+    PortalBetRelativePeriod,
+    PortalBetSortOrder,
+    PortalBetStatus,
+    PortalBetType,
+    PortalDrawType,
+)
+from shared import sao_paulo_timezone, with_sao_paulo_timezone
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
@@ -74,6 +82,78 @@ def run_bet(
         )
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
+
+
+@router.get(
+    "/bets",
+    response_model=list[PortalBetResponse],
+    responses=ERROR_RESPONSES,
+)
+def list_portal_bets(
+    bet_type: str | None = Query(
+        default=None,
+        description=f"Tipo de aposta: {', '.join(bet_type.value for bet_type in PortalBetType)}.",
+        examples=[PortalBetType.INDIVIDUAL.value],
+    ),
+    lottery_modality: str | None = Query(
+        default=None,
+        description=f"Modalidade: all, {', '.join(modality.name for modality in LotteryModality)}.",
+        examples=[LotteryModality.MEGA_SENA.name],
+    ),
+    draw_type: str | None = Query(
+        default=None,
+        description=f"Tipo de concurso: {', '.join(draw_type.value for draw_type in PortalDrawType)}.",
+        examples=[PortalDrawType.NORMAL.value],
+    ),
+    month_year: str | None = Query(
+        default=None,
+        description=(
+            f"Período: {', '.join(period.value for period in PortalBetRelativePeriod)}, "
+            f"{
+                ', '.join(
+                    month.canonical_value
+                    for month in current_and_previous_months(datetime.now(sao_paulo_timezone()).date())
+                )
+            }."
+        ),
+        examples=[PortalBetRelativePeriod.LAST_7_DAYS.value],
+    ),
+    status: str | None = Query(
+        default=None,
+        description=f"Situação: {', '.join(status.value for status in PortalBetStatus)}.",
+        examples=[PortalBetStatus.PAID.value],
+    ),
+    sort_by: str | None = Query(
+        default=None,
+        description=f"Ordenação: {', '.join(order.value for order in PortalBetSortOrder)}.",
+        examples=[PortalBetSortOrder.DATE_DESC.value],
+    ),
+    container: AppContainer = CONTAINER_DEPENDENCY,
+) -> list[PortalBetResponse]:
+    try:
+        results = container.list_portal_bets.run(
+            bet_type=bet_type,
+            lottery_modality=lottery_modality,
+            draw_type=draw_type,
+            month_year=month_year,
+            status=status,
+            sort_by=sort_by,
+        )
+    except ValueError as exc:
+        _raise_bad_request(exc)
+    except AutomationError as exc:
+        ApiExceptionMapper.raise_api_error(exc)
+
+    return [
+        PortalBetResponse(
+            purchase_datetime=with_sao_paulo_timezone(result.purchase_datetime, remove_microseconds=True),
+            lottery_modality=result.lottery_modality,
+            selected_numbers=result.selected_numbers,
+            draw_number=result.draw_number,
+            status=result.status,
+        )
+        for result in results
+    ]
 
 
 @placed_bets_router.get(

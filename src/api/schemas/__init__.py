@@ -3,6 +3,7 @@ from api.schemas.automation_schema import (
     BetRunResponse,
     HealthResponse,
     PlacedBetResponse,
+    PortalBetResponse,
     SessionControlResponse,
     SessionStatusResponse,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "error_response_examples",
     "HealthResponse",
     "PlacedBetResponse",
+    "PortalBetResponse",
     "SessionControlResponse",
     "SessionStatusResponse",
 ]
