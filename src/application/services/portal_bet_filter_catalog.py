@@ -36,102 +36,57 @@ INVALID_DRAW_NUMBER_MESSAGE = "Valor inválido. Informe número maior que zero."
 LOTTERY_MODALITY_ALLOWED_VALUES = [ALL, *LotteryModality.__members__]
 
 
-PORTAL_RELATIVE_PERIOD_ALIASES = {
-    PortalBetRelativePeriod.LAST_7_DAYS.value: PortalBetRelativePeriod.LAST_7_DAYS,
-    "ultimos 7 dias": PortalBetRelativePeriod.LAST_7_DAYS,
-    PortalBetRelativePeriod.LAST_15_DAYS.value: PortalBetRelativePeriod.LAST_15_DAYS,
-    "ultimos 15 dias": PortalBetRelativePeriod.LAST_15_DAYS,
-    PortalBetRelativePeriod.LAST_30_DAYS.value: PortalBetRelativePeriod.LAST_30_DAYS,
-    "ultimos 30 dias": PortalBetRelativePeriod.LAST_30_DAYS,
-    PortalBetRelativePeriod.LAST_45_DAYS.value: PortalBetRelativePeriod.LAST_45_DAYS,
-    "ultimos 45 dias": PortalBetRelativePeriod.LAST_45_DAYS,
-    PortalBetRelativePeriod.LAST_90_DAYS.value: PortalBetRelativePeriod.LAST_90_DAYS,
-    "ultimos 90 dias": PortalBetRelativePeriod.LAST_90_DAYS,
-}
-
-
-PORTAL_LOTTERY_MODALITY_ALIASES = {
-    "todas": None,
-    "dia de sorte": LotteryModality.DIA_DE_SORTE,
-    "dupla sena": LotteryModality.DUPLA_SENA,
-    "loteca": LotteryModality.LOTECA,
-    "lotofacil": LotteryModality.LOTOFACIL,
-    "lotomania": LotteryModality.LOTOMANIA,
-    "+milionaria": LotteryModality.MAIS_MILIONARIA,
-    "mega-sena": LotteryModality.MEGA_SENA,
-    "quina": LotteryModality.QUINA,
-    "super sete": LotteryModality.SUPER_SETE,
-    "timemania": LotteryModality.TIMEMANIA,
-}
-
-UNSUPPORTED_PORTAL_MODALITIES = {
-    LotteryModality.QUINA_ESPECIAL,
-    LotteryModality.LOTECA_ESPECIAL,
-    LotteryModality.LOTOFACIL_ESPECIAL,
-}
-
-
-def normalize_public_value(value: str) -> str:
-    stripped = " ".join(value.strip().split()).casefold()
-    return "".join(
-        character for character in unicodedata.normalize("NFD", stripped) if unicodedata.category(character) != "Mn"
-    )
-
-
 def parse_catalog_value[T: Enum](parameter: str, value: str | None, enum_type: type[T]) -> T | None:
     if value is None:
         return None
-    normalized = normalize_public_value(value)
-    try:
-        return enum_type(normalized)
-    except ValueError:
-        allowed = ", ".join(str(member.value) for member in enum_type)
-        raise ValueError(f"Parâmetro {parameter} inválido. Valores permitidos: {allowed}.") from None
 
+    stripped = value.strip()
+    if stripped in enum_type.__members__:
+        return enum_type[stripped]
+    for member in enum_type:
+        if stripped == _public_catalog_value(member):
+            return member
 
-def allowed_catalog_values(enum_type: type[Enum]) -> list[str]:
-    return [str(member.value) for member in enum_type]
+    allowed = ", ".join(_allowed_catalog_values(enum_type))
+    raise ValueError(f"Parâmetro {parameter} inválido. Valores permitidos: {allowed}.") from None
 
 
 def invalid_catalog_detail(parameter: str, value: str, enum_type: type[Enum]) -> ValidationErrorDetail:
     return ValidationErrorDetail(
         field=parameter,
         rejected_value=value,
-        allowed_values=allowed_catalog_values(enum_type),
+        allowed_values=_allowed_catalog_values(enum_type),
         message=INVALID_VALUE_MESSAGE,
     )
+
+
+def _allowed_catalog_values(enum_type: type[Enum]) -> list[str]:
+    return [_public_catalog_value(member) for member in enum_type]
+
+
+def _public_catalog_value(member: Enum) -> str:
+    return member.name.lower().replace("_", "-")
 
 
 def parse_portal_lottery_modality(value: str | None) -> LotteryModality | None:
     if value is None:
         return None
-    if value in LotteryModality.__members__:
-        modality = LotteryModality[value]
-        if modality in UNSUPPORTED_PORTAL_MODALITIES:
-            raise ValueError("Parâmetro lottery_modality inválido para consulta ao portal.")
-        return modality
-    normalized = normalize_public_value(value)
-    if normalized == ALL:
+    stripped = value.strip()
+    if stripped in LotteryModality.__members__:
+        return LotteryModality[stripped]
+    if stripped == ALL or stripped == ALL.upper():
         return None
-    if normalized in PORTAL_LOTTERY_MODALITY_ALIASES:
-        return PORTAL_LOTTERY_MODALITY_ALIASES[normalized]
-    allowed = ", ".join(LOTTERY_MODALITY_ALLOWED_VALUES)
-    raise ValueError(f"Parâmetro lottery_modality inválido. Valores permitidos: {allowed}.")
 
+    normalized_value = _normalize_lottery_modality_value(stripped)
+    if _normalize_lottery_modality_value(ALL) == normalized_value:
+        return None
+    for modality in LotteryModality:
+        if normalized_value in {
+            _normalize_lottery_modality_value(modality.name),
+            _normalize_lottery_modality_value(modality.value),
+        }:
+            return modality
 
-def parse_public_lottery_modality(value: str | None) -> LotteryModality | None:
-    if value is None:
-        return None
-    if value in LotteryModality.__members__:
-        return LotteryModality[value]
-    normalized = normalize_public_value(value)
-    if normalized == ALL:
-        return None
-    resolved_by_value = LotteryModality.from_string(normalized)
-    if resolved_by_value is not None:
-        return resolved_by_value
-    if normalized in PORTAL_LOTTERY_MODALITY_ALIASES:
-        return PORTAL_LOTTERY_MODALITY_ALIASES[normalized]
     allowed = ", ".join(LOTTERY_MODALITY_ALLOWED_VALUES)
     raise ValueError(f"Parâmetro lottery_modality inválido. Valores permitidos: {allowed}.")
 
@@ -148,9 +103,10 @@ def invalid_lottery_modality_detail(parameter: str, value: str) -> ValidationErr
 def parse_portal_month_year(value: str | None, today: date) -> PortalBetRelativePeriod | PortalYearMonth | None:
     if value is None:
         return None
-    normalized = normalize_public_value(value)
-    if normalized in PORTAL_RELATIVE_PERIOD_ALIASES:
-        return PORTAL_RELATIVE_PERIOD_ALIASES[normalized]
+
+    if value in PortalBetRelativePeriod.__members__:
+        return PortalBetRelativePeriod[value]
+
     year_month = _parse_year_month(value)
     _validate_year_month_window(year_month, today)
     return year_month
@@ -223,9 +179,9 @@ def _parse_localized_month(value: str) -> PortalYearMonth | None:
     match = re.fullmatch(r"([^/]+)/(\d{4})", value)
     if match is None:
         return None
-    month_name = normalize_public_value(match.group(1))
+    month_name = _normalize_public_value(match.group(1))
     for month, label in MONTH_NAMES.items():
-        if normalize_public_value(label) == month_name:
+        if _normalize_public_value(label) == month_name:
             return PortalYearMonth(year=int(match.group(2)), month=month)
     return None
 
@@ -235,3 +191,14 @@ def _validate_year_month_window(year_month: PortalYearMonth, today: date) -> Non
     if year_month not in allowed:
         allowed_values = ", ".join(month.canonical_value for month in allowed)
         raise ValueError(f"Parâmetro month_year fora da janela permitida. Valores permitidos: {allowed_values}.")
+
+
+def _normalize_public_value(value: str) -> str:
+    stripped = " ".join(value.strip().split()).casefold()
+    return "".join(
+        character for character in unicodedata.normalize("NFD", stripped) if unicodedata.category(character) != "Mn"
+    )
+
+
+def _normalize_lottery_modality_value(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", _normalize_public_value(value))

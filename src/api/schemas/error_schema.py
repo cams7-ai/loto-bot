@@ -44,7 +44,7 @@ ERROR_EXAMPLES = {
                     "field": "lottery_modality",
                     "rejected_value": "abc",
                     "allowed_values": [
-                        "all",
+                        "ALL",
                         "MEGA_SENA",
                         "QUINA",
                         "QUINA_ESPECIAL",

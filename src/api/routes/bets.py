@@ -17,8 +17,8 @@ from application.services.portal_bet_filter_catalog import (
     INVALID_DRAW_NUMBER_MESSAGE,
     current_and_previous_months,
     invalid_lottery_modality_detail,
+    parse_portal_lottery_modality,
     parse_positive_int,
-    parse_public_lottery_modality,
 )
 from domain import AutomationError, ErrorCode, LotteryModality
 from domain.enums import (
@@ -102,23 +102,23 @@ def run_bet(
 def list_portal_bets(
     bet_type: str | None = Query(
         default=None,
-        description=f"Tipo de aposta: {', '.join(bet_type.value for bet_type in PortalBetType)}.",
-        examples=[PortalBetType.INDIVIDUAL.value],
+        description=f"Tipo de aposta: {', '.join(bet_type.name for bet_type in PortalBetType)}.",
+        examples=[PortalBetType.INDIVIDUAL.name],
     ),
     lottery_modality: str | None = Query(
         default=None,
-        description=f"Modalidade: all, {', '.join(modality.name for modality in LotteryModality)}.",
+        description=f"Modalidade: ALL, {', '.join(modality.name for modality in LotteryModality)}.",
         examples=[LotteryModality.MEGA_SENA.name],
     ),
     draw_type: str | None = Query(
         default=None,
-        description=f"Tipo de concurso: {', '.join(draw_type.value for draw_type in PortalDrawType)}.",
-        examples=[PortalDrawType.NORMAL.value],
+        description=f"Tipo de concurso: {', '.join(draw_type.name for draw_type in PortalDrawType)}.",
+        examples=[PortalDrawType.NORMAL.name],
     ),
     month_year: str | None = Query(
         default=None,
         description=(
-            f"Período: {', '.join(period.value for period in PortalBetRelativePeriod)}, "
+            f"Período: {', '.join(period.name for period in PortalBetRelativePeriod)}, "
             f"{
                 ', '.join(
                     month.canonical_value
@@ -126,17 +126,17 @@ def list_portal_bets(
                 )
             }."
         ),
-        examples=[PortalBetRelativePeriod.LAST_7_DAYS.value],
+        examples=[PortalBetRelativePeriod.LAST_7_DAYS.name],
     ),
     status: str | None = Query(
         default=None,
-        description=f"Situação: {', '.join(status.value for status in PortalBetStatus)}.",
-        examples=[PortalBetStatus.PAID.value],
+        description=f"Situação: {', '.join(status.name for status in PortalBetStatus)}.",
+        examples=[PortalBetStatus.PAID.name],
     ),
     sort_by: str | None = Query(
         default=None,
-        description=f"Ordenação: {', '.join(order.value for order in PortalBetSortOrder)}.",
-        examples=[PortalBetSortOrder.DATE_DESC.value],
+        description=f"Ordenação: {', '.join(order.name for order in PortalBetSortOrder)}.",
+        examples=[PortalBetSortOrder.DATE_DESC.name],
     ),
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> list[PortalBetResponse]:
@@ -272,7 +272,7 @@ def _parse_selected_lottery_modality(request: BetRunRequest | None) -> LotteryMo
     if request is None or request.selected_lottery_modality is None:
         return None
     try:
-        return parse_public_lottery_modality(request.selected_lottery_modality)
+        return parse_portal_lottery_modality(request.selected_lottery_modality)
     except ValueError:
         _raise_invalid_fields(
             [invalid_lottery_modality_detail("selected_lottery_modality", request.selected_lottery_modality)]
@@ -291,7 +291,7 @@ def _parse_placed_bet_filters(
     parsed_lottery_modality = _parse_filter(
         details,
         lottery_modality,
-        lambda: parse_public_lottery_modality(lottery_modality),
+        lambda: parse_portal_lottery_modality(lottery_modality),
         lambda value: invalid_lottery_modality_detail("lottery_modality", value),
     )
     parsed_draw_number = _parse_filter(
@@ -360,7 +360,7 @@ def _parse_history_date(value: str | None, *, end_of_day: bool) -> datetime | No
 
 
 def _resolve_response_lottery_modality(value: str) -> LotteryModality:
-    resolved = parse_public_lottery_modality(value)
+    resolved = parse_portal_lottery_modality(value)
     if resolved is None:
         raise ValueError("Modalidade de loteria inválida.")
     return resolved

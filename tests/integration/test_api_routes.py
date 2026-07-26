@@ -8,7 +8,7 @@ import pytest
 
 from api.dependencies import get_container
 from api.server import app
-from application import AutomationRunResult, PlacedBetResult, SessionStatusResult
+from application import AutomationRunResult, PlacedBetResult, PortalBetResult, SessionStatusResult
 from domain import BrowserSessionClosedError, BrowserSessionOpenError, LotteryModality, Operation
 
 
@@ -53,6 +53,23 @@ class FakeListPlacedBets:
         return [placed_bet_result(bet_amount=Decimal("6"))]
 
 
+class FakeListPortalBets:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def run(self, **filters):
+        self.calls.append(filters)
+        return [
+            PortalBetResult(
+                purchase_datetime=datetime(2026, 7, 24, 21, 30),
+                lottery_modality="Mega-Sena",
+                selected_numbers=["01", "02", "03", "04", "05", "06"],
+                draw_number="2890",
+                status="Aposta Paga",
+            )
+        ]
+
+
 class FakeGetPlacedBet:
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -70,6 +87,7 @@ class FakeContainer:
     def __init__(self) -> None:
         self.session_control = FakeSessionControl()
         self.run_bet_flow = FakeRunBetFlow()
+        self.list_portal_bets = FakeListPortalBets()
         self.list_placed_bets = FakeListPlacedBets()
         self.get_placed_bet = FakeGetPlacedBet()
 
@@ -243,6 +261,32 @@ async def test_run_bet_route_rejects_invalid_lottery_modality():
     assert "timestamp" in error
     assert "fields" not in error
     assert "messages" not in error
+
+
+@pytest.mark.anyio
+async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(override_container):
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/bets")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "purchase_datetime": "2026-07-24T21:30:00-03:00",
+            "lottery_modality": "mega-sena",
+            "selected_numbers": ["01", "02", "03", "04", "05", "06"],
+            "draw_number": "2890",
+            "status": "Aposta Paga",
+        }
+    ]
+    assert override_container.list_portal_bets.calls[0] == {
+        "bet_type": None,
+        "lottery_modality": None,
+        "draw_type": None,
+        "month_year": None,
+        "status": None,
+        "sort_by": None,
+    }
 
 
 @pytest.mark.anyio

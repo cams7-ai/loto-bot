@@ -12,6 +12,7 @@ import infrastructure.browser.playwright_browser as playwright_browser_module
 from api.dependencies import get_container
 from api.server import app
 from application import RunBetFlowUseCase
+from application.services.portal_bet_filter_catalog import parse_portal_lottery_modality
 from domain import (
     OPERATION_CANNOT_BE_COMPLETED,
     AutomationError,
@@ -92,6 +93,14 @@ def test_lottery_modality_from_string():
     assert LotteryModality.from_string("quina/especial") == LotteryModality.QUINA_ESPECIAL
     assert LotteryModality.from_string(" loteca/especial ") == LotteryModality.LOTECA_ESPECIAL
     assert LotteryModality.from_string("modalidade-invalida") is None
+
+
+def test_parse_portal_lottery_modality_accepts_names_values_and_portal_labels():
+    assert parse_portal_lottery_modality("MEGA_SENA") == LotteryModality.MEGA_SENA
+    assert parse_portal_lottery_modality("mega-sena") == LotteryModality.MEGA_SENA
+    assert parse_portal_lottery_modality("Mega-Sena") == LotteryModality.MEGA_SENA
+    assert parse_portal_lottery_modality("Dupla Sena") == LotteryModality.DUPLA_SENA
+    assert parse_portal_lottery_modality("Mais Milionária") == LotteryModality.MAIS_MILIONARIA
 
 
 def test_clients_error_edges():

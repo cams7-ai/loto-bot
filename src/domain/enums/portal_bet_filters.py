@@ -5,34 +5,34 @@ from enum import Enum
 
 
 class PortalBetType(Enum):
-    ALL = "all"
-    INDIVIDUAL = "individual"
-    POOL = "pool"
+    ALL = "Todas"
+    INDIVIDUAL = "Aposta Individual"
+    POOL = "Aposta Bolão"
 
 
 class PortalDrawType(Enum):
-    ALL = "all"
-    NORMAL = "normal"
-    SPECIAL = "special"
+    ALL = "Todos"
+    NORMAL = "Normal"
+    SPECIAL = "Especial"
 
 
 class PortalBetRelativePeriod(Enum):
-    LAST_7_DAYS = "last-7-days"
-    LAST_15_DAYS = "last-15-days"
-    LAST_30_DAYS = "last-30-days"
-    LAST_45_DAYS = "last-45-days"
-    LAST_90_DAYS = "last-90-days"
+    LAST_7_DAYS = "Últimos 7 dias"
+    LAST_15_DAYS = "Últimos 15 dias"
+    LAST_30_DAYS = "Últimos 30 dias"
+    LAST_45_DAYS = "Últimos 45 dias"
+    LAST_90_DAYS = "Últimos 90 dias"
 
 
 class PortalBetStatus(Enum):
-    ALL = "all"
-    PAID = "paid"
-    EXPIRED = "expired"
+    ALL = "Todas"
+    PAID = "Pagas"
+    EXPIRED = "Prescritas"
 
 
 class PortalBetSortOrder(Enum):
-    DATE_ASC = "date-asc"
-    DATE_DESC = "date-desc"
+    DATE_ASC = "Data Crescente"
+    DATE_DESC = "Data Decrescente"
 
 
 @dataclass(frozen=True, order=True)

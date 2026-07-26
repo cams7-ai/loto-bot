@@ -94,7 +94,7 @@ Quando `selected_lottery_modality` for inválido, a API retorna `400` com detalh
       {
         "field": "selected_lottery_modality",
         "rejected_value": "abc",
-        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
         "message": "Valor inválido."
       }
     ]
@@ -151,7 +151,7 @@ Quando filtros forem inválidos, a API retorna `400` com todos os detalhes acumu
       {
         "field": "lottery_modality",
         "rejected_value": "abc",
-        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
         "message": "Valor inválido."
       },
       {
@@ -226,7 +226,7 @@ Quando houver erro de validação acumulada de parâmetros ou campos, a API reto
       {
         "field": "lottery_modality",
         "rejected_value": "abc",
-        "allowed_values": ["all", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
+        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
         "message": "Valor inválido."
       }
     ]
@@ -320,17 +320,17 @@ Falhas operacionais tentam notificar pelo WhatsApp Web e usam e-mail como fallba
 Exemplo:
 
 ```powershell
-curl "http://localhost:8000/api/v1/bets?bet_type=individual&lottery_modality=MEGA_SENA&draw_type=normal&month_year=last-7-days&status=paid&sort_by=date-desc"
+curl "http://localhost:8000/api/v1/bets?bet_type=INDIVIDUAL&lottery_modality=MEGA_SENA&draw_type=NORMAL&month_year=LAST_7_DAYS&status=PAID&sort_by=DATE_DESC"
 ```
 
 Parâmetros opcionais:
 
-- `bet_type`: `all`, `individual` ou `pool`.
-- `lottery_modality`: `all`, `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
-- `draw_type`: `all`, `normal` ou `special`.
-- `month_year`: `last-7-days`, `last-15-days`, `last-30-days`, `last-45-days`, `last-90-days` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
-- `status`: `all`, `paid` ou `expired`.
-- `sort_by`: `date-asc` ou `date-desc`.
+- `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`.
+- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
+- `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`.
+- `month_year`: `LAST_7_DAYS`, `LAST_15_DAYS`, `LAST_30_DAYS`, `LAST_45_DAYS`, `LAST_90_DAYS` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
+- `status`: `ALL`, `PAID` ou `EXPIRED`.
+- `sort_by`: `DATE_ASC` ou `DATE_DESC`.
 
 Resposta:
 

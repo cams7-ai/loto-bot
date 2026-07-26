@@ -66,7 +66,7 @@ class PlacedBetResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-                "lottery_modality": LotteryModality.MEGA_SENA.value,
+                "lottery_modality": LotteryModality.MEGA_SENA.name,
                 "selected_numbers": ["01", "02", "03", "04", "05", "06"],
                 "draw_number": "1234",
                 "status": "Efetivada",
@@ -93,7 +93,7 @@ class PortalBetResponse(BaseModel):
         json_schema_extra={
             "example": {
                 "purchase_datetime": "2026-07-19T12:33:09-03:00",
-                "lottery_modality": LotteryModality.MEGA_SENA.value,
+                "lottery_modality": LotteryModality.MEGA_SENA.name,
                 "selected_numbers": ["09", "18", "33", "40", "47", "53"],
                 "draw_number": "3034",
                 "status": "Aposta não premiada",

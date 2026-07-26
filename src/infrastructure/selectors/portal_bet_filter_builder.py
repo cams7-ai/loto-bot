@@ -33,53 +33,20 @@ class PortalLotteryModalityBuilder:
 
 
 class PortalBetFilterBuilder:
-    DEFAULT_BET_TYPE = PortalBetType.ALL
-    DEFAULT_DRAW_TYPE = PortalDrawType.ALL
-    DEFAULT_MONTH_YEAR = PortalBetRelativePeriod.LAST_7_DAYS
-    DEFAULT_STATUS = PortalBetStatus.ALL
-    DEFAULT_SORT_BY = PortalBetSortOrder.DATE_DESC
-
-    BET_TYPE_LABELS = {
-        PortalBetType.ALL: "Todas",
-        PortalBetType.INDIVIDUAL: "Aposta Individual",
-        PortalBetType.POOL: "Aposta Bolão",
-    }
-    DRAW_TYPE_LABELS = {
-        PortalDrawType.ALL: "Todos",
-        PortalDrawType.NORMAL: "Normal",
-        PortalDrawType.SPECIAL: "Especial",
-    }
-    RELATIVE_PERIOD_LABELS = {
-        PortalBetRelativePeriod.LAST_7_DAYS: "Últimos 7 dias",
-        PortalBetRelativePeriod.LAST_15_DAYS: "Últimos 15 dias",
-        PortalBetRelativePeriod.LAST_30_DAYS: "Últimos 30 dias",
-        PortalBetRelativePeriod.LAST_45_DAYS: "Últimos 45 dias",
-        PortalBetRelativePeriod.LAST_90_DAYS: "Últimos 90 dias",
-    }
-    STATUS_LABELS = {
-        PortalBetStatus.ALL: "Todas",
-        PortalBetStatus.PAID: "Pagas",
-        PortalBetStatus.EXPIRED: "Prescritas",
-    }
-    SORT_LABELS = {
-        PortalBetSortOrder.DATE_ASC: "Data Crescente",
-        PortalBetSortOrder.DATE_DESC: "Data Decrescente",
-    }
-
     @classmethod
     def labels(cls, filters: PortalBetSearchFilters) -> dict[str, str]:
-        period = filters.month_year or cls.DEFAULT_MONTH_YEAR
+        period = filters.month_year or PortalBetRelativePeriod.LAST_7_DAYS
         return {
-            "bet_type": cls.BET_TYPE_LABELS[filters.bet_type or cls.DEFAULT_BET_TYPE],
+            "bet_type": filters.bet_type.value if filters.bet_type else PortalBetType.ALL.value,
             "lottery_modality": PortalLotteryModalityBuilder.get_lottery_modality(filters.lottery_modality),
-            "draw_type": cls.DRAW_TYPE_LABELS[filters.draw_type or cls.DEFAULT_DRAW_TYPE],
+            "draw_type": filters.draw_type.value if filters.draw_type else PortalDrawType.ALL.value,
             "month_year": cls.period_label(period),
-            "status": cls.STATUS_LABELS[filters.status or cls.DEFAULT_STATUS],
-            "sort_by": cls.SORT_LABELS[filters.sort_by or cls.DEFAULT_SORT_BY],
+            "status": filters.status.value if filters.status else PortalBetStatus.ALL.value,
+            "sort_by": filters.sort_by.value if filters.sort_by else PortalBetSortOrder.DATE_DESC.value,
         }
 
     @classmethod
     def period_label(cls, period: PortalBetRelativePeriod | PortalYearMonth) -> str:
         if isinstance(period, PortalYearMonth):
             return portal_year_month_label(period)
-        return cls.RELATIVE_PERIOD_LABELS[period]
+        return period.value
