@@ -56,13 +56,14 @@ class FakeListPlacedBets:
 class FakeListPortalBets:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
+        self.lottery_modality = "Mega-Sena"
 
     def run(self, **filters):
         self.calls.append(filters)
         return [
             PortalBetResult(
                 purchase_datetime=datetime(2026, 7, 24, 21, 30),
-                lottery_modality="Mega-Sena",
+                lottery_modality=self.lottery_modality,
                 selected_numbers=["01", "02", "03", "04", "05", "06"],
                 draw_number="2890",
                 status="Aposta Paga",
@@ -149,7 +150,6 @@ async def test_openapi_error_responses_match_route_failures():
 
     assert set(paths["/api/v1/sessions/start"]["get"]["responses"]) == {
         "200",
-        "400",
         "409",
         "500",
         "502",
@@ -240,7 +240,7 @@ async def test_run_bet_route_rejects_invalid_lottery_modality():
             "field": "selected_lottery_modality",
             "rejected_value": "abc",
             "allowed_values": [
-                "all",
+                "ALL",
                 "MEGA_SENA",
                 "QUINA",
                 "QUINA_ESPECIAL",
@@ -290,6 +290,17 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
 
 
 @pytest.mark.anyio
+async def test_list_portal_bets_route_preserves_unknown_portal_lottery_modality(override_container):
+    override_container.list_portal_bets.lottery_modality = "Lotofácil da Independência"
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/bets")
+
+    assert response.status_code == 200
+    assert response.json()[0]["lottery_modality"] == "Lotofácil da Independência"
+
+
+@pytest.mark.anyio
 async def test_list_placed_bets_route_returns_serialized_bets(override_container):
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -323,7 +334,7 @@ async def test_list_placed_bets_route_forwards_query_filters(override_container)
         response = await client.get(
             "/api/v1/history/bets",
             params={
-                "lottery_modality": "mega-sena",
+                "lottery_modality": "MEGA_SENA",
                 "draw_number": "1234",
                 "start_date": "2026-07-01",
                 "end_date": "2026-07-31",
@@ -362,7 +373,7 @@ async def test_list_placed_bets_route_returns_structured_filter_errors():
             "field": "lottery_modality",
             "rejected_value": "abc",
             "allowed_values": [
-                "all",
+                "ALL",
                 "MEGA_SENA",
                 "QUINA",
                 "QUINA_ESPECIAL",

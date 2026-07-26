@@ -10,15 +10,15 @@ from domain import AutomationSession
 EXPECTED_FILTER_DETAILS = [
     {
         "field": "bet_type",
-        "rejected_value": "all1",
-        "allowed_values": ["all", "individual", "pool"],
+        "rejected_value": "abc",
+        "allowed_values": ["ALL", "INDIVIDUAL", "POOL"],
         "message": "Valor inválido.",
     },
     {
         "field": "lottery_modality",
-        "rejected_value": "all1",
+        "rejected_value": "abc",
         "allowed_values": [
-            "all",
+            "ALL",
             "MEGA_SENA",
             "QUINA",
             "QUINA_ESPECIAL",
@@ -37,25 +37,25 @@ EXPECTED_FILTER_DETAILS = [
     },
     {
         "field": "draw_type",
-        "rejected_value": "all1",
-        "allowed_values": ["all", "normal", "special"],
+        "rejected_value": "abc",
+        "allowed_values": ["ALL", "NORMAL", "SPECIAL"],
         "message": "Valor inválido.",
     },
     {
         "field": "month_year",
-        "rejected_value": "last-91-days",
+        "rejected_value": "abc",
         "message": "Valor inválido. Utilize o formato YYYY-MM ou um período relativo válido.",
     },
     {
         "field": "status",
-        "rejected_value": "all1",
-        "allowed_values": ["all", "paid", "expired"],
+        "rejected_value": "abc",
+        "allowed_values": ["ALL", "PAID", "EXPIRED"],
         "message": "Valor inválido.",
     },
     {
         "field": "sort_by",
-        "rejected_value": "date-desc1",
-        "allowed_values": ["date-asc", "date-desc"],
+        "rejected_value": "abc",
+        "allowed_values": ["DATE_ASC", "DATE_DESC"],
         "message": "Valor inválido.",
     },
 ]
@@ -83,12 +83,12 @@ def test_list_portal_bets_accumulates_all_filter_validation_messages():
 
     with pytest.raises(PortalBetFiltersValidationError) as captured:
         use_case.run(
-            bet_type="all1",
-            lottery_modality="all1",
-            draw_type="all1",
-            month_year="last-91-days",
-            status="all1",
-            sort_by="date-desc1",
+            bet_type="abc",
+            lottery_modality="abc",
+            draw_type="abc",
+            month_year="abc",
+            status="abc",
+            sort_by="abc",
         )
 
     assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS
@@ -102,12 +102,12 @@ def test_list_portal_bets_validates_filters_before_browser_session_state():
 
     with pytest.raises(PortalBetFiltersValidationError) as captured:
         use_case.run(
-            bet_type="all1",
-            lottery_modality="all1",
-            draw_type="all1",
-            month_year="last-91-days",
-            status="all1",
-            sort_by="date-desc1",
+            bet_type="abc",
+            lottery_modality="abc",
+            draw_type="abc",
+            month_year="abc",
+            status="abc",
+            sort_by="abc",
         )
 
     assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS

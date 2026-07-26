@@ -11,13 +11,13 @@ from application import PortalBetFiltersValidationError, ValidationErrorDetail
 from domain.enums import Operation
 
 EXPECTED_FILTER_DETAILS = [
-    ValidationErrorDetail("bet_type", "all1", "Valor inválido.", ["all", "individual", "pool"]),
+    ValidationErrorDetail("bet_type", "abc", "Valor inválido.", ["ALL", "INDIVIDUAL", "POOL"]),
     ValidationErrorDetail(
         "lottery_modality",
-        "all1",
+        "abc",
         "Valor inválido.",
         [
-            "all",
+            "ALL",
             "MEGA_SENA",
             "QUINA",
             "QUINA_ESPECIAL",
@@ -33,14 +33,14 @@ EXPECTED_FILTER_DETAILS = [
             "SUPER_SETE",
         ],
     ),
-    ValidationErrorDetail("draw_type", "all1", "Valor inválido.", ["all", "normal", "special"]),
+    ValidationErrorDetail("draw_type", "abc", "Valor inválido.", ["ALL", "NORMAL", "SPECIAL"]),
     ValidationErrorDetail(
         "month_year",
-        "last-91-days",
+        "abc",
         "Valor inválido. Utilize o formato YYYY-MM ou um período relativo válido.",
     ),
-    ValidationErrorDetail("status", "all1", "Valor inválido.", ["all", "paid", "expired"]),
-    ValidationErrorDetail("sort_by", "date-desc1", "Valor inválido.", ["date-asc", "date-desc"]),
+    ValidationErrorDetail("status", "abc", "Valor inválido.", ["ALL", "PAID", "EXPIRED"]),
+    ValidationErrorDetail("sort_by", "abc", "Valor inválido.", ["DATE_ASC", "DATE_DESC"]),
 ]
 
 
@@ -60,12 +60,12 @@ async def test_list_portal_bets_returns_all_filter_validation_messages():
             response = await client.get(
                 "/api/v1/bets",
                 params={
-                    "bet_type": "all1",
-                    "lottery_modality": "all1",
-                    "draw_type": "all1",
-                    "month_year": "last-91-days",
-                    "status": "all1",
-                    "sort_by": "date-desc1",
+                    "bet_type": "abc",
+                    "lottery_modality": "abc",
+                    "draw_type": "abc",
+                    "month_year": "abc",
+                    "status": "abc",
+                    "sort_by": "abc",
                 },
             )
     finally:

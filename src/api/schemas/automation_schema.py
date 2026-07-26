@@ -102,7 +102,7 @@ class PortalBetResponse(BaseModel):
     )
 
     purchase_datetime: datetime
-    lottery_modality: LotteryModality
+    lottery_modality: str
     selected_numbers: list[str]
     draw_number: str
     status: str

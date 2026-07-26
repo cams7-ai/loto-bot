@@ -95,12 +95,11 @@ def test_lottery_modality_from_string():
     assert LotteryModality.from_string("modalidade-invalida") is None
 
 
-def test_parse_portal_lottery_modality_accepts_names_values_and_portal_labels():
+def test_parse_portal_lottery_modality_accepts_catalog_names_and_all():
     assert parse_portal_lottery_modality("MEGA_SENA") == LotteryModality.MEGA_SENA
-    assert parse_portal_lottery_modality("mega-sena") == LotteryModality.MEGA_SENA
-    assert parse_portal_lottery_modality("Mega-Sena") == LotteryModality.MEGA_SENA
-    assert parse_portal_lottery_modality("Dupla Sena") == LotteryModality.DUPLA_SENA
-    assert parse_portal_lottery_modality("Mais Milionária") == LotteryModality.MAIS_MILIONARIA
+    assert parse_portal_lottery_modality("DUPLA_SENA") == LotteryModality.DUPLA_SENA
+    assert parse_portal_lottery_modality("MAIS_MILIONARIA") == LotteryModality.MAIS_MILIONARIA
+    assert parse_portal_lottery_modality("ALL") is None
 
 
 def test_clients_error_edges():

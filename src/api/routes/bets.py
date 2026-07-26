@@ -13,10 +13,12 @@ from api.responses import error_response
 from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
 from application import PortalBetFiltersValidationError, ValidationErrorDetail
 from application.services.portal_bet_filter_catalog import (
+    ALL,
     INVALID_DATE_MESSAGE,
     INVALID_DRAW_NUMBER_MESSAGE,
     current_and_previous_months,
     invalid_lottery_modality_detail,
+    normalize_public_value,
     parse_portal_lottery_modality,
     parse_positive_int,
 )
@@ -36,8 +38,45 @@ CONTAINER_DEPENDENCY = Depends(get_container)
 RUN_BET_REQUEST_BODY = Body(default=None)
 
 
-ERROR_RESPONSES = {
-    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
+BET_RUN_BAD_REQUEST_EXAMPLES = {
+    ErrorCode.BAD_REQUEST.value: {
+        "summary": ErrorCode.BAD_REQUEST.value,
+        "value": {
+            "error": {
+                "timestamp": "2026-06-16T10:00:00-03:00",
+                "status_code": 400,
+                "code": ErrorCode.BAD_REQUEST.value,
+                "message": "Parâmetros inválidos",
+                "details": [
+                    {
+                        "field": "selected_lottery_modality",
+                        "rejected_value": "abc",
+                        "allowed_values": [
+                            LotteryModality.MEGA_SENA.name,
+                            LotteryModality.QUINA.name,
+                            LotteryModality.QUINA_ESPECIAL.name,
+                            LotteryModality.LOTECA.name,
+                            LotteryModality.LOTECA_ESPECIAL.name,
+                            LotteryModality.LOTOFACIL.name,
+                            LotteryModality.LOTOFACIL_ESPECIAL.name,
+                            LotteryModality.MAIS_MILIONARIA.name,
+                            LotteryModality.LOTOMANIA.name,
+                            LotteryModality.TIMEMANIA.name,
+                            LotteryModality.DUPLA_SENA.name,
+                            LotteryModality.DIA_DE_SORTE.name,
+                            LotteryModality.SUPER_SETE.name,
+                        ],
+                        "message": "Valor inválido.",
+                    }
+                ],
+            }
+        },
+    }
+}
+
+
+BETS_RUN_ERROR_RESPONSES = {
+    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST, examples=BET_RUN_BAD_REQUEST_EXAMPLES),
     403: error_response(
         "Confirmação de pagamento real desabilitada", ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE
     ),
@@ -57,10 +96,7 @@ ERROR_RESPONSES = {
     503: error_response("Serviço externo indisponível", ErrorCode.EXTERNAL_SERVICE_ERROR_CODE),
 }
 
-PLACED_BETS_ERROR_RESPONSES = {
-    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
-    500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
-}
+BETS_ERROR_RESPONSES = {status_code: BETS_RUN_ERROR_RESPONSES[status_code] for status_code in (400, 409, 500, 503)}
 
 PLACED_BET_DETAIL_ERROR_RESPONSES = {
     400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
@@ -68,11 +104,15 @@ PLACED_BET_DETAIL_ERROR_RESPONSES = {
     500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
 }
 
+PLACED_BETS_ERROR_RESPONSES = {
+    status_code: PLACED_BET_DETAIL_ERROR_RESPONSES[status_code] for status_code in (400, 500)
+}
+
 
 @router.post(
     "/bets/run",
     response_model=BetRunResponse,
-    responses=ERROR_RESPONSES,
+    responses=BETS_RUN_ERROR_RESPONSES,
 )
 def run_bet(
     request: BetRunRequest | None = RUN_BET_REQUEST_BODY,
@@ -97,7 +137,7 @@ def run_bet(
 @router.get(
     "/bets",
     response_model=list[PortalBetResponse],
-    responses=ERROR_RESPONSES,
+    responses=BETS_ERROR_RESPONSES,
 )
 def list_portal_bets(
     bet_type: str | None = Query(
@@ -107,7 +147,7 @@ def list_portal_bets(
     ),
     lottery_modality: str | None = Query(
         default=None,
-        description=f"Modalidade: ALL, {', '.join(modality.name for modality in LotteryModality)}.",
+        description=f"Modalidade: {ALL}, {', '.join(modality.name for modality in LotteryModality)}.",
         examples=[LotteryModality.MEGA_SENA.name],
     ),
     draw_type: str | None = Query(
@@ -174,10 +214,23 @@ def list_portal_bets(
     responses=PLACED_BETS_ERROR_RESPONSES,
 )
 def list_placed_bets(
-    lottery_modality: str | None = None,
-    draw_number: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
+    lottery_modality: str | None = Query(
+        default=None,
+        description=f"Modalidade: {ALL}, {', '.join(modality.name for modality in LotteryModality)}.",
+        examples=[LotteryModality.MEGA_SENA.name],
+    ),
+    draw_number: str | None = Query(
+        default=None,
+        description="Número do sorteio.",
+    ),
+    start_date: str | None = Query(
+        default=None,
+        description="Data de início no formato AAAA-MM-DD.",
+    ),
+    end_date: str | None = Query(
+        default=None,
+        description="Data de término no formato AAAA-MM-DD.",
+    ),
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> list[PlacedBetResponse]:
     try:
@@ -272,7 +325,7 @@ def _parse_selected_lottery_modality(request: BetRunRequest | None) -> LotteryMo
     if request is None or request.selected_lottery_modality is None:
         return None
     try:
-        return parse_portal_lottery_modality(request.selected_lottery_modality)
+        return parse_portal_lottery_modality(request.selected_lottery_modality, False)
     except ValueError:
         _raise_invalid_fields(
             [invalid_lottery_modality_detail("selected_lottery_modality", request.selected_lottery_modality)]
@@ -359,8 +412,21 @@ def _parse_history_date(value: str | None, *, end_of_day: bool) -> datetime | No
     return datetime.combine(parsed_date, time.min)
 
 
-def _resolve_response_lottery_modality(value: str) -> LotteryModality:
-    resolved = parse_portal_lottery_modality(value)
-    if resolved is None:
-        raise ValueError("Modalidade de loteria inválida.")
-    return resolved
+def _resolve_response_lottery_modality(value: str | None) -> str:
+    if value is None:
+        return ""
+
+    stripped = value.strip()
+    normalized_value = _normalize_lottery_modality_value(stripped)
+    for modality in LotteryModality:
+        if normalized_value in {
+            _normalize_lottery_modality_value(modality.name),
+            _normalize_lottery_modality_value(modality.value),
+        }:
+            return modality.value
+
+    return stripped
+
+
+def _normalize_lottery_modality_value(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", normalize_public_value(value))

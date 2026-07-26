@@ -19,7 +19,6 @@ CONTAINER_DEPENDENCY = Depends(get_container)
 
 
 ERROR_RESPONSE_BY_STATUS = {
-    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST, ErrorCode.INVALID_CPF_ERROR_CODE),
     409: error_response(
         "Sessão de navegador já está aberta ou fechada",
         ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE,
@@ -36,9 +35,7 @@ ERROR_RESPONSE_BY_STATUS = {
     503: error_response("Serviço externo indisponível", ErrorCode.EXTERNAL_SERVICE_ERROR_CODE),
 }
 
-START_ERROR_RESPONSES = {
-    status_code: ERROR_RESPONSE_BY_STATUS[status_code] for status_code in (400, 409, 500, 502, 503)
-}
+START_ERROR_RESPONSES = {status_code: ERROR_RESPONSE_BY_STATUS[status_code] for status_code in (409, 500, 502, 503)}
 
 STOP_ERROR_RESPONSES = {status_code: ERROR_RESPONSE_BY_STATUS[status_code] for status_code in (409, 500)}
 
@@ -66,6 +63,6 @@ async def stop_session(container: AppContainer = CONTAINER_DEPENDENCY) -> Sessio
 
 
 @router.get("/status", response_model=SessionStatusResponse, responses=STATUS_ERROR_RESPONSES)
-async def session_status(container: AppContainer = CONTAINER_DEPENDENCY) -> SessionStatusResponse:
+async def session_status(container: AppContainer = CONTAINER_DEPENDENCY) -> SessionControlResponse:
     result = container.session_control.status()
     return ApiResponseMapper.session_response(result, "Status da sessão obtido com sucesso")
