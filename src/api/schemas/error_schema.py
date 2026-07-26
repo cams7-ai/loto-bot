@@ -5,17 +5,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from application.services.portal_bet_filter_catalog import ALL
 from domain import (
-    BET_TEMPORARILY_DISABLED,
-    BETS_NOT_AVAILABLE_FOR_CAPTURE,
-    BROWSER_SESSION_CLOSED,
-    BROWSER_SESSION_OPEN,
-    DAILY_PURCHASE_LIMIT,
-    INDIVIDUAL_BET_REGISTRATION_CLOSED,
-    INVALID_CPF,
-    PAGE_REDIRECTION_ERROR,
-    PAYMENT_CONFIRMATION_DISABLED,
     ErrorCode,
+    ErrorMessage,
+    LotteryModality,
 )
 
 
@@ -43,22 +37,7 @@ ERROR_EXAMPLES = {
                 {
                     "field": "lottery_modality",
                     "rejected_value": "abc",
-                    "allowed_values": [
-                        "ALL",
-                        "MEGA_SENA",
-                        "QUINA",
-                        "QUINA_ESPECIAL",
-                        "LOTECA",
-                        "LOTECA_ESPECIAL",
-                        "LOTOFACIL",
-                        "LOTOFACIL_ESPECIAL",
-                        "MAIS_MILIONARIA",
-                        "LOTOMANIA",
-                        "TIMEMANIA",
-                        "DUPLA_SENA",
-                        "DIA_DE_SORTE",
-                        "SUPER_SETE",
-                    ],
+                    "allowed_values": [ALL, *LotteryModality.__members__],
                     "message": "Valor inválido.",
                 }
             ],
@@ -72,47 +51,47 @@ ERROR_EXAMPLES = {
     ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE,
-        BROWSER_SESSION_OPEN,
+        ErrorMessage.BROWSER_SESSION_OPEN,
     ),
     ErrorCode.BROWSER_SESSION_CLOSED_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.BROWSER_SESSION_CLOSED_ERROR_CODE,
-        BROWSER_SESSION_CLOSED,
+        ErrorMessage.BROWSER_SESSION_CLOSED,
     ),
     ErrorCode.INVALID_CPF_ERROR_CODE: error_example(
         HTTPStatus.BAD_REQUEST,
         ErrorCode.INVALID_CPF_ERROR_CODE,
-        INVALID_CPF,
+        ErrorMessage.INVALID_CPF,
     ),
     ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE: error_example(
         HTTPStatus.FORBIDDEN,
         ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE,
-        PAYMENT_CONFIRMATION_DISABLED,
+        ErrorMessage.PAYMENT_CONFIRMATION_DISABLED,
     ),
     ErrorCode.INDIVIDUAL_BET_REGISTRATION_CLOSED_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.INDIVIDUAL_BET_REGISTRATION_CLOSED_ERROR_CODE,
-        INDIVIDUAL_BET_REGISTRATION_CLOSED,
+        ErrorMessage.INDIVIDUAL_BET_REGISTRATION_CLOSED,
     ),
     ErrorCode.BET_TEMPORARILY_DISABLED_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.BET_TEMPORARILY_DISABLED_ERROR_CODE,
-        BET_TEMPORARILY_DISABLED.format(modality="mega-sena"),
+        ErrorMessage.BET_TEMPORARILY_DISABLED.format(modality="mega-sena"),
     ),
     ErrorCode.DAILY_PURCHASE_LIMIT_ERROR_CODE: error_example(
         HTTPStatus.TOO_MANY_REQUESTS,
         ErrorCode.DAILY_PURCHASE_LIMIT_ERROR_CODE,
-        DAILY_PURCHASE_LIMIT,
+        ErrorMessage.DAILY_PURCHASE_LIMIT,
     ),
     ErrorCode.BETS_NOT_AVAILABLE_FOR_CAPTURE_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,
         ErrorCode.BETS_NOT_AVAILABLE_FOR_CAPTURE_ERROR_CODE,
-        BETS_NOT_AVAILABLE_FOR_CAPTURE,
+        ErrorMessage.BETS_NOT_AVAILABLE_FOR_CAPTURE,
     ),
     ErrorCode.PAGE_REDIRECTION_ERROR_CODE: error_example(
         HTTPStatus.BAD_GATEWAY,
         ErrorCode.PAGE_REDIRECTION_ERROR_CODE,
-        PAGE_REDIRECTION_ERROR.format(path="/pagamento"),
+        ErrorMessage.PAGE_REDIRECTION_ERROR.format(path="/pagamento"),
     ),
     ErrorCode.AUTOMATION_ERROR_CODE: error_example(
         HTTPStatus.INTERNAL_SERVER_ERROR,

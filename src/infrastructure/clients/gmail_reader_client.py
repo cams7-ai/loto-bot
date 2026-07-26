@@ -8,9 +8,7 @@ import httpx
 
 from application import ValidationCodePort
 from domain import (
-    GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED,
-    VALIDATION_CODE_FETCH_FAILED,
-    VALIDATION_CODE_FETCH_TIMEOUT,
+    ErrorMessage,
     ExternalServiceError,
     Operation,
 )
@@ -38,15 +36,15 @@ class GmailReaderClient(ValidationCodePort):
                 timeout=self._settings.validation_code_wait_timeout_seconds + 5,
             )
         except httpx.TimeoutException as exc:
-            raise ExternalServiceError(VALIDATION_CODE_FETCH_TIMEOUT, operation=operation) from exc
+            raise ExternalServiceError(ErrorMessage.VALIDATION_CODE_FETCH_TIMEOUT, operation=operation) from exc
 
         if response.status_code >= 400:
-            raise ExternalServiceError(VALIDATION_CODE_FETCH_FAILED, operation=operation)
+            raise ExternalServiceError(ErrorMessage.VALIDATION_CODE_FETCH_FAILED, operation=operation)
 
         payload = response.json()
         code = str(payload.get("code", "")).strip()
         if not code:
-            raise ExternalServiceError(GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED, operation=operation)
+            raise ExternalServiceError(ErrorMessage.GMAIL_READER_API_VALIDATION_CODE_NOT_RETURNED, operation=operation)
 
         mask_sensitive_value(code)
         return code

@@ -7,10 +7,10 @@ import logging
 from application.ports import BrowserAutomationPort, NotificationPort
 from application.services.playwright_error_message_builder import PlaywrightErrorMessageBuilder
 from domain import (
-    OPERATION_CANNOT_BE_COMPLETED,
     AutomationError,
     AutomationSession,
     AutomationStatus,
+    ErrorMessage,
     Operation,
 )
 
@@ -65,7 +65,7 @@ class SessionFailureHandler:
             extra=Operation.executed_operation(operation),
         )
 
-        error = AutomationError(OPERATION_CANNOT_BE_COMPLETED, operation=operation)
+        error = AutomationError(ErrorMessage.OPERATION_CANNOT_BE_COMPLETED, operation=operation)
 
         notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
 

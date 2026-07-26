@@ -51,21 +51,7 @@ BET_RUN_BAD_REQUEST_EXAMPLES = {
                     {
                         "field": "selected_lottery_modality",
                         "rejected_value": "abc",
-                        "allowed_values": [
-                            LotteryModality.MEGA_SENA.name,
-                            LotteryModality.QUINA.name,
-                            LotteryModality.QUINA_ESPECIAL.name,
-                            LotteryModality.LOTECA.name,
-                            LotteryModality.LOTECA_ESPECIAL.name,
-                            LotteryModality.LOTOFACIL.name,
-                            LotteryModality.LOTOFACIL_ESPECIAL.name,
-                            LotteryModality.MAIS_MILIONARIA.name,
-                            LotteryModality.LOTOMANIA.name,
-                            LotteryModality.TIMEMANIA.name,
-                            LotteryModality.DUPLA_SENA.name,
-                            LotteryModality.DIA_DE_SORTE.name,
-                            LotteryModality.SUPER_SETE.name,
-                        ],
+                        "allowed_values": [*LotteryModality.__members__],
                         "message": "Valor inválido.",
                     }
                 ],

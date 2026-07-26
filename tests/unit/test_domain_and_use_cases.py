@@ -16,14 +16,12 @@ from application import (
 )
 from application.dto import BetResult, BetSearchFilters, PlacedBetResult, PurchaseResult
 from domain import (
-    BROWSER_SESSION_CLOSED,
-    BROWSER_SESSION_OPEN,
-    OPERATION_CANNOT_BE_COMPLETED,
     AutomationError,
     AutomationSession,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
     ErrorCode,
+    ErrorMessage,
     LotteryModality,
     Operation,
     PaymentAuthorization,
@@ -286,7 +284,7 @@ def test_session_control_closes_session_when_authentication_fails_unexpectedly(m
     try:
         use_case.start()
     except AutomationError as exc:
-        assert str(exc) == OPERATION_CANNOT_BE_COMPLETED
+        assert str(exc) == ErrorMessage.OPERATION_CANNOT_BE_COMPLETED
         assert exc.operation == Operation.ACCESS_LOTTERY_PORTAL
     else:
         raise AssertionError("Erro esperado")
@@ -349,7 +347,7 @@ def test_session_control_rejects_invalid_lifecycle(monkeypatch):
     try:
         use_case.stop()
     except BrowserSessionClosedError as exc:
-        assert BROWSER_SESSION_CLOSED in str(exc)
+        assert ErrorMessage.BROWSER_SESSION_CLOSED in str(exc)
     else:
         raise AssertionError("A sessão fechada deveria ser recusada")
 
@@ -357,7 +355,7 @@ def test_session_control_rejects_invalid_lifecycle(monkeypatch):
     try:
         use_case.start()
     except BrowserSessionOpenError as exc:
-        assert BROWSER_SESSION_OPEN in str(exc)
+        assert ErrorMessage.BROWSER_SESSION_OPEN in str(exc)
     else:
         raise AssertionError("A sessão aberta deveria ser recusada")
 

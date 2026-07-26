@@ -9,13 +9,13 @@ from playwright.sync_api import Page
 
 from application.dto import BetResult, PurchaseResult
 from domain import (
-    LOTTERY_MODALITY_NOT_FOUND,
     AutomationError,
     AutomationSession,
     BetsNotAvailableForCaptureError,
     BetTemporarilyDisabledError,
     BrlCurrencyFormatter,
     DailyPurchaseLimitError,
+    ErrorMessage,
     IndividualBetRegistrationClosedError,
     LotteryModality,
     Operation,
@@ -39,7 +39,7 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
         selector = Selectors.modality_button(lottery_modality.value)
         if selector is None:
             raise AutomationError(
-                LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality.value),
+                ErrorMessage.LOTTERY_MODALITY_NOT_FOUND.format(modality=lottery_modality.value),
                 operation=Operation.SELECT_LOTTERY_MODALITY,
             )
 

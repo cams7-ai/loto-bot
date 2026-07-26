@@ -11,9 +11,9 @@ from time import monotonic
 from playwright.sync_api import BrowserContext, Locator, Page, Playwright
 
 from domain import (
-    BROWSER_SESSION_CLOSED,
     AutomationError,
     AutomationSession,
+    ErrorMessage,
     Operation,
     PageRedirectionError,
 )
@@ -104,7 +104,7 @@ class PlaywrightBrowserBase:
 
     def _require_page(self) -> Page:
         if self._page is None:
-            raise AutomationError(BROWSER_SESSION_CLOSED, operation=Operation.END_SESSION)
+            raise AutomationError(ErrorMessage.BROWSER_SESSION_CLOSED, operation=Operation.END_SESSION)
         return self._page
 
     @staticmethod

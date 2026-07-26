@@ -13,11 +13,11 @@ from application.services import (
 )
 from application.use_cases.operation_executor import OperationExecutor
 from domain import (
-    LOTTERY_MODALITY_NOT_FOUND,
     SUPPORTED_BET_RUN_LOTTERY_MODALITIES,
     AutomationError,
     AutomationSession,
     BrowserSessionClosedError,
+    ErrorMessage,
     LotteryModality,
     Operation,
     PaymentAuthorization,
@@ -84,7 +84,7 @@ class RunBetFlowUseCase(OperationExecutor):
         lottery_modality = selected_lottery_modality or LotteryModality.from_string(self._selected_lottery_modality)
         if lottery_modality is None or lottery_modality not in SUPPORTED_BET_RUN_LOTTERY_MODALITIES:
             raise AutomationError(
-                LOTTERY_MODALITY_NOT_FOUND.format(modality=self._selected_lottery_modality),
+                ErrorMessage.LOTTERY_MODALITY_NOT_FOUND.format(modality=self._selected_lottery_modality),
                 operation=Operation.SELECT_LOTTERY_MODALITY,
             )
         return lottery_modality

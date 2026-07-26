@@ -9,10 +9,9 @@ from pathlib import Path
 from playwright.sync_api import BrowserContext, Page
 
 from domain import (
-    BROWSER_SESSION_START_FAILED,
-    CAIXA_AUTHENTICATION_FORBIDDEN,
     AutomationError,
     AutomationSession,
+    ErrorMessage,
     InvalidCPFError,
     InvalidPasswordError,
     Operation,
@@ -60,7 +59,9 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
                 "Falha ao iniciar a sessão de navegador; encerrando contexto e Playwright",
                 extra=Operation.executed_operation(session.executed_operation),
             )
-            raise AutomationError(BROWSER_SESSION_START_FAILED, operation=session.executed_operation) from exc
+            raise AutomationError(
+                ErrorMessage.BROWSER_SESSION_START_FAILED, operation=session.executed_operation
+            ) from exc
 
     @staticmethod
     def _ensure_profile_dir(profile_dir: Path) -> None:
@@ -324,4 +325,4 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
     def _raise_if_forbidden(page: Page, operation: Operation) -> None:
         title = page.locator("h1.error-header__title")
         if title.count() > 0 and title.first.inner_text().strip().lower() == "forbidden":
-            raise AutomationError(CAIXA_AUTHENTICATION_FORBIDDEN, operation=operation)
+            raise AutomationError(ErrorMessage.CAIXA_AUTHENTICATION_FORBIDDEN, operation=operation)

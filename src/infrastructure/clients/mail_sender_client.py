@@ -7,7 +7,7 @@ import logging
 import httpx
 
 from domain import (
-    FALLBACK_EMAIL_SEND_FAILED,
+    ErrorMessage,
     ExternalServiceError,
     Operation,
 )
@@ -33,4 +33,4 @@ class MailSenderClient:
             },
         )
         if response.status_code >= 400:
-            raise ExternalServiceError(FALLBACK_EMAIL_SEND_FAILED, operation=operation)
+            raise ExternalServiceError(ErrorMessage.FALLBACK_EMAIL_SEND_FAILED, operation=operation)

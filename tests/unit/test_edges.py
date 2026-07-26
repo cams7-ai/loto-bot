@@ -14,9 +14,9 @@ from api.server import app
 from application import RunBetFlowUseCase
 from application.services.portal_bet_filter_catalog import parse_portal_lottery_modality
 from domain import (
-    OPERATION_CANNOT_BE_COMPLETED,
     AutomationError,
     AutomationSession,
+    ErrorMessage,
     ExternalServiceError,
     LotteryModality,
     Operation,
@@ -81,7 +81,7 @@ def test_run_bet_flow_handles_unexpected_exception():
     try:
         use_case.run()
     except AutomationError as exc:
-        assert str(exc) == OPERATION_CANNOT_BE_COMPLETED
+        assert str(exc) == ErrorMessage.OPERATION_CANNOT_BE_COMPLETED
     else:
         raise AssertionError("Erro esperado")
 
