@@ -281,7 +281,7 @@ def get_placed_bet(
 def _placed_bet_response(result) -> PlacedBetResponse:
     return PlacedBetResponse(
         bet_id=result.bet_id,
-        lottery_modality=result.lottery_modality,
+        lottery_modality=result.lottery_modality.name if result.lottery_modality else "",
         selected_numbers=result.selected_numbers,
         draw_number=result.draw_number,
         status=result.status,

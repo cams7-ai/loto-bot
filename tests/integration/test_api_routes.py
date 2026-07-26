@@ -310,7 +310,7 @@ async def test_list_placed_bets_route_returns_serialized_bets(override_container
     assert response.json() == [
         {
             "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-            "lottery_modality": "mega-sena",
+            "lottery_modality": "MEGA_SENA",
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "1234",
             "status": "Efetivada",
@@ -419,7 +419,7 @@ async def test_get_placed_bet_route_returns_serialized_bet(override_container):
 
     assert response.status_code == 200
     assert response.json()["bet_id"] == "64ef8f7a6f9a8f0f8f0f8f0f"
-    assert response.json()["lottery_modality"] == "mega-sena"
+    assert response.json()["lottery_modality"] == "MEGA_SENA"
     assert override_container.get_placed_bet.calls == ["64ef8f7a6f9a8f0f8f0f8f0f"]
 
 
