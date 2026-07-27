@@ -409,7 +409,7 @@ def _resolve_response_lottery_modality(value: str | None) -> str:
             _normalize_lottery_modality_value(modality.name),
             _normalize_lottery_modality_value(modality.value),
         }:
-            return modality.value
+            return modality.name
 
     return stripped
 

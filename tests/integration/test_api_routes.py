@@ -273,7 +273,7 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
     assert response.json() == [
         {
             "purchase_datetime": "2026-07-24T21:30:00-03:00",
-            "lottery_modality": "mega-sena",
+            "lottery_modality": "MEGA_SENA",
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "2890",
             "status": "Aposta Paga",
