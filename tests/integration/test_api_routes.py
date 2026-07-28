@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -57,12 +58,13 @@ class FakeListPortalBets:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
         self.lottery_modality = "Mega-Sena"
+        self.purchase_datetime = datetime(2026, 7, 24, 21, 30)
 
     def run(self, **filters):
         self.calls.append(filters)
         return [
             PortalBetResult(
-                purchase_datetime=datetime(2026, 7, 24, 21, 30),
+                purchase_datetime=self.purchase_datetime,
                 lottery_modality=self.lottery_modality,
                 selected_numbers=["01", "02", "03", "04", "05", "06"],
                 draw_number="2890",
@@ -272,7 +274,7 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
     assert response.status_code == 200
     assert response.json() == [
         {
-            "purchase_datetime": "2026-07-24T21:30:00-03:00",
+            "purchase_datetime": None,
             "lottery_modality": "MEGA_SENA",
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "2890",
@@ -298,6 +300,38 @@ async def test_list_portal_bets_route_preserves_unknown_portal_lottery_modality(
 
     assert response.status_code == 200
     assert response.json()[0]["lottery_modality"] == "Lotofácil da Independência"
+
+
+@pytest.mark.anyio
+async def test_list_portal_bets_route_preserves_portal_purchase_time_for_aware_datetime(override_container):
+    override_container.list_portal_bets.purchase_datetime = datetime(2026, 7, 27, 23, 14, 44, tzinfo=UTC)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/bets")
+
+    assert response.status_code == 200
+    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44-03:00"
+
+
+@pytest.mark.anyio
+async def test_list_portal_bets_route_serializes_sao_paulo_aware_purchase_datetime_as_utc_clock(
+    override_container,
+):
+    override_container.list_portal_bets.purchase_datetime = datetime(
+        2026,
+        7,
+        27,
+        20,
+        14,
+        44,
+        tzinfo=ZoneInfo("America/Sao_Paulo"),
+    )
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/bets")
+
+    assert response.status_code == 200
+    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44-03:00"
 
 
 @pytest.mark.anyio

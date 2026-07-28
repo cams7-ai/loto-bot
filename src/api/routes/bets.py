@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from decimal import Decimal
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -184,7 +184,7 @@ def list_portal_bets(
 
     return [
         PortalBetResponse(
-            purchase_datetime=with_sao_paulo_timezone(result.purchase_datetime, remove_microseconds=True),
+            purchase_datetime=_portal_purchase_datetime_with_timezone(result.purchase_datetime),
             lottery_modality=_resolve_response_lottery_modality(result.lottery_modality),
             selected_numbers=result.selected_numbers,
             draw_number=result.draw_number,
@@ -267,7 +267,7 @@ def get_placed_bet(
 def _placed_bet_response(result) -> PlacedBetResponse:
     return PlacedBetResponse(
         bet_id=result.bet_id,
-        lottery_modality=result.lottery_modality.name if result.lottery_modality else "",
+        lottery_modality=result.lottery_modality.name if result.lottery_modality else None,
         selected_numbers=result.selected_numbers,
         draw_number=result.draw_number,
         status=result.status,
@@ -279,6 +279,12 @@ def _placed_bet_response(result) -> PlacedBetResponse:
 
 def _bet_date_with_timezone(bet_date: datetime) -> datetime:
     return with_sao_paulo_timezone(bet_date, remove_microseconds=True)
+
+
+def _portal_purchase_datetime_with_timezone(purchase_datetime: datetime) -> datetime | None:
+    if purchase_datetime.tzinfo is None:
+        return None
+    return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)
 
 
 def _raise_bad_request(exc: ValueError) -> None:
@@ -398,9 +404,9 @@ def _parse_history_date(value: str | None, *, end_of_day: bool) -> datetime | No
     return datetime.combine(parsed_date, time.min)
 
 
-def _resolve_response_lottery_modality(value: str | None) -> str:
+def _resolve_response_lottery_modality(value: str | None) -> str | None:
     if value is None:
-        return ""
+        return None
 
     stripped = value.strip()
     normalized_value = _normalize_lottery_modality_value(stripped)

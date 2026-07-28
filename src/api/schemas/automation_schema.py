@@ -78,7 +78,7 @@ class PlacedBetResponse(BaseModel):
     )
 
     bet_id: str
-    lottery_modality: str
+    lottery_modality: str | None
     selected_numbers: list[str]
     draw_number: str
     status: str
@@ -101,8 +101,8 @@ class PortalBetResponse(BaseModel):
         },
     )
 
-    purchase_datetime: datetime
-    lottery_modality: str
+    purchase_datetime: datetime | None
+    lottery_modality: str | None
     selected_numbers: list[str]
     draw_number: str
     status: str
