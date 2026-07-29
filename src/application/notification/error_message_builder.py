@@ -6,7 +6,7 @@ class ErrorMessageBuilder:
     def get_error_message(error_code: ErrorCode) -> str:
         messages = {
             ErrorCode.BAD_REQUEST: "Requisição inválida",
-            ErrorCode.NOT_FOUND: "Rota não encontrada",
+            ErrorCode.ROUTE_NOT_FOUND: "Rota não encontrada",
             ErrorCode.METHOD_NOT_ALLOWED: "Método não permitido",
             ErrorCode.INTERNAL_SERVER_ERROR: "Erro interno",
             ErrorCode.AUTOMATION_ERROR_CODE: "Falha na automação",

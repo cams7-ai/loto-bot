@@ -274,7 +274,7 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
     assert response.status_code == 200
     assert response.json() == [
         {
-            "purchase_datetime": None,
+            "purchase_datetime": "2026-07-24T21:30:00",
             "lottery_modality": "MEGA_SENA",
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "2890",
@@ -310,11 +310,11 @@ async def test_list_portal_bets_route_preserves_portal_purchase_time_for_aware_d
         response = await client.get("/api/v1/bets")
 
     assert response.status_code == 200
-    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44-03:00"
+    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44Z"
 
 
 @pytest.mark.anyio
-async def test_list_portal_bets_route_serializes_sao_paulo_aware_purchase_datetime_as_utc_clock(
+async def test_list_portal_bets_route_preserves_sao_paulo_aware_purchase_datetime(
     override_container,
 ):
     override_container.list_portal_bets.purchase_datetime = datetime(
@@ -331,7 +331,7 @@ async def test_list_portal_bets_route_serializes_sao_paulo_aware_purchase_dateti
         response = await client.get("/api/v1/bets")
 
     assert response.status_code == 200
-    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44-03:00"
+    assert response.json()[0]["purchase_datetime"] == "2026-07-27T20:14:44-03:00"
 
 
 @pytest.mark.anyio
@@ -458,13 +458,13 @@ async def test_get_placed_bet_route_returns_serialized_bet(override_container):
 
 
 @pytest.mark.anyio
-async def test_get_placed_bet_route_returns_not_found_when_bet_does_not_exist():
+async def test_get_placed_bet_route_returns_internal_error_when_use_case_returns_none():
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.get("/api/v1/history/bets/missing")
 
-    assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ROTA_NAO_ENCONTRADA"
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "ERRO_INTERNO"
 
 
 @pytest.mark.anyio

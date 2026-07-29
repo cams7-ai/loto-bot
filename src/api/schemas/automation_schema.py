@@ -36,7 +36,7 @@ class BetRunResponse(OperationResponse):
     model_config = ConfigDict(populate_by_name=True)
 
     message: str
-    purchase_number: str
+    purchase_number: str | None
 
 
 class BetRunRequest(BaseModel):

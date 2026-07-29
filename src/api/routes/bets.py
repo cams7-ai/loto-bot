@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, time
+from datetime import datetime, time
 from decimal import Decimal
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -11,7 +11,7 @@ from api.exceptions import ApiError
 from api.mappers import ApiExceptionMapper
 from api.responses import error_response
 from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
-from application import PortalBetFiltersValidationError, ValidationErrorDetail
+from application import AutomationRunResult, PortalBetFiltersValidationError, PortalBetResult, ValidationErrorDetail
 from application.services.portal_bet_filter_catalog import (
     ALL,
     INVALID_DATE_MESSAGE,
@@ -86,7 +86,7 @@ BETS_ERROR_RESPONSES = {status_code: BETS_RUN_ERROR_RESPONSES[status_code] for s
 
 PLACED_BET_DETAIL_ERROR_RESPONSES = {
     400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
-    404: error_response("Aposta não encontrada", ErrorCode.NOT_FOUND),
+    404: error_response("Rota não encontrada", ErrorCode.ROUTE_NOT_FOUND),
     500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
 }
 
@@ -103,21 +103,27 @@ PLACED_BETS_ERROR_RESPONSES = {
 def run_bet(
     request: BetRunRequest | None = RUN_BET_REQUEST_BODY,
     container: AppContainer = CONTAINER_DEPENDENCY,
-) -> BetRunResponse | None:
+) -> BetRunResponse:
     try:
         selected_lottery_modality = _parse_selected_lottery_modality(request)
         result = container.run_bet_flow.run(
             selected_lottery_modality=selected_lottery_modality,
         )
-        return BetRunResponse(
-            session_id=str(result.session_id),
-            status=result.status,
-            message=result.message,
-            executed_operation=result.executed_operation.value,
-            purchase_number=result.purchase_number,
-        )
+        if result is None:
+            _raise_internal_server_error("Erro interno. Resultado da execução do fluxo de apostas não retornado.")
+        return _run_bet_response(result)
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
+
+
+def _run_bet_response(result: AutomationRunResult) -> BetRunResponse:
+    return BetRunResponse(
+        session_id=str(result.session_id),
+        status=result.status,
+        message=result.message,
+        executed_operation=result.executed_operation.value,
+        purchase_number=result.purchase_number,
+    )
 
 
 @router.get(
@@ -166,6 +172,7 @@ def list_portal_bets(
     ),
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> list[PortalBetResponse]:
+    results = []
     try:
         results = container.list_portal_bets.run(
             bet_type=bet_type,
@@ -182,16 +189,17 @@ def list_portal_bets(
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
 
-    return [
-        PortalBetResponse(
-            purchase_datetime=_portal_purchase_datetime_with_timezone(result.purchase_datetime),
-            lottery_modality=_resolve_response_lottery_modality(result.lottery_modality),
-            selected_numbers=result.selected_numbers,
-            draw_number=result.draw_number,
-            status=result.status,
-        )
-        for result in results
-    ]
+    return [_portal_bet_response(result) for result in results]
+
+
+def _portal_bet_response(result: PortalBetResult) -> PortalBetResponse:
+    return PortalBetResponse(
+        purchase_datetime=result.purchase_datetime,
+        lottery_modality=_resolve_response_lottery_modality(result.lottery_modality),
+        selected_numbers=result.selected_numbers,
+        draw_number=result.draw_number,
+        status=result.status,
+    )
 
 
 @placed_bets_router.get(
@@ -219,6 +227,7 @@ def list_placed_bets(
     ),
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> list[PlacedBetResponse]:
+    results = []
     try:
         parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date = _parse_placed_bet_filters(
             lottery_modality=lottery_modality,
@@ -255,10 +264,8 @@ def get_placed_bet(
         _raise_bad_request(exc)
 
     if result is None:
-        raise ApiError(
-            status_code=404,
-            code=ErrorCode.NOT_FOUND,
-            message="Aposta não encontrada.",
+        _raise_internal_server_error(
+            "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado."
         )
 
     return _placed_bet_response(result)
@@ -281,10 +288,12 @@ def _bet_date_with_timezone(bet_date: datetime) -> datetime:
     return with_sao_paulo_timezone(bet_date, remove_microseconds=True)
 
 
-def _portal_purchase_datetime_with_timezone(purchase_datetime: datetime) -> datetime | None:
-    if purchase_datetime.tzinfo is None:
-        return None
-    return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)
+def _raise_internal_server_error(message: str) -> None:
+    raise ApiError(
+        status_code=500,
+        code=ErrorCode.INTERNAL_SERVER_ERROR,
+        message=message,
+    )
 
 
 def _raise_bad_request(exc: ValueError) -> None:

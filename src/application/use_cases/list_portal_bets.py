@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 from application.dto import PortalBetResult, PortalBetSearchFilters
 from application.exceptions import PortalBetFiltersValidationError, ValidationErrorDetail
@@ -20,6 +21,7 @@ from domain.enums import (
     PortalBetType,
     PortalDrawType,
 )
+from shared import sao_paulo_timezone
 
 
 class ListPortalBetsUseCase:
@@ -88,7 +90,16 @@ class ListPortalBetsUseCase:
 
         self._session.mark_running(Operation.LIST_PORTAL_BETS)
         try:
-            results = self._portal_bets.find_all(self._session, filters)
+            results = [
+                PortalBetResult(
+                    purchase_datetime=_portal_purchase_datetime_with_timezone(result.purchase_datetime),
+                    lottery_modality=result.lottery_modality,
+                    selected_numbers=result.selected_numbers,
+                    draw_number=result.draw_number,
+                    status=result.status,
+                )
+                for result in self._portal_bets.find_all(self._session, filters)
+            ]
         except ValueError:
             self._session.mark_ready()
             raise
@@ -112,3 +123,9 @@ def _parse_filter[T](
     except ValueError:
         details.append(detail_factory())
         return None
+
+
+def _portal_purchase_datetime_with_timezone(purchase_datetime: datetime | None) -> datetime | None:
+    if purchase_datetime is None or purchase_datetime.tzinfo is None:
+        return None
+    return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)

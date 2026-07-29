@@ -37,7 +37,7 @@ async def request_validation_error_handler(_: Request, __: RequestValidationErro
 
 async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> Utf8JSONResponse:
     if exc.status_code == status.HTTP_404_NOT_FOUND:
-        return _error_response(status_code=404, code=ErrorCode.NOT_FOUND, message="Rota não encontrada.")
+        return _error_response(status_code=404, code=ErrorCode.ROUTE_NOT_FOUND, message="Rota não encontrada.")
     if exc.status_code == status.HTTP_405_METHOD_NOT_ALLOWED:
         return _error_response(
             status_code=405, code=ErrorCode.METHOD_NOT_ALLOWED, message="Método HTTP não permitido para esta rota."

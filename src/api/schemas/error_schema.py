@@ -43,10 +43,10 @@ ERROR_EXAMPLES = {
             ],
         }
     },
-    ErrorCode.NOT_FOUND: error_example(
+    ErrorCode.ROUTE_NOT_FOUND: error_example(
         HTTPStatus.NOT_FOUND,
-        ErrorCode.NOT_FOUND,
-        "Aposta não encontrada.",
+        ErrorCode.ROUTE_NOT_FOUND,
+        "Rota não encontrada.",
     ),
     ErrorCode.BROWSER_SESSION_OPEN_ERROR_CODE: error_example(
         HTTPStatus.CONFLICT,

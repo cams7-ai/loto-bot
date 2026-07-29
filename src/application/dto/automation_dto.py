@@ -91,7 +91,7 @@ class PortalBetSearchFilters:
 
 @dataclass(frozen=True)
 class PortalBetResult:
-    purchase_datetime: datetime
+    purchase_datetime: datetime | None
     lottery_modality: str
     selected_numbers: list[str]
     draw_number: str
