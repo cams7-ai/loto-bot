@@ -28,3 +28,14 @@ def error_response(
             }
         },
     }
+
+
+def success_response(description: str, example: dict[str, Any]) -> dict:
+    return {
+        "description": description,
+        "content": {
+            Utf8JSONResponse.media_type: {
+                "example": example,
+            }
+        },
+    }

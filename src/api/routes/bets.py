@@ -1,42 +1,37 @@
 from __future__ import annotations
 
-import re
-from datetime import datetime, time
-from decimal import Decimal
+from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, Query
 
 from api.dependencies import AppContainer, get_container
-from api.exceptions import ApiError
-from api.mappers import ApiExceptionMapper
-from api.responses import error_response
+from api.mappers import ApiExceptionMapper, ApiResponseMapper
+from api.parsers import BetRequestParser
+from api.responses import error_response, success_response
 from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
-from application import AutomationRunResult, PortalBetFiltersValidationError, PortalBetResult, ValidationErrorDetail
-from application.services.portal_bet_filter_catalog import (
+from application import (
     ALL,
-    INVALID_DATE_MESSAGE,
-    INVALID_DRAW_NUMBER_MESSAGE,
+    PortalBetFiltersValidationError,
     current_and_previous_months,
-    invalid_lottery_modality_detail,
-    normalize_public_value,
-    parse_portal_lottery_modality,
-    parse_positive_int,
 )
-from domain import AutomationError, ErrorCode, LotteryModality
-from domain.enums import (
+from domain import (
+    AutomationError,
+    AutomationStatus,
+    ErrorCode,
+    LotteryModality,
+    Operation,
     PortalBetRelativePeriod,
     PortalBetSortOrder,
     PortalBetStatus,
     PortalBetType,
     PortalDrawType,
 )
-from shared import sao_paulo_timezone, with_sao_paulo_timezone
+from shared import sao_paulo_timezone
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
 CONTAINER_DEPENDENCY = Depends(get_container)
 RUN_BET_REQUEST_BODY = Body(default=None)
-
 
 BET_RUN_BAD_REQUEST_EXAMPLES = {
     ErrorCode.BAD_REQUEST.value: {
@@ -60,7 +55,6 @@ BET_RUN_BAD_REQUEST_EXAMPLES = {
     }
 }
 
-
 BETS_RUN_ERROR_RESPONSES = {
     400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST, examples=BET_RUN_BAD_REQUEST_EXAMPLES),
     403: error_response(
@@ -82,6 +76,20 @@ BETS_RUN_ERROR_RESPONSES = {
     503: error_response("Serviço externo indisponível", ErrorCode.EXTERNAL_SERVICE_ERROR_CODE),
 }
 
+BETS_RUN_RESPONSES = {
+    200: success_response(
+        "Fluxo de aposta executado com sucesso",
+        {
+            "session_id": "00000000-0000-0000-0000-000000000001",
+            "status": f"{AutomationStatus.FINISHED.value}",
+            "executed_operation": f"{Operation.COMPLETE_BET.value}",
+            "message": "Aposta finalizada com sucesso.",
+            "purchase_number": "123456",
+        },
+    ),
+    **BETS_RUN_ERROR_RESPONSES,
+}
+
 BETS_ERROR_RESPONSES = {status_code: BETS_RUN_ERROR_RESPONSES[status_code] for status_code in (400, 409, 500, 503)}
 
 PLACED_BET_DETAIL_ERROR_RESPONSES = {
@@ -98,32 +106,20 @@ PLACED_BETS_ERROR_RESPONSES = {
 @router.post(
     "/bets/run",
     response_model=BetRunResponse,
-    responses=BETS_RUN_ERROR_RESPONSES,
+    responses=BETS_RUN_RESPONSES,
 )
 def run_bet(
     request: BetRunRequest | None = RUN_BET_REQUEST_BODY,
     container: AppContainer = CONTAINER_DEPENDENCY,
-) -> BetRunResponse:
+) -> BetRunResponse | None:
     try:
-        selected_lottery_modality = _parse_selected_lottery_modality(request)
+        selected_lottery_modality = BetRequestParser.parse_selected_lottery_modality(request)
         result = container.run_bet_flow.run(
             selected_lottery_modality=selected_lottery_modality,
         )
-        if result is None:
-            _raise_internal_server_error("Erro interno. Resultado da execução do fluxo de apostas não retornado.")
-        return _run_bet_response(result)
+        return ApiResponseMapper.run_bet_response(result)
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
-
-
-def _run_bet_response(result: AutomationRunResult) -> BetRunResponse:
-    return BetRunResponse(
-        session_id=str(result.session_id),
-        status=result.status,
-        message=result.message,
-        executed_operation=result.executed_operation.value,
-        purchase_number=result.purchase_number,
-    )
 
 
 @router.get(
@@ -183,23 +179,13 @@ def list_portal_bets(
             sort_by=sort_by,
         )
     except PortalBetFiltersValidationError as exc:
-        _raise_invalid_parameters(exc.details)
+        ApiExceptionMapper.raise_invalid_parameters(exc.details)
     except ValueError as exc:
-        _raise_bad_request(exc)
+        ApiExceptionMapper.raise_bad_request(exc)
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
 
-    return [_portal_bet_response(result) for result in results]
-
-
-def _portal_bet_response(result: PortalBetResult) -> PortalBetResponse:
-    return PortalBetResponse(
-        purchase_datetime=result.purchase_datetime,
-        lottery_modality=_resolve_response_lottery_modality(result.lottery_modality),
-        selected_numbers=result.selected_numbers,
-        draw_number=result.draw_number,
-        status=result.status,
-    )
+    return ApiResponseMapper.portal_bets_response(results)
 
 
 @placed_bets_router.get(
@@ -229,11 +215,13 @@ def list_placed_bets(
 ) -> list[PlacedBetResponse]:
     results = []
     try:
-        parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date = _parse_placed_bet_filters(
-            lottery_modality=lottery_modality,
-            draw_number=draw_number,
-            start_date=start_date,
-            end_date=end_date,
+        parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date = (
+            BetRequestParser.parse_placed_bet_filters(
+                lottery_modality=lottery_modality,
+                draw_number=draw_number,
+                start_date=start_date,
+                end_date=end_date,
+            )
         )
         results = container.list_placed_bets.run(
             lottery_modality=parsed_lottery_modality,
@@ -242,11 +230,11 @@ def list_placed_bets(
             end_date=parsed_end_date,
         )
     except PortalBetFiltersValidationError as exc:
-        _raise_invalid_parameters(exc.details)
+        ApiExceptionMapper.raise_invalid_parameters(exc.details)
     except ValueError as exc:
-        _raise_bad_request(exc)
+        ApiExceptionMapper.raise_bad_request(exc)
 
-    return [_placed_bet_response(result) for result in results]
+    return ApiResponseMapper.placed_bets_response(results)
 
 
 @placed_bets_router.get(
@@ -261,173 +249,11 @@ def get_placed_bet(
     try:
         result = container.get_placed_bet.run(bet_id=bet_id)
     except ValueError as exc:
-        _raise_bad_request(exc)
+        ApiExceptionMapper.raise_bad_request(exc)
 
     if result is None:
-        _raise_internal_server_error(
+        ApiExceptionMapper.raise_internal_server_error(
             "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado."
         )
 
-    return _placed_bet_response(result)
-
-
-def _placed_bet_response(result) -> PlacedBetResponse:
-    return PlacedBetResponse(
-        bet_id=result.bet_id,
-        lottery_modality=result.lottery_modality.name if result.lottery_modality else None,
-        selected_numbers=result.selected_numbers,
-        draw_number=result.draw_number,
-        status=result.status,
-        bet_amount=result.bet_amount.quantize(Decimal("0.01")),
-        purchase_number=result.purchase_number,
-        bet_date=_bet_date_with_timezone(result.bet_date),
-    )
-
-
-def _bet_date_with_timezone(bet_date: datetime) -> datetime:
-    return with_sao_paulo_timezone(bet_date, remove_microseconds=True)
-
-
-def _raise_internal_server_error(message: str) -> None:
-    raise ApiError(
-        status_code=500,
-        code=ErrorCode.INTERNAL_SERVER_ERROR,
-        message=message,
-    )
-
-
-def _raise_bad_request(exc: ValueError) -> None:
-    raise ApiError(
-        status_code=400,
-        code=ErrorCode.BAD_REQUEST,
-        message=str(exc),
-    ) from exc
-
-
-def _raise_invalid_parameters(details: list[ValidationErrorDetail]) -> None:
-    raise ApiError(
-        status_code=400,
-        code=ErrorCode.BAD_REQUEST,
-        message="Parâmetros inválidos",
-        details=[detail.to_dict() for detail in details],
-    )
-
-
-def _raise_invalid_fields(details: list[ValidationErrorDetail]) -> None:
-    raise ApiError(
-        status_code=400,
-        code=ErrorCode.BAD_REQUEST,
-        message="Campos inválidos",
-        details=[detail.to_dict() for detail in details],
-    )
-
-
-def _parse_selected_lottery_modality(request: BetRunRequest | None) -> LotteryModality | None:
-    if request is None or request.selected_lottery_modality is None:
-        return None
-    try:
-        return parse_portal_lottery_modality(request.selected_lottery_modality, False)
-    except ValueError:
-        _raise_invalid_fields(
-            [invalid_lottery_modality_detail("selected_lottery_modality", request.selected_lottery_modality)]
-        )
-        return None
-
-
-def _parse_placed_bet_filters(
-    *,
-    lottery_modality: str | None,
-    draw_number: str | None,
-    start_date: str | None,
-    end_date: str | None,
-) -> tuple[LotteryModality | None, int | None, datetime | None, datetime | None]:
-    details: list[ValidationErrorDetail] = []
-    parsed_lottery_modality = _parse_filter(
-        details,
-        lottery_modality,
-        lambda: parse_portal_lottery_modality(lottery_modality),
-        lambda value: invalid_lottery_modality_detail("lottery_modality", value),
-    )
-    parsed_draw_number = _parse_filter(
-        details,
-        draw_number,
-        lambda: parse_positive_int(draw_number),
-        lambda value: ValidationErrorDetail(
-            field="draw_number", rejected_value=value, message=INVALID_DRAW_NUMBER_MESSAGE
-        ),
-    )
-    parsed_start_date = _parse_filter(
-        details,
-        start_date,
-        lambda: _parse_history_date(start_date, end_of_day=False),
-        lambda value: ValidationErrorDetail(field="start_date", rejected_value=value, message=INVALID_DATE_MESSAGE),
-    )
-    parsed_end_date = _parse_filter(
-        details,
-        end_date,
-        lambda: _parse_history_date(end_date, end_of_day=True),
-        lambda value: ValidationErrorDetail(field="end_date", rejected_value=value, message=INVALID_DATE_MESSAGE),
-    )
-    if (
-        not details
-        and parsed_start_date is not None
-        and parsed_end_date is not None
-        and parsed_start_date > parsed_end_date
-    ):
-        details.append(
-            ValidationErrorDetail(
-                field="start_date",
-                rejected_value=start_date or "",
-                message="Valor inválido. A data inicial não pode ser maior que a data final.",
-            )
-        )
-    if details:
-        raise PortalBetFiltersValidationError(details)
-    return parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date
-
-
-def _parse_filter[T](
-    details: list[ValidationErrorDetail],
-    raw_value: str | None,
-    parser,
-    detail_factory,
-) -> T | None:
-    if raw_value is None:
-        return None
-    try:
-        return parser()
-    except ValueError:
-        details.append(detail_factory(raw_value))
-        return None
-
-
-def _parse_history_date(value: str | None, *, end_of_day: bool) -> datetime | None:
-    if value is None:
-        return None
-    stripped = value.strip()
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stripped) is None:
-        raise ValueError(INVALID_DATE_MESSAGE)
-    parsed_date = datetime.strptime(stripped, "%Y-%m-%d").date()
-    if end_of_day:
-        return datetime.combine(parsed_date, time(23, 59, 59))
-    return datetime.combine(parsed_date, time.min)
-
-
-def _resolve_response_lottery_modality(value: str | None) -> str | None:
-    if value is None:
-        return None
-
-    stripped = value.strip()
-    normalized_value = _normalize_lottery_modality_value(stripped)
-    for modality in LotteryModality:
-        if normalized_value in {
-            _normalize_lottery_modality_value(modality.name),
-            _normalize_lottery_modality_value(modality.value),
-        }:
-            return modality.name
-
-    return stripped
-
-
-def _normalize_lottery_modality_value(value: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", normalize_public_value(value))
+    return ApiResponseMapper.placed_bet_response(result)
