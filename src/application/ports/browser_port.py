@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from application.dto import PurchaseResult
+from application.dto import PortalBetResult, PortalBetSearchFilters, PurchaseResult
 from domain import AutomationSession, LotteryModality
 
 
 class BrowserAutomationPort(Protocol):
+    ### SessionControlBrowserMixin
     def start(self, session: AutomationSession) -> None:
         """Abre uma sessão persistente."""
 
@@ -48,6 +49,7 @@ class BrowserAutomationPort(Protocol):
     def submit_password(self, session: AutomationSession) -> None:
         """Informa a senha."""
 
+    ### RunBetFlowBrowserMixin
     def clear_shopping_cart(self, session: AutomationSession) -> None:
         """Limpa carrinho no portal."""
 
@@ -73,3 +75,7 @@ class BrowserAutomationPort(Protocol):
 
     def finish_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> PurchaseResult:
         """Finaliza a aposta e retorna os dados da compra."""
+
+    ### PortalBetsBrowserMixin
+    def find_all(self, session: AutomationSession, filters: PortalBetSearchFilters) -> list[PortalBetResult]:
+        """Busca no portal as apostas que atendem aos filtros."""

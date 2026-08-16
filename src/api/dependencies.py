@@ -42,7 +42,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     database = MongoDatabase(uri=resolved_settings.mongodb_uri, database_name=resolved_settings.mongodb_database)
     bet_repository = BeanieBetRepository(database=database)
     list_placed_bets = ListPlacedBetsUseCase(repository=bet_repository)
-    list_portal_bets = ListPortalBetsUseCase(session=session, portal_bets=browser, clock=SaoPauloClock())
+    list_portal_bets = ListPortalBetsUseCase(session=session, browser=browser, clock=SaoPauloClock())
     get_placed_bet = GetPlacedBetUseCase(repository=bet_repository)
     bet_persistence = (
         PlacedBetService(

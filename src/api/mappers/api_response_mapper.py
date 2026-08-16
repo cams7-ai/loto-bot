@@ -6,10 +6,15 @@ from decimal import Decimal
 
 from api.mappers import ApiExceptionMapper
 from api.schemas import BetRunResponse, PlacedBetResponse, PortalBetResponse, SessionControlResponse
-from application import AutomationRunResult, PlacedBetResult, PortalBetResult, SessionStatusResult
-from application.services.portal_bet_filter_catalog import normalize_public_value
+from application import (
+    AutomationRunResult,
+    PlacedBetResult,
+    PortalBetResult,
+    SessionStatusResult,
+    normalize_public_value,
+)
 from domain import LotteryModality
-from shared.datetime_utils import with_sao_paulo_timezone
+from shared import with_sao_paulo_timezone
 
 
 class ApiResponseMapper:
@@ -57,6 +62,11 @@ class ApiResponseMapper:
 
     @classmethod
     def placed_bet_response(cls, result) -> PlacedBetResponse:
+        if result is None:
+            ApiExceptionMapper.raise_internal_server_error(
+                "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado."
+            )
+
         return PlacedBetResponse(
             bet_id=result.bet_id,
             lottery_modality=result.lottery_modality.name if result.lottery_modality else None,

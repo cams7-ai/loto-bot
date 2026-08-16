@@ -21,7 +21,6 @@ from application.ports import (
     BrowserAutomationPort,
     ClockPort,
     NotificationPort,
-    PortalBetQueryPort,
     ValidationCodePort,
 )
 from application.services import (
@@ -61,7 +60,6 @@ __all__ = [
     "BrowserAutomationPort",
     "ClockPort",
     "NotificationPort",
-    "PortalBetQueryPort",
     "ValidationCodePort",
     "PlacedBetService",
     "build_error_email_message",

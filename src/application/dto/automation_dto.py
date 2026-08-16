@@ -7,8 +7,9 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from domain import LotteryModality, Operation
-from domain.enums import (
+from domain import (
+    LotteryModality,
+    Operation,
     PortalBetRelativePeriod,
     PortalBetSortOrder,
     PortalBetStatus,

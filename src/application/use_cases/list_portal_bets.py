@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 
 from application.dto import PortalBetResult, PortalBetSearchFilters
 from application.exceptions import PortalBetFiltersValidationError, ValidationErrorDetail
-from application.ports import ClockPort, PortalBetQueryPort
-from application.services.portal_bet_filter_catalog import (
+from application.ports import BrowserAutomationPort, ClockPort
+from application.services import (
     invalid_catalog_detail,
     invalid_lottery_modality_detail,
     invalid_month_year_detail,
@@ -25,9 +25,9 @@ from shared import sao_paulo_timezone
 
 
 class ListPortalBetsUseCase:
-    def __init__(self, session: AutomationSession, portal_bets: PortalBetQueryPort, clock: ClockPort) -> None:
+    def __init__(self, session: AutomationSession, browser: BrowserAutomationPort, clock: ClockPort) -> None:
         self._session = session
-        self._portal_bets = portal_bets
+        self._browser = browser
         self._clock = clock
 
     def run(
@@ -98,7 +98,7 @@ class ListPortalBetsUseCase:
                     draw_number=result.draw_number,
                     status=result.status,
                 )
-                for result in self._portal_bets.find_all(self._session, filters)
+                for result in self._browser.find_all(self._session, filters)
             ]
         except ValueError:
             self._session.mark_ready()

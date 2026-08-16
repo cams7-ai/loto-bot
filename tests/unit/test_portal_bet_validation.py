@@ -79,7 +79,7 @@ def test_list_portal_bets_accumulates_all_filter_validation_messages():
     session = AutomationSession()
     session.mark_open()
     portal_bets = RecordingPortalBetQuery()
-    use_case = ListPortalBetsUseCase(session=session, portal_bets=portal_bets, clock=FixedClock())
+    use_case = ListPortalBetsUseCase(session=session, browser=portal_bets, clock=FixedClock())
 
     with pytest.raises(PortalBetFiltersValidationError) as captured:
         use_case.run(
@@ -98,7 +98,7 @@ def test_list_portal_bets_accumulates_all_filter_validation_messages():
 def test_list_portal_bets_validates_filters_before_browser_session_state():
     session = AutomationSession()
     portal_bets = RecordingPortalBetQuery()
-    use_case = ListPortalBetsUseCase(session=session, portal_bets=portal_bets, clock=FixedClock())
+    use_case = ListPortalBetsUseCase(session=session, browser=portal_bets, clock=FixedClock())
 
     with pytest.raises(PortalBetFiltersValidationError) as captured:
         use_case.run(

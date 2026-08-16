@@ -4,9 +4,13 @@ from application.services.portal_bet_filter_catalog import (
     INVALID_DATE_MESSAGE,
     INVALID_DRAW_NUMBER_MESSAGE,
     current_and_previous_months,
+    invalid_catalog_detail,
     invalid_lottery_modality_detail,
+    invalid_month_year_detail,
     normalize_public_value,
+    parse_catalog_value,
     parse_portal_lottery_modality,
+    parse_portal_month_year,
     parse_positive_int,
 )
 from application.services.session_failure_handler import SessionFailureHandler
@@ -28,4 +32,8 @@ __all__ = [
     "normalize_public_value",
     "parse_portal_lottery_modality",
     "parse_positive_int",
+    "invalid_catalog_detail",
+    "invalid_month_year_detail",
+    "parse_catalog_value",
+    "parse_portal_month_year",
 ]

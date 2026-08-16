@@ -245,15 +245,9 @@ def list_placed_bets(
 def get_placed_bet(
     bet_id: str,
     container: AppContainer = CONTAINER_DEPENDENCY,
-) -> PlacedBetResponse:
+) -> PlacedBetResponse | None:
     try:
         result = container.get_placed_bet.run(bet_id=bet_id)
+        return ApiResponseMapper.placed_bet_response(result)
     except ValueError as exc:
         ApiExceptionMapper.raise_bad_request(exc)
-
-    if result is None:
-        ApiExceptionMapper.raise_internal_server_error(
-            "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado."
-        )
-
-    return ApiResponseMapper.placed_bet_response(result)
