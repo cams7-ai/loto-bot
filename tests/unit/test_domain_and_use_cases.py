@@ -269,7 +269,7 @@ def test_session_control_closes_session_when_authentication_fails_with_automatio
     else:
         raise AssertionError("Erro esperado")
 
-    assert session.status.value == "closed"
+    assert session.status.value == "Fechada"
     assert browser.open is False
     assert browser.calls[-1] == "stop"
     assert notifier.stopped is True
@@ -290,7 +290,7 @@ def test_session_control_closes_session_when_authentication_fails_unexpectedly(m
     else:
         raise AssertionError("Erro esperado")
 
-    assert session.status.value == "closed"
+    assert session.status.value == "Fechada"
     assert browser.open is False
     assert browser.calls[-1] == "stop"
     assert notifier.stopped is True
@@ -310,7 +310,7 @@ def test_session_control_keeps_whatsapp_session_when_failure_notification_has_no
     else:
         raise AssertionError("Erro esperado")
 
-    assert session.status.value == "closed"
+    assert session.status.value == "Fechada"
     assert browser.open is False
     assert browser.calls[-1] == "stop"
     assert notifier.stopped is False
@@ -335,7 +335,7 @@ def test_session_control_does_not_read_code_for_invalid_cpf(monkeypatch):
     assert validation_codes.calls == []
     assert "request_validation_code" not in browser.calls
     assert notifier.messages
-    assert session.status.value == "closed"
+    assert session.status.value == "Fechada"
     assert browser.open is False
 
 
@@ -472,7 +472,7 @@ def test_run_bet_flow_blocks_payment_without_authorization():
 
     assert notifier.messages
     assert "confirm_payment" not in browser.calls
-    assert session.status.value == "failed"
+    assert session.status.value == "Falhou"
 
 
 def test_placed_bet_service_delegates_purchase_with_resolved_modality():

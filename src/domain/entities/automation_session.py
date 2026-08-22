@@ -10,11 +10,11 @@ from domain.enums import Operation
 
 
 class AutomationStatus(Enum):
-    CLOSED = "closed"
-    OPEN = "open"
-    RUNNING = "running"
-    FAILED = "failed"
-    FINISHED = "finished"
+    CLOSED = "Fechada"
+    OPEN = "Aberta"
+    RUNNING = "Em execução"
+    FAILED = "Falhou"
+    FINISHED = "Finalizada"
 
 
 @dataclass

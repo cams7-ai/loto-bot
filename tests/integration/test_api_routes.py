@@ -206,7 +206,7 @@ async def test_session_routes_delegate_to_use_case(override_container):
     assert start.status_code == 200
     assert start.json()["is_open"] is True
     assert start.json()["message"] == "Sessão de navegador iniciada com sucesso"
-    assert status.json()["status"] == "closed"
+    assert status.json()["status"] == "Fechada"
     assert stop.json()["is_open"] is False
     assert override_container.session_control.started is True
     assert override_container.session_control.stopped is True
@@ -219,7 +219,7 @@ async def test_run_bet_route_returns_failed_flow_without_real_network(override_c
         response = await client.post("/api/v1/bets/run")
 
     assert response.status_code == 200
-    assert response.json()["status"] == "failed"
+    assert response.json()["status"] == "Falhou"
     assert response.json()["executed_operation"] == "Confirma o pagamento"
     assert override_container.run_bet_flow.calls[0] == {"selected_lottery_modality": None}
 

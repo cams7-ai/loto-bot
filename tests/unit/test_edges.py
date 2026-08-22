@@ -85,7 +85,7 @@ def test_run_bet_flow_handles_unexpected_exception():
     else:
         raise AssertionError("Erro esperado")
 
-    assert session.status.value == "failed"
+    assert session.status.value == "Falhou"
 
 
 def test_lottery_modality_from_string():
