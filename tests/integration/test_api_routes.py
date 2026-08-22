@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -10,7 +11,7 @@ import pytest
 from api.dependencies import get_container
 from api.server import app
 from application import AutomationRunResult, PlacedBetResult, PortalBetResult, SessionStatusResult
-from domain import BrowserSessionClosedError, BrowserSessionOpenError, LotteryModality, Operation
+from domain import AutomationStatus, BrowserSessionClosedError, BrowserSessionOpenError, LotteryModality, Operation
 
 
 class FakeSessionControl:
@@ -20,14 +21,20 @@ class FakeSessionControl:
 
     def start(self):
         self.started = True
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "open", Operation.START_SESSION, True)
+        return SessionStatusResult(
+            UUID("00000000-0000-0000-0000-000000000001"), AutomationStatus.OPEN, Operation.START_SESSION, True
+        )
 
     def stop(self):
         self.stopped = True
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", Operation.END_SESSION, False)
+        return SessionStatusResult(
+            UUID("00000000-0000-0000-0000-000000000001"), AutomationStatus.CLOSED, Operation.END_SESSION, False
+        )
 
     def status(self):
-        return SessionStatusResult("00000000-0000-0000-0000-000000000001", "closed", Operation.UNKNOWN_OPERATION, False)
+        return SessionStatusResult(
+            UUID("00000000-0000-0000-0000-000000000001"), AutomationStatus.CLOSED, Operation.UNKNOWN_OPERATION, False
+        )
 
 
 class FakeRunBetFlow:
@@ -37,8 +44,8 @@ class FakeRunBetFlow:
     def run(self, **kwargs):
         self.calls.append(kwargs)
         return AutomationRunResult(
-            session_id="00000000-0000-0000-0000-000000000001",
-            status="failed",
+            session_id=UUID("00000000-0000-0000-0000-000000000001"),
+            status=AutomationStatus.FAILED,
             message="A confirmação de pagamento real está desabilitada.",
             executed_operation=Operation.CONFIRM_PAYMENT,
             purchase_number="",
@@ -57,7 +64,7 @@ class FakeListPlacedBets:
 class FakeListPortalBets:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
-        self.lottery_modality = "Mega-Sena"
+        self.lottery_modality = LotteryModality.MEGA_SENA
         self.purchase_datetime = datetime(2026, 7, 24, 21, 30)
 
     def run(self, **filters):
@@ -348,9 +355,9 @@ async def test_list_placed_bets_route_returns_serialized_bets(override_container
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "1234",
             "status": "Efetivada",
-            "bet_amount": "6.00",
+            "bet_amount": "6",
             "purchase_number": "123456",
-            "bet_date": "2026-07-12T18:08:14-03:00",
+            "bet_date": "2026-07-12T18:08:14.457000",
         }
     ]
     assert override_container.list_placed_bets.calls[0] == {

@@ -8,6 +8,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from domain import (
+    AutomationStatus,
     LotteryModality,
     Operation,
     PortalBetRelativePeriod,
@@ -22,7 +23,7 @@ from domain import (
 @dataclass(frozen=True)
 class SessionStatusResult:
     session_id: UUID
-    status: str
+    status: AutomationStatus
     executed_operation: Operation
     is_open: bool
 
@@ -30,10 +31,10 @@ class SessionStatusResult:
 @dataclass(frozen=True)
 class AutomationRunResult:
     session_id: UUID
-    status: str
+    status: AutomationStatus
     message: str
     executed_operation: Operation
-    purchase_number: str | None = None
+    purchase_number: str
 
 
 @dataclass(frozen=True)
@@ -92,8 +93,8 @@ class PortalBetSearchFilters:
 
 @dataclass(frozen=True)
 class PortalBetResult:
-    purchase_datetime: datetime | None
-    lottery_modality: str
+    purchase_datetime: datetime
+    lottery_modality: LotteryModality | str
     selected_numbers: list[str]
     draw_number: str
     status: str

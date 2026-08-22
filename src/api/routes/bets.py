@@ -179,7 +179,7 @@ def list_portal_bets(
             sort_by=sort_by,
         )
     except PortalBetFiltersValidationError as exc:
-        ApiExceptionMapper.raise_invalid_parameters(exc.details)
+        ApiExceptionMapper.raise_invalid_parameters(exc)
     except ValueError as exc:
         ApiExceptionMapper.raise_bad_request(exc)
     except AutomationError as exc:
@@ -230,7 +230,7 @@ def list_placed_bets(
             end_date=parsed_end_date,
         )
     except PortalBetFiltersValidationError as exc:
-        ApiExceptionMapper.raise_invalid_parameters(exc.details)
+        ApiExceptionMapper.raise_invalid_parameters(exc)
     except ValueError as exc:
         ApiExceptionMapper.raise_bad_request(exc)
 

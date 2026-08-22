@@ -16,6 +16,7 @@ from domain import (
     SUPPORTED_BET_RUN_LOTTERY_MODALITIES,
     AutomationError,
     AutomationSession,
+    AutomationStatus,
     BrowserSessionClosedError,
     ErrorMessage,
     LotteryModality,
@@ -69,7 +70,7 @@ class RunBetFlowUseCase(OperationExecutor):
             self._session.mark_finished()
             return AutomationRunResult(
                 session_id=self._session.id,
-                status="finished",
+                status=AutomationStatus.FINISHED,
                 message="Aposta finalizada com sucesso.",
                 executed_operation=self._session.executed_operation,
                 purchase_number=purchase_number,

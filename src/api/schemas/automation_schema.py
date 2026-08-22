@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from domain import LotteryModality
 
@@ -36,7 +36,7 @@ class BetRunResponse(OperationResponse):
     model_config = ConfigDict(populate_by_name=True)
 
     message: str
-    purchase_number: str | None
+    purchase_number: str
 
 
 class BetRunRequest(BaseModel):
@@ -49,15 +49,7 @@ class BetRunRequest(BaseModel):
         },
     )
 
-    selected_lottery_modality: str | None = Field(
-        default=None,
-        description=(
-            "Modalidade opcional para execução da aposta. "
-            "Se não informada, "
-            "a aplicação utilizará o valor definido na variável de ambiente SELECTED_LOTTERY_MODALITY."
-        ),
-        examples=[LotteryModality.MEGA_SENA.name],
-    )
+    selected_lottery_modality: str | None
 
 
 class PlacedBetResponse(BaseModel):
@@ -78,11 +70,11 @@ class PlacedBetResponse(BaseModel):
     )
 
     bet_id: str
-    lottery_modality: str | None
+    lottery_modality: str
     selected_numbers: list[str]
     draw_number: str
     status: str
-    bet_amount: Decimal = Field(examples=["123.45"])
+    bet_amount: Decimal
     purchase_number: str
     bet_date: datetime
 
@@ -101,8 +93,8 @@ class PortalBetResponse(BaseModel):
         },
     )
 
-    purchase_datetime: datetime | None
-    lottery_modality: str | None
+    purchase_datetime: datetime
+    lottery_modality: str
     selected_numbers: list[str]
     draw_number: str
     status: str

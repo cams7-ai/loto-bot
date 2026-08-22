@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
 
 from application.dto import PortalBetResult, PortalBetSearchFilters
 from application.exceptions import PortalBetFiltersValidationError, ValidationErrorDetail
@@ -14,14 +13,16 @@ from application.services import (
     parse_portal_lottery_modality,
     parse_portal_month_year,
 )
-from domain import AutomationError, AutomationSession, BrowserSessionClosedError, Operation
-from domain.enums import (
+from domain import (
+    AutomationError,
+    AutomationSession,
+    BrowserSessionClosedError,
+    Operation,
     PortalBetSortOrder,
     PortalBetStatus,
     PortalBetType,
     PortalDrawType,
 )
-from shared import sao_paulo_timezone
 
 
 class ListPortalBetsUseCase:
@@ -40,32 +41,32 @@ class ListPortalBetsUseCase:
         sort_by: str | None = None,
     ) -> list[PortalBetResult]:
         validation_details: list[ValidationErrorDetail] = []
-        parsed_bet_type = _parse_filter(
+        parsed_bet_type = self._parse_filter(
             validation_details,
             lambda: parse_catalog_value("bet_type", bet_type, PortalBetType),
             lambda: invalid_catalog_detail("bet_type", bet_type or "", PortalBetType),
         )
-        parsed_lottery_modality = _parse_filter(
+        parsed_lottery_modality = self._parse_filter(
             validation_details,
             lambda: parse_portal_lottery_modality(lottery_modality),
             lambda: invalid_lottery_modality_detail("lottery_modality", lottery_modality or ""),
         )
-        parsed_draw_type = _parse_filter(
+        parsed_draw_type = self._parse_filter(
             validation_details,
             lambda: parse_catalog_value("draw_type", draw_type, PortalDrawType),
             lambda: invalid_catalog_detail("draw_type", draw_type or "", PortalDrawType),
         )
-        parsed_month_year = _parse_filter(
+        parsed_month_year = self._parse_filter(
             validation_details,
             lambda: parse_portal_month_year(month_year, self._clock.today()),
             lambda: invalid_month_year_detail(month_year or "", self._clock.today()),
         )
-        parsed_status = _parse_filter(
+        parsed_status = self._parse_filter(
             validation_details,
             lambda: parse_catalog_value("status", status, PortalBetStatus),
             lambda: invalid_catalog_detail("status", status or "", PortalBetStatus),
         )
-        parsed_sort_by = _parse_filter(
+        parsed_sort_by = self._parse_filter(
             validation_details,
             lambda: parse_catalog_value("sort_by", sort_by, PortalBetSortOrder),
             lambda: invalid_catalog_detail("sort_by", sort_by or "", PortalBetSortOrder),
@@ -92,7 +93,7 @@ class ListPortalBetsUseCase:
         try:
             results = [
                 PortalBetResult(
-                    purchase_datetime=_portal_purchase_datetime_with_timezone(result.purchase_datetime),
+                    purchase_datetime=result.purchase_datetime,
                     lottery_modality=result.lottery_modality,
                     selected_numbers=result.selected_numbers,
                     draw_number=result.draw_number,
@@ -112,20 +113,14 @@ class ListPortalBetsUseCase:
         self._session.mark_ready()
         return results
 
-
-def _parse_filter[T](
-    details: list[ValidationErrorDetail],
-    parser: Callable[[], T],
-    detail_factory: Callable[[], ValidationErrorDetail],
-) -> T | None:
-    try:
-        return parser()
-    except ValueError:
-        details.append(detail_factory())
-        return None
-
-
-def _portal_purchase_datetime_with_timezone(purchase_datetime: datetime | None) -> datetime | None:
-    if purchase_datetime is None or purchase_datetime.tzinfo is None:
-        return None
-    return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)
+    @staticmethod
+    def _parse_filter[T](
+        details: list[ValidationErrorDetail],
+        parser: Callable[[], T],
+        detail_factory: Callable[[], ValidationErrorDetail],
+    ) -> T | None:
+        try:
+            return parser()
+        except ValueError:
+            details.append(detail_factory())
+            return None

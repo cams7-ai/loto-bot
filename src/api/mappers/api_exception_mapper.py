@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from api.exceptions import ApiError
-from application import ValidationErrorDetail
+from application import PortalBetFiltersValidationError, ValidationErrorDetail
 from domain import AutomationError, ErrorCode
 
 
@@ -31,13 +31,13 @@ class ApiExceptionMapper:
         ) from exc
 
     @classmethod
-    def raise_invalid_parameters(cls, details: list[ValidationErrorDetail]) -> None:
+    def raise_invalid_parameters(cls, exc: PortalBetFiltersValidationError) -> None:
         raise ApiError(
             status_code=400,
             code=ErrorCode.BAD_REQUEST,
             message="Parâmetros inválidos",
-            details=[detail.to_dict() for detail in details],
-        )
+            details=[detail.to_dict() for detail in exc.details],
+        ) from exc
 
     @classmethod
     def raise_invalid_fields(cls, details: list[ValidationErrorDetail]) -> None:

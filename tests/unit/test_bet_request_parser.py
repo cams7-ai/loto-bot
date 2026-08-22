@@ -11,7 +11,7 @@ from domain import LotteryModality
 
 def test_parse_selected_lottery_modality_handles_missing_and_valid_values() -> None:
     assert BetRequestParser.parse_selected_lottery_modality(None) is None
-    assert BetRequestParser.parse_selected_lottery_modality(BetRunRequest()) is None
+    assert BetRequestParser.parse_selected_lottery_modality(BetRunRequest(selected_lottery_modality=None)) is None
     assert (
         BetRequestParser.parse_selected_lottery_modality(BetRunRequest(selected_lottery_modality="MEGA_SENA"))
         is LotteryModality.MEGA_SENA

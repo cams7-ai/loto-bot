@@ -147,8 +147,8 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
             purchase_details.bet_date.isoformat(),
             extra=Operation.executed_operation(session.executed_operation),
         )
-        bets = self._get_bets(self._require_page())
-        for bet in bets:
+        all_bets = self._get_bets(self._require_page())
+        for bet in all_bets:
             logger.info(
                 "Números da aposta: %s, Concurso da aposta: %s, Situação da aposta: %s, Valor da aposta: %s",
                 bet.numbers,
@@ -184,7 +184,7 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
                     status=bet.status,
                     amount=bet.amount,
                 )
-                for bet in bets
+                for bet in all_bets
             ],
             purchase_number=purchase_details.number,
             purchase_datetime=purchase_details.bet_date,

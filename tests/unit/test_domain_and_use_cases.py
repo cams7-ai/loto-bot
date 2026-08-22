@@ -18,6 +18,7 @@ from application.dto import BetResult, BetSearchFilters, PlacedBetResult, Purcha
 from domain import (
     AutomationError,
     AutomationSession,
+    AutomationStatus,
     BrowserSessionClosedError,
     BrowserSessionOpenError,
     ErrorCode,
@@ -209,13 +210,13 @@ def test_session_control_lifecycle(monkeypatch):
 
     started = use_case.start()
     assert started.is_open is True
-    assert started.status == "open"
+    assert started.status == AutomationStatus.OPEN
     assert browser.calls[0] == "start"
     assert notifier.started is True
 
     stopped = use_case.stop()
     assert stopped.is_open is False
-    assert stopped.status == "closed"
+    assert stopped.status == AutomationStatus.CLOSED
     assert notifier.stopped is True
 
 
@@ -228,7 +229,7 @@ def test_session_control_skips_authentication_steps_when_already_authenticated(m
 
     started = use_case.start()
 
-    assert started.status == "open"
+    assert started.status == AutomationStatus.OPEN
     assert "is_authenticated" in browser.calls
     assert "access_lottery_portal" not in browser.calls
     assert "accept_terms" not in browser.calls
@@ -374,7 +375,7 @@ def test_run_bet_flow_finishes_when_payment_is_authorized():
 
     result = use_case.run()
 
-    assert result.status == "finished"
+    assert result.status == AutomationStatus.FINISHED
     assert result.purchase_number == "123456"
     assert browser.calls[0] == "access_authenticated_home"
     assert "confirm_payment" in browser.calls
@@ -399,7 +400,7 @@ def test_run_bet_flow_persists_purchase_when_service_is_configured():
 
     result = use_case.run(selected_lottery_modality=LotteryModality.QUINA)
 
-    assert result.status == "finished"
+    assert result.status == AutomationStatus.FINISHED
     assert repository.saved[0][0] == LotteryModality.QUINA
     assert repository.saved[0][1].purchase_number == "123456"
     assert ("select_lottery_modality", (session, LotteryModality.QUINA)) in browser.call_args
@@ -423,9 +424,9 @@ def test_run_bet_flow_does_not_fail_when_persistence_fails_after_purchase():
 
     result = use_case.run()
 
-    assert result.status == "finished"
+    assert result.status == AutomationStatus.FINISHED
     assert notifier.success_notifications[0].purchase_number == "123456"
-    assert session.status.value == "finished"
+    assert session.status.value == AutomationStatus.FINISHED.value
 
 
 def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monkeypatch):
@@ -443,7 +444,7 @@ def test_run_bet_flow_starts_code_lookup_before_requesting_validation_code(monke
 
     result = use_case.run()
 
-    assert result.status == "finished"
+    assert result.status == AutomationStatus.FINISHED
     assert "request_validation_code" not in browser.calls
     assert session.valid_code is None
 

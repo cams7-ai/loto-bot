@@ -19,7 +19,6 @@ from domain import (
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 CONTAINER_DEPENDENCY = Depends(get_container)
 
-
 ERROR_RESPONSE_BY_STATUS = {
     409: error_response(
         "Sessão de navegador já está aberta ou fechada",
@@ -50,8 +49,8 @@ START_RESPONSES = {
         "Sessão de navegador iniciada com sucesso",
         {
             "session_id": "00000000-0000-0000-0000-000000000001",
-            "status": f"{AutomationStatus.OPEN.value}",
-            "executed_operation": f"{Operation.START_SESSION.value}",
+            "status": AutomationStatus.OPEN.value,
+            "executed_operation": Operation.START_SESSION.value,
             "message": "Sessão de navegador iniciada com sucesso",
             "is_open": True,
         },
@@ -64,8 +63,8 @@ STOP_RESPONSES = {
         "Sessão de navegador encerrada com sucesso",
         {
             "session_id": "00000000-0000-0000-0000-000000000001",
-            "status": f"{AutomationStatus.CLOSED.value}",
-            "executed_operation": f"{Operation.END_SESSION.value}",
+            "status": AutomationStatus.CLOSED.value,
+            "executed_operation": Operation.END_SESSION.value,
             "message": "Sessão de navegador encerrada com sucesso",
             "is_open": False,
         },
@@ -78,8 +77,8 @@ STATUS_RESPONSES = {
         "Status da sessão obtido com sucesso",
         {
             "session_id": "00000000-0000-0000-0000-000000000001",
-            "status": f"{AutomationStatus.OPEN.value}",
-            "executed_operation": f"{Operation.START_SESSION.value}",
+            "status": AutomationStatus.OPEN.value,
+            "executed_operation": Operation.START_SESSION.value,
             "is_open": True,
         },
     ),

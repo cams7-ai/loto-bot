@@ -118,7 +118,7 @@ class SessionControlUseCase(OperationExecutor):
     def status(self) -> SessionStatusResult:
         return SessionStatusResult(
             session_id=self._session.id,
-            status=self._session.status.value,
+            status=self._session.status,
             executed_operation=self._session.executed_operation,
             is_open=self._session.is_open,
         )

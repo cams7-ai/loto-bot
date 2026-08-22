@@ -54,7 +54,7 @@ class BeanieBetRepository(BetRepositoryPort):
             expressions.append(BetModel.bet_date <= filters.end_date)
 
         bet_models = await BetModel.find(*expressions).sort("-bet_date").to_list()
-        return [bet_model.to_search_result() for bet_model in bet_models]
+        return [bet_model.to_result() for bet_model in bet_models]
 
     async def _find_by_id(self, bet_id: str) -> PlacedBetResult | None:
         await self._database.ensure_initialized()
@@ -66,7 +66,7 @@ class BeanieBetRepository(BetRepositoryPort):
         bet_model = await BetModel.find_one(BetModel.bet_id == object_id)
         if bet_model is None:
             return None
-        return bet_model.to_search_result()
+        return bet_model.to_result()
 
     def _run_sync(self, action: Callable[[], Awaitable[T]]) -> T:
         try:

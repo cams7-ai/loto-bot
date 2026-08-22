@@ -60,7 +60,7 @@ def test_parse_portal_bet_rows_ignores_auxiliary_colspan_row_and_keeps_bet():
     results = PortalBetsBrowserMixin._parse_portal_bet_rows(page)
 
     assert len(results) == 1
-    assert results[0].lottery_modality == "Mega-Sena"
+    assert results[0].lottery_modality == "MEGA_SENA"
     assert results[0].selected_numbers == ["01", "02", "03", "04", "05", "06"]
     assert results[0].draw_number == "2890"
     assert results[0].status == "Aposta Paga"

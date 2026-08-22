@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import logging
+import re
+from datetime import UTC, datetime
 
-from application.dto import PortalBetResult, PortalBetSearchFilters
-from domain import AutomationError, AutomationSession
-from domain.enums import PortalBetSortOrder, PortalYearMonth
+from application import (
+    PortalBetResult,
+    PortalBetSearchFilters,
+    normalize_public_value,
+)
+from domain import AutomationError, AutomationSession, LotteryModality, PortalBetSortOrder, PortalYearMonth
 from infrastructure.browser.playwright_common import PlaywrightBrowserBase
 from infrastructure.selectors import PortalBetFilterBuilder, Selectors
-from shared import parse_sao_paulo_datetime
+from shared import parse_sao_paulo_datetime, sao_paulo_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -185,8 +190,8 @@ class PortalBetsBrowserMixin(PlaywrightBrowserBase):
             raise ValueError(error_message) from last_error
         raise AutomationError(f"Filtro do portal indisponivel para selecao: {selector}") from last_error
 
-    @staticmethod
-    def _parse_portal_bet_rows(page) -> list[PortalBetResult]:
+    @classmethod
+    def _parse_portal_bet_rows(cls, page) -> list[PortalBetResult]:
         rows = page.locator(Selectors.PORTAL_BETS_TABLE_ROWS)
         results: list[PortalBetResult] = []
         for index in range(rows.count()):
@@ -211,11 +216,34 @@ class PortalBetsBrowserMixin(PlaywrightBrowserBase):
                 raise AutomationError("Linha de aposta incompleta na tabela do portal.")
             results.append(
                 PortalBetResult(
-                    purchase_datetime=parse_sao_paulo_datetime(date_parts[0], date_parts[1]),
-                    lottery_modality=lottery_modality,
+                    purchase_datetime=cls._purchase_datetime_with_timezone(
+                        parse_sao_paulo_datetime(date_parts[0], date_parts[1])
+                    ),
+                    lottery_modality=cls._lottery_modality(lottery_modality),
                     selected_numbers=selected_numbers,
                     draw_number=draw_number,
                     status=status,
                 )
             )
         return results
+
+    @staticmethod
+    def _purchase_datetime_with_timezone(purchase_datetime: datetime) -> datetime:
+        return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)
+
+    @classmethod
+    def _lottery_modality(cls, value: str | None) -> str:
+        stripped = value.strip()
+        normalized_value = cls._modality_value(stripped)
+        for modality in LotteryModality:
+            if normalized_value in {
+                cls._modality_value(modality.name),
+                cls._modality_value(modality.value),
+            }:
+                return modality.name
+
+        return stripped
+
+    @staticmethod
+    def _modality_value(value: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", normalize_public_value(value))

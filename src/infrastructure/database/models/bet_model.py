@@ -11,6 +11,7 @@ from pydantic import field_validator
 
 from application.dto import BetResult, PlacedBetResult, PurchaseResult
 from domain import LotteryModality
+from shared import with_sao_paulo_timezone
 
 
 class BetModel(Document):
@@ -61,14 +62,14 @@ class BetModel(Document):
             bet_date=purchase.purchase_datetime,
         )
 
-    def to_search_result(self) -> PlacedBetResult:
+    def to_result(self) -> PlacedBetResult:
         return PlacedBetResult(
             bet_id=str(self.bet_id),
             lottery_modality=self.lottery_modality,
             selected_numbers=self.selected_numbers,
             draw_number=self.draw_number,
             status=self.status,
-            bet_amount=self.bet_amount,
+            bet_amount=self.bet_amount.quantize(Decimal("0.01")),
             purchase_number=self.purchase_number,
-            bet_date=self.bet_date,
+            bet_date=with_sao_paulo_timezone(self.bet_date, remove_microseconds=True),
         )
