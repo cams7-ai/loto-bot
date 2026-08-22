@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from api.mappers import ApiExceptionMapper
-from api.schemas import BetRunResponse, PlacedBetResponse, PortalBetResponse, SessionControlResponse
+from api.schemas import (
+    BetRunResponse,
+    PlacedBetResponse,
+    PortalBetResponse,
+    SessionControlResponse,
+    SessionStatusResponse,
+)
 from application import (
     AutomationRunResult,
     PlacedBetResult,
@@ -13,8 +19,18 @@ from domain import LotteryModality
 
 class ApiResponseMapper:
     @classmethod
-    def session_response(cls, result: SessionStatusResult, message: str) -> SessionControlResponse:
+    def session_control_response(cls, result: SessionStatusResult, message: str) -> SessionControlResponse:
         return SessionControlResponse(
+            session_id=str(result.session_id),
+            status=result.status.value,
+            executed_operation=result.executed_operation.value,
+            is_open=result.is_open,
+            message=message,
+        )
+
+    @classmethod
+    def session_status_response(cls, result: SessionStatusResult, message: str) -> SessionStatusResponse:
+        return SessionStatusResponse(
             session_id=str(result.session_id),
             status=result.status.value,
             executed_operation=result.executed_operation.value,

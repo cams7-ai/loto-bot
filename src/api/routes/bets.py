@@ -92,14 +92,54 @@ BETS_RUN_RESPONSES = {
 
 BETS_ERROR_RESPONSES = {status_code: BETS_RUN_ERROR_RESPONSES[status_code] for status_code in (400, 409, 500, 503)}
 
+BETS_RESPONSES = {
+    200: success_response(
+        "Lista de apostas obtida com sucesso",
+        [
+            {
+                "purchase_datetime": "2026-07-19T12:33:09-03:00",
+                "lottery_modality": LotteryModality.MEGA_SENA.name,
+                "selected_numbers": ["09", "18", "33", "40", "47", "53"],
+                "draw_number": "3034",
+                "status": "Aposta não premiada",
+            }
+        ],
+    ),
+    **BETS_ERROR_RESPONSES,
+}
+
+PLACED_BET_RESPONSE = {
+    "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
+    "lottery_modality": LotteryModality.MEGA_SENA.name,
+    "selected_numbers": ["01", "02", "03", "04", "05", "06"],
+    "draw_number": "1234",
+    "status": "Efetivada",
+    "bet_amount": "123.45",
+    "purchase_number": "123456",
+    "bet_date": "2026-07-12T18:08:14-03:00",
+}
+
 PLACED_BET_DETAIL_ERROR_RESPONSES = {
     400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
     404: error_response("Rota não encontrada", ErrorCode.ROUTE_NOT_FOUND),
     500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
 }
 
+PLACED_BET_DETAIL_RESPONSES = {
+    200: success_response(
+        "Detalhes da aposta obtidos com sucesso",
+        PLACED_BET_RESPONSE,
+    ),
+    **PLACED_BET_DETAIL_ERROR_RESPONSES,
+}
+
 PLACED_BETS_ERROR_RESPONSES = {
     status_code: PLACED_BET_DETAIL_ERROR_RESPONSES[status_code] for status_code in (400, 500)
+}
+
+PLACED_BETS_RESPONSES = {
+    200: success_response("Lista de apostas obtida com sucesso", [PLACED_BET_RESPONSE]),
+    **PLACED_BETS_ERROR_RESPONSES,
 }
 
 
@@ -125,7 +165,7 @@ def run_bet(
 @router.get(
     "/bets",
     response_model=list[PortalBetResponse],
-    responses=BETS_ERROR_RESPONSES,
+    responses=BETS_RESPONSES,
 )
 def list_portal_bets(
     bet_type: str | None = Query(
@@ -191,7 +231,7 @@ def list_portal_bets(
 @placed_bets_router.get(
     "/bets",
     response_model=list[PlacedBetResponse],
-    responses=PLACED_BETS_ERROR_RESPONSES,
+    responses=PLACED_BETS_RESPONSES,
 )
 def list_placed_bets(
     lottery_modality: str | None = Query(
@@ -240,7 +280,7 @@ def list_placed_bets(
 @placed_bets_router.get(
     "/bets/{bet_id}",
     response_model=PlacedBetResponse,
-    responses=PLACED_BET_DETAIL_ERROR_RESPONSES,
+    responses=PLACED_BET_DETAIL_RESPONSES,
 )
 def get_placed_bet(
     bet_id: str,
