@@ -5,7 +5,7 @@ import pytest
 from api.exceptions import ApiError
 from api.parsers import BetRequestParser
 from api.schemas import BetRunRequest
-from application import PortalBetFiltersValidationError
+from application import BetSearchFilters, PortalBetFiltersValidationError
 from domain import LotteryModality
 
 
@@ -36,11 +36,11 @@ def test_parse_placed_bet_filters_returns_domain_values_and_date_boundaries() ->
         end_date="2026-07-31",
     )
 
-    assert result == (
-        LotteryModality.MEGA_SENA,
-        1234,
-        datetime(2026, 7, 1),
-        datetime(2026, 7, 31, 23, 59, 59),
+    assert result == BetSearchFilters(
+        lottery_modality=LotteryModality.MEGA_SENA,
+        draw_number=1234,
+        start_date=datetime(2026, 7, 1),
+        end_date=datetime(2026, 7, 31, 23, 59, 59),
     )
 
 

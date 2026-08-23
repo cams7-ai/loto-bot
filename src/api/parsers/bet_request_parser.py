@@ -6,6 +6,7 @@ from api.schemas import BetRunRequest
 from application import (
     INVALID_DATE_MESSAGE,
     INVALID_DRAW_NUMBER_MESSAGE,
+    BetSearchFilters,
     PortalBetFiltersValidationError,
     PortalBetSearchFilters,
     ValidationErrorDetail,
@@ -47,7 +48,7 @@ class BetRequestParser:
         draw_number: str | None,
         start_date: str | None,
         end_date: str | None,
-    ) -> tuple[LotteryModality | None, int | None, datetime | None, datetime | None]:
+    ) -> BetSearchFilters:
         details: list[ValidationErrorDetail] = []
         parsed_lottery_modality = cls._parse_placed_bet_filter(
             details,
@@ -75,6 +76,7 @@ class BetRequestParser:
             lambda: cls._parse_history_date(end_date, end_of_day=True),
             lambda value: ValidationErrorDetail(field="end_date", rejected_value=value, message=INVALID_DATE_MESSAGE),
         )
+
         if (
             not details
             and parsed_start_date is not None
@@ -88,9 +90,16 @@ class BetRequestParser:
                     message="Valor inválido. A data inicial não pode ser maior que a data final.",
                 )
             )
+
         if details:
             raise PortalBetFiltersValidationError(details)
-        return parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date
+
+        return BetSearchFilters(
+            lottery_modality=parsed_lottery_modality,
+            draw_number=parsed_draw_number,
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        )
 
     @staticmethod
     def _parse_placed_bet_filter[T](

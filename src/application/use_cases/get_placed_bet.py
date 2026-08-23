@@ -10,7 +10,7 @@ class GetPlacedBetUseCase:
     def __init__(self, repository: BetRepositoryPort) -> None:
         self._repository = repository
 
-    def run(self, *, bet_id: str) -> PlacedBetResult | None:
+    def run(self, bet_id: str) -> PlacedBetResult | None:
         normalized_bet_id = bet_id.strip()
         if not normalized_bet_id:
             raise ValueError("Identificador da aposta é obrigatório.")

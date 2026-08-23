@@ -496,37 +496,31 @@ def test_placed_bet_service_rejects_invalid_modality():
         raise AssertionError("Modalidade inválida deveria ser recusada")
 
 
-def test_list_placed_bets_use_case_builds_filters():
+def test_list_placed_bets_use_case_forwards_filters():
     repository = FakeBetRepository()
     use_case = ListPlacedBetsUseCase(repository=repository)
-    start_date = datetime(2026, 7, 1)
-    end_date = datetime(2026, 7, 31)
-
-    results = use_case.run(
+    filters = BetSearchFilters(
         lottery_modality=LotteryModality.MEGA_SENA,
         draw_number=1234,
-        start_date=start_date,
-        end_date=end_date,
+        start_date=datetime(2026, 7, 1),
+        end_date=datetime(2026, 7, 31),
     )
+
+    results = use_case.run(filters)
 
     assert results == repository.search_results
-    assert repository.filters == BetSearchFilters(
-        lottery_modality=LotteryModality.MEGA_SENA,
-        draw_number=1234,
-        start_date=start_date,
-        end_date=end_date,
-    )
+    assert repository.filters == filters
 
 
-def test_list_placed_bets_use_case_rejects_invalid_date_range():
-    use_case = ListPlacedBetsUseCase(repository=FakeBetRepository())
+def test_list_placed_bets_use_case_forwards_empty_filters():
+    repository = FakeBetRepository()
+    use_case = ListPlacedBetsUseCase(repository=repository)
+    filters = BetSearchFilters()
 
-    try:
-        use_case.run(start_date=datetime(2026, 7, 31), end_date=datetime(2026, 7, 1))
-    except ValueError as exc:
-        assert "data inicial" in str(exc)
-    else:
-        raise AssertionError("Intervalo inválido deveria ser recusado")
+    results = use_case.run(filters)
+
+    assert results == repository.search_results
+    assert repository.filters == filters
 
 
 def test_get_placed_bet_use_case_delegates_search_by_bet_id():

@@ -107,4 +107,4 @@ async def stop_session(container: AppContainer = CONTAINER_DEPENDENCY) -> Sessio
 @router.get("/status", response_model=SessionStatusResponse, responses=STATUS_RESPONSES)
 async def session_status(container: AppContainer = CONTAINER_DEPENDENCY) -> SessionStatusResponse:
     result = container.session_control.status()
-    return ApiResponseMapper.session_status_response(result, "Status da sessão obtido com sucesso")
+    return ApiResponseMapper.session_status_response(result)

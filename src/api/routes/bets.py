@@ -154,9 +154,7 @@ def run_bet(
 ) -> BetRunResponse | None:
     try:
         selected_lottery_modality = BetRequestParser.parse_selected_lottery_modality(request)
-        result = container.run_bet_flow.run(
-            selected_lottery_modality=selected_lottery_modality,
-        )
+        result = container.run_bet_flow.run(selected_lottery_modality)
         return ApiResponseMapper.run_bet_response(result)
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
@@ -257,20 +255,14 @@ def list_placed_bets(
 ) -> list[PlacedBetResponse]:
     results = []
     try:
-        parsed_lottery_modality, parsed_draw_number, parsed_start_date, parsed_end_date = (
-            BetRequestParser.parse_placed_bet_filters(
-                lottery_modality=lottery_modality,
-                draw_number=draw_number,
-                start_date=start_date,
-                end_date=end_date,
-            )
+        filters = BetRequestParser.parse_placed_bet_filters(
+            lottery_modality=lottery_modality,
+            draw_number=draw_number,
+            start_date=start_date,
+            end_date=end_date,
         )
-        results = container.list_placed_bets.run(
-            lottery_modality=parsed_lottery_modality,
-            draw_number=parsed_draw_number,
-            start_date=parsed_start_date,
-            end_date=parsed_end_date,
-        )
+
+        results = container.list_placed_bets.run(filters)
     except PortalBetFiltersValidationError as exc:
         ApiExceptionMapper.raise_invalid_parameters(exc)
     except ValueError as exc:
@@ -289,7 +281,7 @@ def get_placed_bet(
     container: AppContainer = CONTAINER_DEPENDENCY,
 ) -> PlacedBetResponse | None:
     try:
-        result = container.get_placed_bet.run(bet_id=bet_id)
+        result = container.get_placed_bet.run(bet_id)
         return ApiResponseMapper.placed_bet_response(result)
     except ValueError as exc:
         ApiExceptionMapper.raise_bad_request(exc)

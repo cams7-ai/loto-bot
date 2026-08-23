@@ -12,6 +12,7 @@ from api.dependencies import get_container
 from api.server import app
 from application import (
     AutomationRunResult,
+    BetSearchFilters,
     PlacedBetResult,
     PortalBetResult,
     PortalBetSearchFilters,
@@ -45,10 +46,10 @@ class FakeSessionControl:
 
 class FakeRunBetFlow:
     def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[LotteryModality | None] = []
 
-    def run(self, **kwargs):
-        self.calls.append(kwargs)
+    def run(self, selected_lottery_modality: LotteryModality | None):
+        self.calls.append(selected_lottery_modality)
         return AutomationRunResult(
             session_id=UUID("00000000-0000-0000-0000-000000000001"),
             status=AutomationStatus.FAILED,
@@ -60,9 +61,9 @@ class FakeRunBetFlow:
 
 class FakeListPlacedBets:
     def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[BetSearchFilters] = []
 
-    def run(self, **filters):
+    def run(self, filters: BetSearchFilters):
         self.calls.append(filters)
         return [placed_bet_result(bet_amount=Decimal("6"))]
 
@@ -90,7 +91,7 @@ class FakeGetPlacedBet:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def run(self, *, bet_id: str):
+    def run(self, bet_id: str):
         self.calls.append(bet_id)
         if bet_id == "invalid":
             raise ValueError("Identificador da aposta inválido.")
@@ -227,7 +228,7 @@ async def test_run_bet_route_returns_failed_flow_without_real_network(override_c
     assert response.status_code == 200
     assert response.json()["status"] == "Falhou"
     assert response.json()["executed_operation"] == "Confirma o pagamento"
-    assert override_container.run_bet_flow.calls[0] == {"selected_lottery_modality": None}
+    assert override_container.run_bet_flow.calls[0] is None
 
 
 @pytest.mark.anyio
@@ -237,7 +238,7 @@ async def test_run_bet_route_forwards_selected_lottery_modality(override_contain
         response = await client.post("/api/v1/bets/run", json={"selected_lottery_modality": "QUINA"})
 
     assert response.status_code == 200
-    assert override_container.run_bet_flow.calls[0] == {"selected_lottery_modality": LotteryModality.QUINA}
+    assert override_container.run_bet_flow.calls[0] is LotteryModality.QUINA
 
 
 @pytest.mark.anyio
@@ -359,12 +360,7 @@ async def test_list_placed_bets_route_returns_serialized_bets(override_container
             "bet_date": "2026-07-12T18:08:14.457000",
         }
     ]
-    assert override_container.list_placed_bets.calls[0] == {
-        "lottery_modality": None,
-        "draw_number": None,
-        "start_date": None,
-        "end_date": None,
-    }
+    assert override_container.list_placed_bets.calls[0] == BetSearchFilters()
 
 
 @pytest.mark.anyio
@@ -382,12 +378,12 @@ async def test_list_placed_bets_route_forwards_query_filters(override_container)
         )
 
     assert response.status_code == 200
-    assert override_container.list_placed_bets.calls[0] == {
-        "lottery_modality": LotteryModality.MEGA_SENA,
-        "draw_number": 1234,
-        "start_date": datetime(2026, 7, 1, 0, 0, 0),
-        "end_date": datetime(2026, 7, 31, 23, 59, 59),
-    }
+    assert override_container.list_placed_bets.calls[0] == BetSearchFilters(
+        lottery_modality=LotteryModality.MEGA_SENA,
+        draw_number=1234,
+        start_date=datetime(2026, 7, 1, 0, 0, 0),
+        end_date=datetime(2026, 7, 31, 23, 59, 59),
+    )
 
 
 @pytest.mark.anyio
