@@ -10,7 +10,13 @@ import pytest
 
 from api.dependencies import get_container
 from api.server import app
-from application import AutomationRunResult, PlacedBetResult, PortalBetResult, SessionStatusResult
+from application import (
+    AutomationRunResult,
+    PlacedBetResult,
+    PortalBetResult,
+    PortalBetSearchFilters,
+    SessionStatusResult,
+)
 from domain import AutomationStatus, BrowserSessionClosedError, BrowserSessionOpenError, LotteryModality, Operation
 
 
@@ -63,11 +69,11 @@ class FakeListPlacedBets:
 
 class FakeListPortalBets:
     def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[PortalBetSearchFilters] = []
         self.lottery_modality = LotteryModality.MEGA_SENA
         self.purchase_datetime = datetime(2026, 7, 24, 21, 30)
 
-    def run(self, **filters):
+    def run(self, filters: PortalBetSearchFilters):
         self.calls.append(filters)
         return [
             PortalBetResult(
@@ -288,14 +294,7 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
             "status": "Aposta Paga",
         }
     ]
-    assert override_container.list_portal_bets.calls[0] == {
-        "bet_type": None,
-        "lottery_modality": None,
-        "draw_type": None,
-        "month_year": None,
-        "status": None,
-        "sort_by": None,
-    }
+    assert override_container.list_portal_bets.calls[0] == PortalBetSearchFilters()
 
 
 @pytest.mark.anyio

@@ -4,8 +4,16 @@ from datetime import date
 
 import pytest
 
-from application import ListPortalBetsUseCase, PortalBetFiltersValidationError
-from domain import AutomationSession
+from api.parsers import BetRequestParser
+from application import PortalBetFiltersValidationError, PortalBetSearchFilters
+from domain import (
+    LotteryModality,
+    PortalBetSortOrder,
+    PortalBetStatus,
+    PortalBetType,
+    PortalDrawType,
+    PortalYearMonth,
+)
 
 EXPECTED_FILTER_DETAILS = [
     {
@@ -61,28 +69,10 @@ EXPECTED_FILTER_DETAILS = [
 ]
 
 
-class FixedClock:
-    def today(self) -> date:
-        return date(2026, 7, 24)
-
-
-class RecordingPortalBetQuery:
-    def __init__(self) -> None:
-        self.called = False
-
-    def find_all(self, session, filters):
-        self.called = True
-        return []
-
-
-def test_list_portal_bets_accumulates_all_filter_validation_messages():
-    session = AutomationSession()
-    session.mark_open()
-    portal_bets = RecordingPortalBetQuery()
-    use_case = ListPortalBetsUseCase(session=session, browser=portal_bets, clock=FixedClock())
-
+def test_parse_portal_bet_filters_accumulates_all_validation_messages():
     with pytest.raises(PortalBetFiltersValidationError) as captured:
-        use_case.run(
+        BetRequestParser.parse_portal_bet_filters(
+            today=date(2026, 7, 24),
             bet_type="abc",
             lottery_modality="abc",
             draw_type="abc",
@@ -92,23 +82,25 @@ def test_list_portal_bets_accumulates_all_filter_validation_messages():
         )
 
     assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS
-    assert portal_bets.called is False
 
 
-def test_list_portal_bets_validates_filters_before_browser_session_state():
-    session = AutomationSession()
-    portal_bets = RecordingPortalBetQuery()
-    use_case = ListPortalBetsUseCase(session=session, browser=portal_bets, clock=FixedClock())
+def test_parse_portal_bet_filters_returns_domain_filters():
+    filters = BetRequestParser.parse_portal_bet_filters(
+        today=date(2026, 7, 24),
+        bet_type="INDIVIDUAL",
+        lottery_modality="MEGA_SENA",
+        draw_type="NORMAL",
+        month_year="2026-07",
+        status="PAID",
+        sort_by="DATE_DESC",
+    )
 
-    with pytest.raises(PortalBetFiltersValidationError) as captured:
-        use_case.run(
-            bet_type="abc",
-            lottery_modality="abc",
-            draw_type="abc",
-            month_year="abc",
-            status="abc",
-            sort_by="abc",
-        )
-
-    assert [detail.to_dict() for detail in captured.value.details] == EXPECTED_FILTER_DETAILS
-    assert portal_bets.called is False
+    assert filters == PortalBetSearchFilters(
+        bet_type=PortalBetType.INDIVIDUAL,
+        lottery_modality=LotteryModality.MEGA_SENA,
+        draw_type=PortalDrawType.NORMAL,
+        month_year=PortalYearMonth(2026, 7),
+        status=PortalBetStatus.PAID,
+        sort_by=PortalBetSortOrder.DATE_DESC,
+        has_explicit_filters=True,
+    )

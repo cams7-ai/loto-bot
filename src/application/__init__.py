@@ -19,7 +19,6 @@ from application.notification import (
 from application.ports import (
     BetRepositoryPort,
     BrowserAutomationPort,
-    ClockPort,
     NotificationPort,
     ValidationCodePort,
 )
@@ -32,9 +31,13 @@ from application.services import (
     current_and_previous_months,
     handle_custom_failure,
     handle_failure,
+    invalid_catalog_detail,
     invalid_lottery_modality_detail,
+    invalid_month_year_detail,
     normalize_public_value,
+    parse_catalog_value,
     parse_portal_lottery_modality,
+    parse_portal_month_year,
     parse_positive_int,
 )
 from application.use_cases import (
@@ -58,7 +61,6 @@ __all__ = [
     "ValidationErrorDetail",
     "BetRepositoryPort",
     "BrowserAutomationPort",
-    "ClockPort",
     "NotificationPort",
     "ValidationCodePort",
     "PlacedBetService",
@@ -83,4 +85,8 @@ __all__ = [
     "normalize_public_value",
     "parse_portal_lottery_modality",
     "parse_positive_int",
+    "invalid_catalog_detail",
+    "invalid_month_year_detail",
+    "parse_catalog_value",
+    "parse_portal_month_year",
 ]

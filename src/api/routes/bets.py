@@ -26,14 +26,14 @@ from domain import (
     PortalBetType,
     PortalDrawType,
 )
-from shared import sao_paulo_timezone
+from shared import SaoPauloClock, sao_paulo_timezone
 
 router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
 CONTAINER_DEPENDENCY = Depends(get_container)
 RUN_BET_REQUEST_BODY = Body(default=None)
 
-BET_RUN_BAD_REQUEST_EXAMPLES = {
+BET_RUN_BAD_REQUEST_EXAMPLE = {
     ErrorCode.BAD_REQUEST.value: {
         "summary": ErrorCode.BAD_REQUEST.value,
         "value": {
@@ -56,7 +56,7 @@ BET_RUN_BAD_REQUEST_EXAMPLES = {
 }
 
 BETS_RUN_ERROR_RESPONSES = {
-    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST, examples=BET_RUN_BAD_REQUEST_EXAMPLES),
+    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST, examples=BET_RUN_BAD_REQUEST_EXAMPLE),
     403: error_response(
         "Confirmação de pagamento real desabilitada", ErrorCode.PAYMENT_CONFIRMATION_DISABLED_ERROR_CODE
     ),
@@ -108,7 +108,7 @@ BETS_RESPONSES = {
     **BETS_ERROR_RESPONSES,
 }
 
-PLACED_BET_RESPONSE = {
+PLACED_BET_RESPONSE_EXAMPLE = {
     "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
     "lottery_modality": LotteryModality.MEGA_SENA.name,
     "selected_numbers": ["01", "02", "03", "04", "05", "06"],
@@ -128,7 +128,7 @@ PLACED_BET_DETAIL_ERROR_RESPONSES = {
 PLACED_BET_DETAIL_RESPONSES = {
     200: success_response(
         "Detalhes da aposta obtidos com sucesso",
-        PLACED_BET_RESPONSE,
+        PLACED_BET_RESPONSE_EXAMPLE,
     ),
     **PLACED_BET_DETAIL_ERROR_RESPONSES,
 }
@@ -138,7 +138,7 @@ PLACED_BETS_ERROR_RESPONSES = {
 }
 
 PLACED_BETS_RESPONSES = {
-    200: success_response("Lista de apostas obtida com sucesso", [PLACED_BET_RESPONSE]),
+    200: success_response("Lista de apostas obtida com sucesso", [PLACED_BET_RESPONSE_EXAMPLE]),
     **PLACED_BETS_ERROR_RESPONSES,
 }
 
@@ -210,14 +210,16 @@ def list_portal_bets(
 ) -> list[PortalBetResponse]:
     results = []
     try:
-        results = container.list_portal_bets.run(
+        filters = BetRequestParser.parse_portal_bet_filters(
             bet_type=bet_type,
             lottery_modality=lottery_modality,
             draw_type=draw_type,
             month_year=month_year,
             status=status,
             sort_by=sort_by,
+            today=SaoPauloClock.today(),
         )
+        results = container.list_portal_bets.run(filters)
     except PortalBetFiltersValidationError as exc:
         ApiExceptionMapper.raise_invalid_parameters(exc)
     except ValueError as exc:
