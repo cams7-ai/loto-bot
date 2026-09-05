@@ -11,25 +11,13 @@ from domain.enums import (
     PortalDrawType,
     PortalYearMonth,
 )
+from infrastructure.selectors.lottery_modality_builder import LotteryModalityBuilder
 
 
 class PortalLotteryModalityBuilder:
     @staticmethod
     def get_lottery_modality(lottery_modality: LotteryModality | None) -> str:
-        labels = {
-            None: "Todas",
-            LotteryModality.DIA_DE_SORTE: "Dia de Sorte",
-            LotteryModality.DUPLA_SENA: "Dupla Sena",
-            LotteryModality.LOTECA: "Loteca",
-            LotteryModality.LOTOFACIL: "Lotofácil",
-            LotteryModality.LOTOMANIA: "Lotomania",
-            LotteryModality.MAIS_MILIONARIA: "+Milionária",
-            LotteryModality.MEGA_SENA: "Mega-Sena",
-            LotteryModality.QUINA: "Quina",
-            LotteryModality.SUPER_SETE: "Super Sete",
-            LotteryModality.TIMEMANIA: "Timemania",
-        }
-        return labels[lottery_modality]
+        return LotteryModalityBuilder.portal_filter_label(lottery_modality)
 
 
 class PortalBetFilterBuilder:

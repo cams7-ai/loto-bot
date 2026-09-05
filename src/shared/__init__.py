@@ -1,6 +1,12 @@
 from shared.clock import SaoPauloClock
 from shared.constants import SAO_PAULO_TIMEZONE
-from shared.datetime_utils import parse_sao_paulo_datetime, sao_paulo_timezone, with_sao_paulo_timezone
+from shared.datetime_utils import (
+    format_with_sao_paulo_timezone,
+    parse_sao_paulo_datetime,
+    sao_paulo_timezone,
+    with_sao_paulo_timezone,
+    with_utc,
+)
 from shared.masking import mask_sensitive_value
 
 __all__ = [
@@ -9,5 +15,7 @@ __all__ = [
     "parse_sao_paulo_datetime",
     "sao_paulo_timezone",
     "with_sao_paulo_timezone",
+    "with_utc",
+    "format_with_sao_paulo_timezone",
     "SaoPauloClock",
 ]

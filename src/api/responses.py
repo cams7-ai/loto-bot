@@ -30,12 +30,20 @@ def error_response(
     }
 
 
-def success_response(description: str, example: dict[str, Any]) -> dict:
+def success_response(
+    description: str,
+    example: Any | None = None,
+    *,
+    examples: dict[str, dict[str, Any]] | None = None,
+) -> dict:
+    media_definition: dict[str, Any] = {}
+    if examples is not None:
+        media_definition["examples"] = examples
+    elif example is not None:
+        media_definition["example"] = example
     return {
         "description": description,
         "content": {
-            Utf8JSONResponse.media_type: {
-                "example": example,
-            }
+            Utf8JSONResponse.media_type: media_definition,
         },
     }

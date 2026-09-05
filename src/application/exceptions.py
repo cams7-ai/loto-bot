@@ -7,7 +7,7 @@ from typing import Any
 @dataclass(frozen=True)
 class ValidationErrorDetail:
     field: str
-    rejected_value: str
+    rejected_value: object | None
     message: str
     allowed_values: list[str] | None = None
 

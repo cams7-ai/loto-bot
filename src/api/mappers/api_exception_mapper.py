@@ -38,10 +38,16 @@ class ApiExceptionMapper:
         ) from exc
 
     @staticmethod
-    def raise_invalid_fields(details: list[ValidationErrorDetail]) -> None:
-        raise ApiError(
+    def raise_invalid_fields(
+        details: list[ValidationErrorDetail],
+        cause: Exception | None = None,
+    ) -> None:
+        error = ApiError(
             status_code=400,
             code=ErrorCode.BAD_REQUEST,
             message="Campos inválidos",
             details=[detail.to_dict() for detail in details],
         )
+        if cause is None:
+            raise error
+        raise error from cause

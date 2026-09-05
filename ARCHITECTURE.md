@@ -44,6 +44,14 @@ FastAPI, rotas, schemas, tratamento padronizado de erros e composição de depen
 
 Em qualquer falha, o caso de uso registra o erro, aciona notificações e encerra a sessão.
 
+## Conferência de Resultados
+
+`POST /api/v1/bets/check_draws` valida o corpo integralmente na fronteira da API e entrega filtros tipados a `CheckBetDrawsUseCase`. O caso de uso compõe `ListPlacedBetsUseCase` e `ListPortalBetsUseCase`, correlaciona os DTOs em memória e usa `NotificationPort` sem acessar MongoDB, Playwright ou clients HTTP diretamente.
+
+A chave de correlação preserva modalidade canônica, ordem dos números e número textual do concurso. Se não houver histórico, o portal não é consultado; se não houver correspondência, nenhum canal de notificação é acionado. Havendo correspondências, uma única mensagem consolidada usa WhatsApp como canal primário e e-mail exclusivamente como fallback.
+
+O adapter Playwright continua sendo o responsável por timezone e normalização dos rótulos conhecidos do portal. O caso de uso preserva a sessão aberta após sucesso e não usa o tratamento de falha do fluxo de compra, evitando uma segunda notificação ou o fechamento indevido dos recursos persistentes.
+
 ## Segurança
 
 - Segredos entram apenas por variáveis de ambiente.

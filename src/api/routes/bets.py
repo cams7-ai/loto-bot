@@ -8,7 +8,14 @@ from api.dependencies import AppContainer, get_container
 from api.mappers import ApiExceptionMapper, ApiResponseMapper
 from api.parsers import BetRequestParser
 from api.responses import error_response, success_response
-from api.schemas import BetRunRequest, BetRunResponse, PlacedBetResponse, PortalBetResponse
+from api.schemas import (
+    BetRunRequest,
+    BetRunResponse,
+    CheckBetDrawsRequest,
+    CheckBetDrawsResponse,
+    PlacedBetResponse,
+    PortalBetResponse,
+)
 from application import (
     ALL,
     PortalBetFiltersValidationError,
@@ -32,6 +39,7 @@ router = APIRouter(prefix="/api/v1", tags=["bets"])
 placed_bets_router = APIRouter(prefix="/api/v1/history", tags=["placed-bets"])
 CONTAINER_DEPENDENCY = Depends(get_container)
 RUN_BET_REQUEST_BODY = Body(default=None)
+CHECK_BET_DRAWS_REQUEST_BODY = Body(default=None)
 
 BET_RUN_BAD_REQUEST_EXAMPLE = {
     ErrorCode.BAD_REQUEST.value: {
@@ -108,6 +116,72 @@ BETS_RESPONSES = {
     **BETS_ERROR_RESPONSES,
 }
 
+CHECK_BET_DRAWS_BAD_REQUEST_EXAMPLE = {
+    ErrorCode.BAD_REQUEST.value: {
+        "summary": ErrorCode.BAD_REQUEST.value,
+        "value": {
+            "error": {
+                "timestamp": "2026-07-28T22:00:00-03:00",
+                "status_code": 400,
+                "code": ErrorCode.BAD_REQUEST.value,
+                "message": "Campos inválidos",
+                "details": [
+                    {
+                        "field": "lottery_modality",
+                        "rejected_value": "abc",
+                        "allowed_values": [ALL, *LotteryModality.__members__],
+                        "message": "Valor inválido.",
+                    }
+                ],
+            }
+        },
+    }
+}
+
+CHECK_BET_DRAWS_RESPONSES = {
+    200: success_response(
+        "Conferência de apostas concluída",
+        examples={
+            "WHATSAPP": {
+                "summary": "Notificação enviada pelo WhatsApp",
+                "value": {
+                    "matched_bets": 1,
+                    "notification_sent": True,
+                    "notification_channel": "WHATSAPP",
+                    "message": "Conferência concluída e notificação enviada pelo WhatsApp.",
+                },
+            },
+            "EMAIL": {
+                "summary": "Notificação enviada por e-mail",
+                "value": {
+                    "matched_bets": 1,
+                    "notification_sent": True,
+                    "notification_channel": "EMAIL",
+                    "message": "Conferência concluída e notificação enviada por e-mail.",
+                },
+            },
+            "NONE": {
+                "summary": "Nenhuma correspondência encontrada",
+                "value": {
+                    "matched_bets": 0,
+                    "notification_sent": False,
+                    "notification_channel": "NONE",
+                    "message": "Conferência concluída. Nenhuma aposta correspondente foi encontrada.",
+                },
+            },
+        },
+    ),
+    400: error_response(
+        "Campos inválidos",
+        ErrorCode.BAD_REQUEST,
+        examples=CHECK_BET_DRAWS_BAD_REQUEST_EXAMPLE,
+    ),
+    409: BETS_RUN_ERROR_RESPONSES[409],
+    500: BETS_RUN_ERROR_RESPONSES[500],
+    502: BETS_RUN_ERROR_RESPONSES[502],
+    503: BETS_RUN_ERROR_RESPONSES[503],
+}
+
 PLACED_BET_RESPONSE_EXAMPLE = {
     "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
     "lottery_modality": LotteryModality.MEGA_SENA.name,
@@ -156,6 +230,27 @@ def run_bet(
         selected_lottery_modality = BetRequestParser.parse_selected_lottery_modality(request)
         result = container.run_bet_flow.run(selected_lottery_modality)
         return ApiResponseMapper.run_bet_response(result)
+    except AutomationError as exc:
+        ApiExceptionMapper.raise_api_error(exc)
+
+
+@router.post(
+    "/bets/check_draws",
+    response_model=CheckBetDrawsResponse,
+    responses=CHECK_BET_DRAWS_RESPONSES,
+)
+def check_bet_draws(
+    request: CheckBetDrawsRequest | None = CHECK_BET_DRAWS_REQUEST_BODY,
+    container: AppContainer = CONTAINER_DEPENDENCY,
+) -> CheckBetDrawsResponse | None:
+    try:
+        command = BetRequestParser.parse_check_bet_draws(request, today=SaoPauloClock.today())
+        result = container.check_bet_draws.run(command)
+        return ApiResponseMapper.check_bet_draws_response(result)
+    except PortalBetFiltersValidationError as exc:
+        ApiExceptionMapper.raise_invalid_fields(exc.details, exc)
+    except ValueError as exc:
+        ApiExceptionMapper.raise_bad_request(exc)
     except AutomationError as exc:
         ApiExceptionMapper.raise_api_error(exc)
 

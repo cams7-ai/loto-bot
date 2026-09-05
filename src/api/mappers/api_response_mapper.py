@@ -1,6 +1,7 @@
 from api.mappers import ApiExceptionMapper
 from api.schemas import (
     BetRunResponse,
+    CheckBetDrawsResponse,
     PlacedBetResponse,
     PortalBetResponse,
     SessionControlResponse,
@@ -8,14 +9,25 @@ from api.schemas import (
 )
 from application import (
     AutomationRunResult,
+    CheckBetDrawsResult,
     PlacedBetResult,
     PortalBetResult,
     SessionStatusResult,
 )
 from domain import LotteryModality
+from shared import format_with_sao_paulo_timezone
 
 
 class ApiResponseMapper:
+    @staticmethod
+    def check_bet_draws_response(result: CheckBetDrawsResult) -> CheckBetDrawsResponse:
+        return CheckBetDrawsResponse(
+            matched_bets=result.matched_bets,
+            notification_sent=result.notification_sent,
+            notification_channel=result.notification_channel,
+            message=result.message,
+        )
+
     @staticmethod
     def session_control_response(result: SessionStatusResult, message: str) -> SessionControlResponse:
         return SessionControlResponse(
@@ -54,7 +66,7 @@ class ApiResponseMapper:
     def portal_bets_response(results: list[PortalBetResult]) -> list[PortalBetResponse]:
         return [
             PortalBetResponse(
-                purchase_datetime=result.purchase_datetime,
+                purchase_datetime=format_with_sao_paulo_timezone(result.purchase_datetime),
                 lottery_modality=result.lottery_modality.name
                 if isinstance(result.lottery_modality, LotteryModality)
                 else result.lottery_modality,
@@ -84,5 +96,5 @@ class ApiResponseMapper:
             status=result.status,
             bet_amount=result.bet_amount,
             purchase_number=result.purchase_number,
-            bet_date=result.bet_date,
+            bet_date=format_with_sao_paulo_timezone(result.bet_date),
         )

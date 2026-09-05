@@ -10,6 +10,7 @@ from uuid import UUID
 from domain import (
     AutomationStatus,
     LotteryModality,
+    NotificationChannel,
     Operation,
     PortalBetRelativePeriod,
     PortalBetSortOrder,
@@ -98,3 +99,17 @@ class PortalBetResult:
     selected_numbers: list[str]
     draw_number: str
     status: str
+
+
+@dataclass(frozen=True)
+class CheckBetDrawsCommand:
+    history_filters: BetSearchFilters
+    portal_filters: PortalBetSearchFilters
+
+
+@dataclass(frozen=True)
+class CheckBetDrawsResult:
+    matched_bets: int
+    notification_sent: bool
+    notification_channel: NotificationChannel
+    message: str

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from application import (
+    CheckBetDrawsUseCase,
     GetPlacedBetUseCase,
     ListPlacedBetsUseCase,
     ListPortalBetsUseCase,
@@ -28,6 +29,7 @@ class AppContainer:
     list_placed_bets: ListPlacedBetsUseCase
     list_portal_bets: ListPortalBetsUseCase
     get_placed_bet: GetPlacedBetUseCase
+    check_bet_draws: CheckBetDrawsUseCase
 
 
 def build_container(settings: Settings | None = None) -> AppContainer:
@@ -60,6 +62,12 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         bet_persistence=bet_persistence,
         selected_lottery_modality=resolved_settings.selected_lottery_modality,
     )
+    check_bet_draws = CheckBetDrawsUseCase(
+        session=session,
+        list_placed_bets=list_placed_bets,
+        list_portal_bets=list_portal_bets,
+        notifier=notifier,
+    )
     return AppContainer(
         settings=resolved_settings,
         session=session,
@@ -68,6 +76,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         list_placed_bets=list_placed_bets,
         list_portal_bets=list_portal_bets,
         get_placed_bet=get_placed_bet,
+        check_bet_draws=check_bet_draws,
     )
 
 

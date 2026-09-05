@@ -1,5 +1,6 @@
 from domain.enums.error_code import ErrorCode
 from domain.enums.lottery_modality import SUPPORTED_BET_RUN_LOTTERY_MODALITIES, LotteryModality
+from domain.enums.notification_channel import NotificationChannel
 from domain.enums.operation import Operation
 from domain.enums.portal_bet_filters import (
     PortalBetRelativePeriod,
@@ -19,6 +20,7 @@ __all__ = [
     "WhatsAppMessageStatus",
     "LotteryModality",
     "SUPPORTED_BET_RUN_LOTTERY_MODALITIES",
+    "NotificationChannel",
     "PortalBetType",
     "PortalDrawType",
     "PortalBetRelativePeriod",

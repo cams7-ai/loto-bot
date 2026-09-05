@@ -57,15 +57,13 @@ class BrowserAutomationPort(Protocol):
         """Seleciona a modalidade."""
 
     def place_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
-        """Completa o jogo com números aleatórios."""
-        """Adiciona a aposta ao carrinho."""
+        """Completa o jogo com números aleatórios e adiciona a aposta ao carrinho."""
 
     def confirm_purchase(self, session: AutomationSession) -> None:
         """Confirma a compra."""
 
     def confirm_payment(self) -> None:
-        """Seleciona a forma de pagamento."""
-        """Confirma o pagamento no portal."""
+        """Seleciona a forma de pagamento e confirma o pagamento no portal."""
 
     def check_bet_processing(self, session: AutomationSession) -> None:
         """Acessa a página de conferência de processamento da aposta."""

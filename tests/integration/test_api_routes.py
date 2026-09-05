@@ -288,7 +288,7 @@ async def test_list_portal_bets_route_serializes_portal_lottery_modality_label(o
     assert response.status_code == 200
     assert response.json() == [
         {
-            "purchase_datetime": "2026-07-24T21:30:00",
+            "purchase_datetime": "2026-07-24T21:30:00-03:00",
             "lottery_modality": "MEGA_SENA",
             "selected_numbers": ["01", "02", "03", "04", "05", "06"],
             "draw_number": "2890",
@@ -317,7 +317,7 @@ async def test_list_portal_bets_route_preserves_portal_purchase_time_for_aware_d
         response = await client.get("/api/v1/bets")
 
     assert response.status_code == 200
-    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44Z"
+    assert response.json()[0]["purchase_datetime"] == "2026-07-27T23:14:44-03:00"
 
 
 @pytest.mark.anyio
@@ -357,7 +357,7 @@ async def test_list_placed_bets_route_returns_serialized_bets(override_container
             "status": "Efetivada",
             "bet_amount": "6",
             "purchase_number": "123456",
-            "bet_date": "2026-07-12T18:08:14.457000",
+            "bet_date": "2026-07-12T18:08:14-03:00",
         }
     ]
     assert override_container.list_placed_bets.calls[0] == BetSearchFilters()

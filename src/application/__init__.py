@@ -2,6 +2,8 @@ from application.dto import (
     AutomationRunResult,
     BetResult,
     BetSearchFilters,
+    CheckBetDrawsCommand,
+    CheckBetDrawsResult,
     PlacedBetResult,
     PortalBetResult,
     PortalBetSearchFilters,
@@ -10,6 +12,9 @@ from application.dto import (
 )
 from application.exceptions import PortalBetFiltersValidationError, ValidationErrorDetail
 from application.notification import (
+    DRAW_RESULTS_SUBJECT,
+    build_draw_results_email_message,
+    build_draw_results_whatsapp_message,
     build_error_email_message,
     build_error_whatsapp_message,
     build_success_email_message,
@@ -41,6 +46,7 @@ from application.services import (
     parse_positive_int,
 )
 from application.use_cases import (
+    CheckBetDrawsUseCase,
     GetPlacedBetUseCase,
     ListPlacedBetsUseCase,
     ListPortalBetsUseCase,
@@ -50,8 +56,11 @@ from application.use_cases import (
 
 __all__ = [
     "AutomationRunResult",
+    "DRAW_RESULTS_SUBJECT",
     "BetResult",
     "BetSearchFilters",
+    "CheckBetDrawsCommand",
+    "CheckBetDrawsResult",
     "PlacedBetResult",
     "PortalBetResult",
     "PortalBetSearchFilters",
@@ -65,6 +74,8 @@ __all__ = [
     "ValidationCodePort",
     "PlacedBetService",
     "build_error_email_message",
+    "build_draw_results_email_message",
+    "build_draw_results_whatsapp_message",
     "build_success_email_message",
     "build_success_whatsapp_message",
     "build_error_whatsapp_message",
@@ -73,6 +84,7 @@ __all__ = [
     "handle_custom_failure",
     "close_if_open",
     "GetPlacedBetUseCase",
+    "CheckBetDrawsUseCase",
     "ListPlacedBetsUseCase",
     "ListPortalBetsUseCase",
     "RunBetFlowUseCase",

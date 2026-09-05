@@ -1,6 +1,8 @@
 from api.schemas.automation_schema import (
     BetRunRequest,
     BetRunResponse,
+    CheckBetDrawsRequest,
+    CheckBetDrawsResponse,
     HealthResponse,
     PlacedBetResponse,
     PortalBetResponse,
@@ -12,6 +14,8 @@ from api.schemas.error_schema import ErrorResponse, error_response_examples
 __all__ = [
     "BetRunResponse",
     "BetRunRequest",
+    "CheckBetDrawsRequest",
+    "CheckBetDrawsResponse",
     "ErrorResponse",
     "error_response_examples",
     "HealthResponse",

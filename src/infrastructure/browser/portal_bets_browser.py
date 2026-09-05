@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import UTC, datetime
 
 from application import (
     PortalBetResult,
     PortalBetSearchFilters,
-    normalize_public_value,
 )
-from domain import AutomationError, AutomationSession, LotteryModality, PortalBetSortOrder, PortalYearMonth
+from domain import AutomationError, AutomationSession, PortalBetSortOrder, PortalYearMonth
 from infrastructure.browser.playwright_common import PlaywrightBrowserBase
-from infrastructure.selectors import PortalBetFilterBuilder, Selectors
-from shared import parse_sao_paulo_datetime, sao_paulo_timezone
+from infrastructure.selectors import LotteryModalityBuilder, PortalBetFilterBuilder, Selectors
+from shared import parse_sao_paulo_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -229,21 +227,15 @@ class PortalBetsBrowserMixin(PlaywrightBrowserBase):
 
     @staticmethod
     def _purchase_datetime_with_timezone(purchase_datetime: datetime) -> datetime:
-        return purchase_datetime.astimezone(UTC).replace(tzinfo=sao_paulo_timezone(), microsecond=0)
+        # The portal table renders the purchase wall time shifted by the local UTC
+        # offset (for example, 21:42 is exposed as 18:42 in Sao Paulo). Recover
+        # the original wall time before returning the API's Sao Paulo datetime.
+        return purchase_datetime.astimezone(UTC).replace(
+            microsecond=0,
+        )
 
     @classmethod
     def _lottery_modality(cls, value: str | None) -> str:
         stripped = value.strip()
-        normalized_value = cls._modality_value(stripped)
-        for modality in LotteryModality:
-            if normalized_value in {
-                cls._modality_value(modality.name),
-                cls._modality_value(modality.value),
-            }:
-                return modality.name
-
-        return stripped
-
-    @staticmethod
-    def _modality_value(value: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", normalize_public_value(value))
+        modality = LotteryModalityBuilder.from_portal_label(stripped)
+        return modality.name if modality is not None else stripped

@@ -11,6 +11,8 @@ O código segue Clean Architecture: domínio e casos de uso não dependem de Fas
 - `GET /api/v1/sessions/stop`: encerra o navegador e o WhatsApp Web.
 - `GET /api/v1/sessions/status`: consulta o estado da sessão.
 - `POST /api/v1/bets/run`: executa o fluxo principal de aposta.
+- `POST /api/v1/bets/check_draws`: confere apostas persistidas contra os resultados atuais do portal e notifica as correspondências.
+- `GET /api/v1/bets`: consulta ao vivo as apostas exibidas no portal.
 - `GET /api/v1/history/bets`: lista apostas persistidas no MongoDB, com filtros opcionais.
 - `GET /api/v1/history/bets/{bet_id}`: consulta uma aposta persistida pelo identificador.
 - Swagger UI em `/docs`, ReDoc em `/redoc` e OpenAPI em `/openapi.json`.
@@ -114,7 +116,7 @@ Resposta:
 [
   {
     "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-    "lottery_modality": "mega-sena",
+    "lottery_modality": "MEGA_SENA",
     "selected_numbers": ["01", "02", "03", "04", "05", "06"],
     "draw_number": "1234",
     "status": "Efetivada",
@@ -185,7 +187,7 @@ Resposta:
 ```json
 {
   "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-  "lottery_modality": "mega-sena",
+  "lottery_modality": "MEGA_SENA",
   "selected_numbers": ["01", "02", "03", "04", "05", "06"],
   "draw_number": "1234",
   "status": "Efetivada",
@@ -334,13 +336,13 @@ Parâmetros opcionais:
 
 Resposta:
 
-Na resposta, `lottery_modality` é serializado como `LotteryModality`, por exemplo `mega-sena`.
+Na resposta, modalidades reconhecidas são serializadas pelo nome de `LotteryModality`, por exemplo `MEGA_SENA`. Rótulos desconhecidos do portal são preservados literalmente.
 
 ```json
 [
   {
     "purchase_datetime": "2026-07-19T12:33:09-03:00",
-    "lottery_modality": "mega-sena",
+    "lottery_modality": "MEGA_SENA",
     "selected_numbers": ["09", "18", "33", "40", "47", "53"],
     "draw_number": "3034",
     "status": "Aposta não premiada"
@@ -351,3 +353,67 @@ Na resposta, `lottery_modality` é serializado como `LotteryModality`, por exemp
 Quando filtros forem inválidos, a API retorna `400` com `details` e sem `fields` ou `messages`.
 
 Diferença de escopo: `/api/v1/bets` consulta ao vivo a sessão autenticada do portal; `/api/v1/history/bets` consulta somente o histórico persistido no MongoDB.
+
+## Conferir Resultados das Apostas
+
+`POST /api/v1/bets/check_draws` consulta primeiro o histórico persistido e, quando houver apostas no período, usa a sessão autenticada já aberta para consultar o portal uma única vez. O endpoint não inicia nem encerra o navegador ou o WhatsApp.
+
+Campos obrigatórios:
+
+- `lottery_modality`: `ALL` ou o nome de um membro de `LotteryModality`, como `MEGA_SENA`;
+- `start_date`: início do período no formato `YYYY-MM-DD`;
+- `end_date`: fim do período no formato `YYYY-MM-DD`.
+
+Campos opcionais:
+
+- `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`;
+- `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`;
+- `month_year`: período relativo, `YYYY-MM` na janela aceita pelo portal ou rótulo localizado `Mês/YYYY`;
+- `status`: `ALL`, `PAID` ou `EXPIRED`.
+
+`sort_by` não faz parte desse contrato. Quando os campos opcionais são omitidos, o portal usa seus padrões atuais: todos os tipos, modalidades, concursos e situações, últimos sete dias e data decrescente.
+
+```powershell
+curl -X POST http://localhost:8000/api/v1/bets/check_draws `
+  -H "Content-Type: application/json" `
+  -d '{"lottery_modality":"MEGA_SENA","start_date":"2026-07-27","end_date":"2026-07-27","bet_type":"INDIVIDUAL","draw_type":"ALL","month_year":"LAST_7_DAYS","status":"ALL"}'
+```
+
+A correlação usa exatamente a modalidade canônica, a sequência posicional dos números selecionados e o número textual do concurso. A ordem e os zeros à esquerda são preservados; situação e datas não participam da chave.
+
+Quando houver correspondências, todas são reunidas em uma única mensagem. O WhatsApp é tentado primeiro e, se estiver desabilitado, fechado ou não confirmar o envio, o mesmo conteúdo é enviado por e-mail. Um WhatsApp bem-sucedido não gera e-mail.
+
+Resposta com WhatsApp:
+
+```json
+{
+  "matched_bets": 1,
+  "notification_sent": true,
+  "notification_channel": "WHATSAPP",
+  "message": "Conferência concluída e notificação enviada pelo WhatsApp."
+}
+```
+
+Resposta com fallback para e-mail:
+
+```json
+{
+  "matched_bets": 1,
+  "notification_sent": true,
+  "notification_channel": "EMAIL",
+  "message": "Conferência concluída e notificação enviada por e-mail."
+}
+```
+
+Quando o histórico estiver vazio, a sessão do navegador nem sequer é consultada. Quando o histórico contiver apostas, mas nenhuma chave corresponder ao portal, também não há notificação:
+
+```json
+{
+  "matched_bets": 0,
+  "notification_sent": false,
+  "notification_channel": "NONE",
+  "message": "Conferência concluída. Nenhuma aposta correspondente foi encontrada."
+}
+```
+
+Entradas inválidas retornam `400` com todos os detalhes acumulados antes de qualquer acesso ao repositório, navegador ou serviço de notificação. Uma sessão fechada retorna `409` somente quando a consulta ao portal for necessária. Se WhatsApp e e-mail falharem, a API retorna `503` e não informa sucesso falso.

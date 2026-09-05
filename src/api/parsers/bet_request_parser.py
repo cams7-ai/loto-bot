@@ -2,11 +2,12 @@ import re
 from datetime import date, datetime, time
 
 from api.mappers import ApiExceptionMapper
-from api.schemas import BetRunRequest
+from api.schemas import BetRunRequest, CheckBetDrawsRequest
 from application import (
     INVALID_DATE_MESSAGE,
     INVALID_DRAW_NUMBER_MESSAGE,
     BetSearchFilters,
+    CheckBetDrawsCommand,
     PortalBetFiltersValidationError,
     PortalBetSearchFilters,
     ValidationErrorDetail,
@@ -28,6 +29,8 @@ from domain import (
 
 
 class BetRequestParser:
+    REQUIRED_FIELD_MESSAGE = "Campo obrigatório."
+
     @classmethod
     def parse_selected_lottery_modality(cls, request: BetRunRequest | None) -> LotteryModality | None:
         if request is None or request.selected_lottery_modality is None:
@@ -38,7 +41,6 @@ class BetRequestParser:
             ApiExceptionMapper.raise_invalid_fields(
                 [invalid_lottery_modality_detail("selected_lottery_modality", request.selected_lottery_modality)]
             )
-            return None
 
     @classmethod
     def parse_placed_bet_filters(
@@ -145,7 +147,7 @@ class BetRequestParser:
         parsed_bet_type = cls._parse_portal_bet_filter(
             details,
             lambda: parse_catalog_value("bet_type", bet_type, PortalBetType),
-            lambda: invalid_catalog_detail("bet_type", bet_type or "", PortalBetType),  # noqa: F821
+            lambda: invalid_catalog_detail("bet_type", bet_type or "", PortalBetType),
         )
         parsed_lottery_modality = cls._parse_portal_bet_filter(
             details,
@@ -187,6 +189,148 @@ class BetRequestParser:
                 value is not None for value in (bet_type, lottery_modality, draw_type, month_year, status, sort_by)
             ),
         )
+
+    @classmethod
+    def parse_check_bet_draws(
+        cls,
+        request: CheckBetDrawsRequest | None,
+        *,
+        today: date,
+    ) -> CheckBetDrawsCommand:
+        values = request.model_dump() if request is not None else {}
+        details: list[ValidationErrorDetail] = []
+
+        raw_lottery_modality = values.get("lottery_modality")
+        lottery_modality = cls._parse_required_text(
+            details,
+            "lottery_modality",
+            raw_lottery_modality,
+            lambda value: parse_portal_lottery_modality(value),
+            lambda value: invalid_lottery_modality_detail("lottery_modality", value),
+        )
+        raw_start_date = values.get("start_date")
+        start_date = cls._parse_required_text(
+            details,
+            "start_date",
+            raw_start_date,
+            lambda value: cls._parse_history_date(value, end_of_day=False),
+            lambda value: ValidationErrorDetail("start_date", value, INVALID_DATE_MESSAGE),
+        )
+        raw_end_date = values.get("end_date")
+        end_date = cls._parse_required_text(
+            details,
+            "end_date",
+            raw_end_date,
+            lambda value: cls._parse_history_date(value, end_of_day=True),
+            lambda value: ValidationErrorDetail("end_date", value, INVALID_DATE_MESSAGE),
+        )
+        if start_date is not None and end_date is not None and start_date > end_date:
+            details.append(
+                ValidationErrorDetail(
+                    field="start_date",
+                    rejected_value=raw_start_date,
+                    message="Valor inválido. A data inicial não pode ser maior que a data final.",
+                )
+            )
+
+        bet_type = cls._parse_optional_text(
+            details,
+            "bet_type",
+            values.get("bet_type"),
+            lambda value: parse_catalog_value("bet_type", value, PortalBetType),
+            lambda value: invalid_catalog_detail("bet_type", value, PortalBetType),
+        )
+        draw_type = cls._parse_optional_text(
+            details,
+            "draw_type",
+            values.get("draw_type"),
+            lambda value: parse_catalog_value("draw_type", value, PortalDrawType),
+            lambda value: invalid_catalog_detail("draw_type", value, PortalDrawType),
+        )
+        raw_month_year = values.get("month_year")
+        month_year = cls._parse_optional_text(
+            details,
+            "month_year",
+            raw_month_year,
+            lambda value: parse_portal_month_year(value, today),
+            lambda value: invalid_month_year_detail(value, today),
+        )
+        status = cls._parse_optional_text(
+            details,
+            "status",
+            values.get("status"),
+            lambda value: parse_catalog_value("status", value, PortalBetStatus),
+            lambda value: invalid_catalog_detail("status", value, PortalBetStatus),
+        )
+
+        if details:
+            raise PortalBetFiltersValidationError(details)
+
+        return CheckBetDrawsCommand(
+            history_filters=BetSearchFilters(
+                lottery_modality=lottery_modality,
+                draw_number=None,
+                start_date=start_date,
+                end_date=end_date,
+            ),
+            portal_filters=PortalBetSearchFilters(
+                bet_type=bet_type,
+                lottery_modality=lottery_modality,
+                draw_type=draw_type,
+                month_year=month_year,
+                status=status,
+                sort_by=None,
+                has_explicit_filters=True,
+            ),
+        )
+
+    @classmethod
+    def _parse_required_text[T](
+        cls,
+        details: list[ValidationErrorDetail],
+        field: str,
+        raw_value: object | None,
+        parser,
+        detail_factory,
+    ) -> T | None:
+        if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
+            details.append(ValidationErrorDetail(field, raw_value, cls.REQUIRED_FIELD_MESSAGE))
+            return None
+        return cls._parse_text(details, raw_value, parser, detail_factory)
+
+    @classmethod
+    def _parse_optional_text[T](
+        cls,
+        details: list[ValidationErrorDetail],
+        field: str,
+        raw_value: object | None,
+        parser,
+        detail_factory,
+    ) -> T | None:
+        if raw_value is None:
+            return None
+        return cls._parse_text(details, raw_value, parser, detail_factory, field)
+
+    @staticmethod
+    def _parse_text[T](
+        details: list[ValidationErrorDetail],
+        raw_value: object,
+        parser,
+        detail_factory,
+        field: str | None = None,
+    ) -> T | None:
+        if not isinstance(raw_value, str):
+            if field == "month_year":
+                template = detail_factory("")
+                details.append(ValidationErrorDetail(field, raw_value, template.message, template.allowed_values))
+            else:
+                details.append(detail_factory(raw_value))
+            return None
+        try:
+            return parser(raw_value)
+        except ValueError:
+            details.append(detail_factory(raw_value))
+            return None
 
     @staticmethod
     def _parse_portal_bet_filter[T](

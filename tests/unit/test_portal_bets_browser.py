@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import Mock
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from application.dto import PortalBetSearchFilters
-from domain import AutomationError
+from domain import AutomationError, LotteryModality
 from domain.enums import PortalBetSortOrder, PortalYearMonth
 from infrastructure.browser.portal_bets_browser import PortalBetsBrowserMixin
+from infrastructure.selectors import LotteryModalityBuilder, PortalBetFilterBuilder
 
 
 def _row_with_cells(cell_count: int, *, colspan: str | None = None) -> Mock:
@@ -25,7 +27,7 @@ def _valid_bet_row() -> Mock:
     cells = row.locator.return_value
     cell_items = [Mock() for _ in range(6)]
     cells.nth.side_effect = lambda index: cell_items[index]
-    cell_items[1].locator.return_value.all_inner_texts.return_value = ["24/07/2026", "21:30:00"]
+    cell_items[1].locator.return_value.all_inner_texts.return_value = ["24/07/2026", "18:30:00"]
     cell_items[2].inner_text.return_value = "Mega-Sena"
     cell_items[3].locator.return_value.all_inner_texts.return_value = ["01", "02", "03", "04", "05", "06"]
     cell_items[4].inner_text.return_value = "2890"
@@ -64,6 +66,15 @@ def test_parse_portal_bet_rows_ignores_auxiliary_colspan_row_and_keeps_bet():
     assert results[0].selected_numbers == ["01", "02", "03", "04", "05", "06"]
     assert results[0].draw_number == "2890"
     assert results[0].status == "Aposta Paga"
+    assert results[0].purchase_datetime == datetime(2026, 7, 24, 21, 30, tzinfo=UTC)
+
+
+def test_purchase_datetime_recovers_portal_shifted_wall_time():
+    portal_datetime = datetime(2026, 8, 23, 18, 42, 6, tzinfo=ZoneInfo("America/Sao_Paulo"))
+
+    result = PortalBetsBrowserMixin._purchase_datetime_with_timezone(portal_datetime)
+
+    assert result == datetime(2026, 8, 23, 21, 42, 6, tzinfo=UTC)
 
 
 def test_parse_portal_bet_rows_rejects_malformed_bet_row_without_colspan():
@@ -237,3 +248,16 @@ def test_filters_are_selected_compares_draw_type_when_filter_exists(monkeypatch)
     }
     monkeypatch.setattr(PortalBetsBrowserMixin, "_selected_label", selected_label)
     assert browser._filters_are_selected(page, labels) is False
+
+
+@pytest.mark.parametrize("modality", list(LotteryModality))
+def test_every_public_modality_has_filter_label_and_reverse_normalization(modality: LotteryModality) -> None:
+    labels = PortalBetFilterBuilder.labels(PortalBetSearchFilters(lottery_modality=modality))
+
+    assert labels["lottery_modality"]
+    assert LotteryModalityBuilder.from_portal_label(labels["lottery_modality"]) is modality
+    assert PortalBetsBrowserMixin._lottery_modality(labels["lottery_modality"]) == modality.name
+
+
+def test_portal_modality_normalization_preserves_unknown_label() -> None:
+    assert PortalBetsBrowserMixin._lottery_modality("Modalidade futura") == "Modalidade futura"

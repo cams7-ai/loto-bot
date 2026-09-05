@@ -7,15 +7,27 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfoNotFoundError
 
 from application import (
+    DRAW_RESULTS_SUBJECT,
     NotificationPort,
+    build_draw_results_email_message,
+    build_draw_results_whatsapp_message,
     build_error_email_message,
     build_error_whatsapp_message,
     build_success_email_message,
     build_success_whatsapp_message,
     get_error_message,
 )
-from application.dto import PurchaseResult
-from domain import AutomationError, AutomationSession, Operation, WhatsAppMessageStatus, WhatsAppSessionStatus
+from application.dto import PortalBetResult, PurchaseResult
+from domain import (
+    AutomationError,
+    AutomationSession,
+    ErrorMessage,
+    ExternalServiceError,
+    NotificationChannel,
+    Operation,
+    WhatsAppMessageStatus,
+    WhatsAppSessionStatus,
+)
 from infrastructure.clients.mail_sender_client import MailSenderClient
 from infrastructure.clients.whatsapp_notify_client import WhatsAppNotifyClient
 from shared import SAO_PAULO_TIMEZONE, sao_paulo_timezone
@@ -110,11 +122,52 @@ class NotificationGateway(NotificationPort):
         except Exception as exc:
             logger.error("Erro ao enviar e-mail de sucesso: %s", exc, extra=Operation.executed_operation(operation))
 
+    def notify_draw_results(
+        self,
+        session: AutomationSession,
+        bets: list[PortalBetResult],
+    ) -> NotificationChannel:
+        operation = Operation.CHECK_BET_DRAWS
+        if session.whatsapp_enabled:
+            try:
+                status = self._whatsapp.status(operation)
+                if status == WhatsAppSessionStatus.SESSION_OPEN.value:
+                    response = self._whatsapp.send_message(operation, build_draw_results_whatsapp_message(bets))
+                    if response == WhatsAppMessageStatus.SENT.value:
+                        logger.info(
+                            "Notificação da conferência enviada pelo WhatsApp",
+                            extra=Operation.executed_operation(operation),
+                        )
+                        return NotificationChannel.WHATSAPP
+            except Exception as exc:
+                logger.warning(
+                    "Falha ao enviar conferência pelo WhatsApp: %s",
+                    exc,
+                    extra=Operation.executed_operation(operation),
+                )
+
+        try:
+            self._mail.send(
+                operation,
+                DRAW_RESULTS_SUBJECT,
+                build_draw_results_email_message(bets),
+            )
+        except ExternalServiceError:
+            raise
+        except Exception as exc:
+            raise ExternalServiceError(ErrorMessage.FALLBACK_EMAIL_SEND_FAILED, operation=operation) from exc
+
+        logger.info(
+            "Notificação da conferência enviada por e-mail",
+            extra=Operation.executed_operation(operation),
+        )
+        return NotificationChannel.EMAIL
+
     def _send_mail_fallback(self, exc: AutomationError) -> None:
         operation = exc.operation
         try:
             timestamp_timezone = sao_paulo_timezone()
-        except ZoneInfoNotFoundError:  # pragma: no cover - depends on host timezone database.
+        except ZoneInfoNotFoundError:
             logger.warning(
                 "Timezone %s indisponível; usando UTC-03:00",
                 SAO_PAULO_TIMEZONE,

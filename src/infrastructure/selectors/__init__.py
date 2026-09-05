@@ -4,4 +4,10 @@ from infrastructure.selectors.portal_bet_filter_builder import PortalBetFilterBu
 
 get_lottery_modality = LotteryModalityBuilder.get_lottery_modality
 
-__all__ = ["Selectors", "get_lottery_modality", "PortalBetFilterBuilder", "PortalLotteryModalityBuilder"]
+__all__ = [
+    "Selectors",
+    "LotteryModalityBuilder",
+    "get_lottery_modality",
+    "PortalBetFilterBuilder",
+    "PortalLotteryModalityBuilder",
+]
