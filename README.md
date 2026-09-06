@@ -368,7 +368,7 @@ Campos opcionais:
 
 - `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`;
 - `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`;
-- `month_year`: período relativo, `YYYY-MM` na janela aceita pelo portal ou rótulo localizado `Mês/YYYY`;
+- `month_year`: período relativo, `YYYY-MM` na janela aceita pelo portal ou rótulo localizado `MM/YYYY`;
 - `status`: `ALL`, `PAID` ou `EXPIRED`.
 
 `sort_by` não faz parte desse contrato. Quando os campos opcionais são omitidos, o portal usa seus padrões atuais: todos os tipos, modalidades, concursos e situações, últimos sete dias e data decrescente.
