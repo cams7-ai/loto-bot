@@ -151,8 +151,8 @@ class BetRequestParser:
         )
         parsed_lottery_modality = cls._parse_portal_bet_filter(
             details,
-            lambda: parse_portal_lottery_modality(lottery_modality),
-            lambda: invalid_lottery_modality_detail("lottery_modality", lottery_modality or ""),
+            lambda: parse_portal_lottery_modality(lottery_modality, allow_special=False),
+            lambda: invalid_lottery_modality_detail("lottery_modality", lottery_modality or "", allow_special=False),
         )
         parsed_draw_type = cls._parse_portal_bet_filter(
             details,
@@ -205,8 +205,8 @@ class BetRequestParser:
             details,
             "lottery_modality",
             raw_lottery_modality,
-            lambda value: parse_portal_lottery_modality(value),
-            lambda value: invalid_lottery_modality_detail("lottery_modality", value),
+            lambda value: parse_portal_lottery_modality(value, allow_special=False),
+            lambda value: invalid_lottery_modality_detail("lottery_modality", value, allow_special=False),
         )
         raw_start_date = values.get("start_date")
         start_date = cls._parse_required_text(
@@ -266,9 +266,11 @@ class BetRequestParser:
         if details:
             raise PortalBetFiltersValidationError(details)
 
+        history_lottery_modality = cls._history_lottery_modality(lottery_modality, draw_type)
+
         return CheckBetDrawsCommand(
             history_filters=BetSearchFilters(
-                lottery_modality=lottery_modality,
+                lottery_modality=history_lottery_modality,
                 draw_number=None,
                 start_date=start_date,
                 end_date=end_date,
@@ -283,6 +285,17 @@ class BetRequestParser:
                 has_explicit_filters=True,
             ),
         )
+
+    @staticmethod
+    def _history_lottery_modality(
+        lottery_modality: LotteryModality | None,
+        draw_type: PortalDrawType | None,
+    ) -> LotteryModality | None:
+        if lottery_modality is None or draw_type is not PortalDrawType.SPECIAL:
+            return lottery_modality
+
+        special_modality_name = f"{lottery_modality.name}_ESPECIAL"
+        return LotteryModality.__members__.get(special_modality_name, lottery_modality)
 
     @classmethod
     def _parse_required_text[T](

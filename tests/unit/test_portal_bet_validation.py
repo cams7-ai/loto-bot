@@ -29,11 +29,8 @@ EXPECTED_FILTER_DETAILS = [
             "ALL",
             "MEGA_SENA",
             "QUINA",
-            "QUINA_ESPECIAL",
             "LOTECA",
-            "LOTECA_ESPECIAL",
             "LOTOFACIL",
-            "LOTOFACIL_ESPECIAL",
             "MAIS_MILIONARIA",
             "LOTOMANIA",
             "TIMEMANIA",
@@ -104,3 +101,17 @@ def test_parse_portal_bet_filters_returns_domain_filters():
         sort_by=PortalBetSortOrder.DATE_DESC,
         has_explicit_filters=True,
     )
+
+
+@pytest.mark.parametrize("lottery_modality", ["QUINA_ESPECIAL", "LOTECA_ESPECIAL", "LOTOFACIL_ESPECIAL"])
+def test_parse_portal_bet_filters_rejects_special_lottery_modalities(lottery_modality: str) -> None:
+    with pytest.raises(PortalBetFiltersValidationError) as captured:
+        BetRequestParser.parse_portal_bet_filters(
+            today=date(2026, 7, 24),
+            lottery_modality=lottery_modality,
+        )
+
+    detail = captured.value.details[0]
+    assert detail.field == "lottery_modality"
+    assert detail.rejected_value == lottery_modality
+    assert all(not value.endswith("_ESPECIAL") for value in detail.allowed_values or [])

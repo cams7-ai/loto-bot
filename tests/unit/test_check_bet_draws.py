@@ -141,6 +141,65 @@ def test_parse_check_bet_draws_maps_all_to_none_in_both_filters() -> None:
     assert result.portal_filters.has_explicit_filters is True
 
 
+@pytest.mark.parametrize(
+    ("lottery_modality", "expected_history_modality"),
+    [
+        ("QUINA", LotteryModality.QUINA_ESPECIAL),
+        ("LOTECA", LotteryModality.LOTECA_ESPECIAL),
+        ("LOTOFACIL", LotteryModality.LOTOFACIL_ESPECIAL),
+    ],
+)
+def test_parse_check_bet_draws_maps_special_draw_to_special_history_modality(
+    lottery_modality: str,
+    expected_history_modality: LotteryModality,
+) -> None:
+    result = BetRequestParser.parse_check_bet_draws(
+        CheckBetDrawsRequest(
+            lottery_modality=lottery_modality,
+            start_date="2026-07-01",
+            end_date="2026-07-31",
+            draw_type="SPECIAL",
+        ),
+        today=date(2026, 7, 28),
+    )
+
+    assert result.history_filters.lottery_modality is expected_history_modality
+    assert result.portal_filters.lottery_modality is LotteryModality[lottery_modality]
+    assert result.portal_filters.draw_type is PortalDrawType.SPECIAL
+
+
+def test_parse_check_bet_draws_keeps_valid_history_modality_when_special_variant_does_not_exist() -> None:
+    result = BetRequestParser.parse_check_bet_draws(
+        CheckBetDrawsRequest(
+            lottery_modality="MEGA_SENA",
+            start_date="2026-07-01",
+            end_date="2026-07-31",
+            draw_type="SPECIAL",
+        ),
+        today=date(2026, 7, 28),
+    )
+
+    assert result.history_filters.lottery_modality is LotteryModality.MEGA_SENA
+    assert isinstance(result.history_filters.lottery_modality, LotteryModality)
+
+
+@pytest.mark.parametrize("lottery_modality", ["QUINA_ESPECIAL", "LOTECA_ESPECIAL", "LOTOFACIL_ESPECIAL"])
+def test_parse_check_bet_draws_rejects_special_lottery_modalities(lottery_modality: str) -> None:
+    request = CheckBetDrawsRequest(
+        lottery_modality=lottery_modality,
+        start_date="2026-07-01",
+        end_date="2026-07-31",
+    )
+
+    with pytest.raises(PortalBetFiltersValidationError) as captured:
+        BetRequestParser.parse_check_bet_draws(request, today=date(2026, 7, 28))
+
+    detail = captured.value.details[0]
+    assert detail.field == "lottery_modality"
+    assert detail.rejected_value == lottery_modality
+    assert all(not value.endswith("_ESPECIAL") for value in detail.allowed_values or [])
+
+
 def test_parse_check_bet_draws_accumulates_raw_validation_details_in_contract_order() -> None:
     request = CheckBetDrawsRequest(
         lottery_modality="invalid",

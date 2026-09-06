@@ -20,11 +20,8 @@ EXPECTED_FILTER_DETAILS = [
             "ALL",
             "MEGA_SENA",
             "QUINA",
-            "QUINA_ESPECIAL",
             "LOTECA",
-            "LOTECA_ESPECIAL",
             "LOTOFACIL",
-            "LOTOFACIL_ESPECIAL",
             "MAIS_MILIONARIA",
             "LOTOMANIA",
             "TIMEMANIA",
@@ -47,6 +44,28 @@ EXPECTED_FILTER_DETAILS = [
 class InvalidPortalBetFiltersUseCase:
     def run(self, **filters):
         raise PortalBetFiltersValidationError(EXPECTED_FILTER_DETAILS)
+
+
+class TrackingPortalBetsUseCase:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def run(self, filters):
+        self.calls.append(filters)
+        return []
+
+
+def test_list_portal_bets_openapi_description_excludes_special_lottery_modalities() -> None:
+    operation = app.openapi()["paths"]["/api/v1/bets"]["get"]
+    lottery_modality = next(
+        parameter for parameter in operation["parameters"] if parameter["name"] == "lottery_modality"
+    )
+
+    assert lottery_modality["description"] == (
+        "Modalidade: ALL, MEGA_SENA, QUINA, LOTECA, LOTOFACIL, MAIS_MILIONARIA, "
+        "LOTOMANIA, TIMEMANIA, DUPLA_SENA, DIA_DE_SORTE, SUPER_SETE."
+    )
+    assert "_ESPECIAL" not in lottery_modality["description"]
 
 
 @pytest.mark.anyio
@@ -80,6 +99,25 @@ async def test_list_portal_bets_returns_all_filter_validation_messages():
     assert "timestamp" in error
     assert "messages" not in error
     assert "fields" not in error
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("lottery_modality", ["QUINA_ESPECIAL", "LOTECA_ESPECIAL", "LOTOFACIL_ESPECIAL"])
+async def test_list_portal_bets_rejects_special_lottery_modalities(lottery_modality: str) -> None:
+    use_case = TrackingPortalBetsUseCase()
+    app.dependency_overrides[get_container] = lambda: SimpleNamespace(list_portal_bets=use_case)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/v1/bets", params={"lottery_modality": lottery_modality})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    detail = response.json()["error"]["details"][0]
+    assert detail["rejected_value"] == lottery_modality
+    assert all(not value.endswith("_ESPECIAL") for value in detail["allowed_values"])
+    assert use_case.calls == []
 
 
 @pytest.mark.anyio

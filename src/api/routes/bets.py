@@ -18,6 +18,7 @@ from api.schemas import (
 )
 from application import (
     ALL,
+    PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES,
     PortalBetFiltersValidationError,
     current_and_previous_months,
 )
@@ -98,7 +99,36 @@ BETS_RUN_RESPONSES = {
     **BETS_RUN_ERROR_RESPONSES,
 }
 
-BETS_ERROR_RESPONSES = {status_code: BETS_RUN_ERROR_RESPONSES[status_code] for status_code in (400, 409, 500, 503)}
+PORTAL_BETS_BAD_REQUEST_EXAMPLE = {
+    ErrorCode.BAD_REQUEST.value: {
+        "summary": ErrorCode.BAD_REQUEST.value,
+        "value": {
+            "error": {
+                "timestamp": "2026-06-16T10:00:00-03:00",
+                "status_code": 400,
+                "code": ErrorCode.BAD_REQUEST.value,
+                "message": "Parâmetros inválidos",
+                "details": [
+                    {
+                        "field": "lottery_modality",
+                        "rejected_value": "abc",
+                        "allowed_values": PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES[1:],
+                        "message": "Valor inválido.",
+                    }
+                ],
+            }
+        },
+    }
+}
+
+BETS_ERROR_RESPONSES = {
+    400: error_response(
+        "Requisição inválida",
+        ErrorCode.BAD_REQUEST,
+        examples=PORTAL_BETS_BAD_REQUEST_EXAMPLE,
+    ),
+    **{status_code: BETS_RUN_ERROR_RESPONSES[status_code] for status_code in (409, 500, 503)},
+}
 
 BETS_RESPONSES = {
     200: success_response(
@@ -129,7 +159,7 @@ CHECK_BET_DRAWS_BAD_REQUEST_EXAMPLE = {
                     {
                         "field": "lottery_modality",
                         "rejected_value": "abc",
-                        "allowed_values": [ALL, *LotteryModality.__members__],
+                        "allowed_values": PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES,
                         "message": "Valor inválido.",
                     }
                 ],
@@ -193,10 +223,43 @@ PLACED_BET_RESPONSE_EXAMPLE = {
     "bet_date": "2026-07-12T18:08:14-03:00",
 }
 
+PLACED_BET_DETAIL_BAD_REQUEST_EXAMPLE = {
+    ErrorCode.BAD_REQUEST.value: {
+        "summary": ErrorCode.BAD_REQUEST.value,
+        "value": {
+            "error": {
+                "status_code": 400,
+                "code": ErrorCode.BAD_REQUEST.value,
+                "message": "Identificador da aposta inválido.",
+            }
+        },
+    }
+}
+
+PLACED_BET_DETAIL_INTERNAL_ERROR_EXAMPLE = {
+    ErrorCode.INTERNAL_SERVER_ERROR.value: {
+        "summary": ErrorCode.INTERNAL_SERVER_ERROR.value,
+        "value": {
+            "error": {
+                "status_code": 500,
+                "code": ErrorCode.INTERNAL_SERVER_ERROR.value,
+                "message": "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado.",
+            }
+        },
+    }
+}
+
 PLACED_BET_DETAIL_ERROR_RESPONSES = {
-    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
-    404: error_response("Rota não encontrada", ErrorCode.ROUTE_NOT_FOUND),
-    500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
+    400: error_response(
+        "Requisição inválida",
+        ErrorCode.BAD_REQUEST,
+        examples=PLACED_BET_DETAIL_BAD_REQUEST_EXAMPLE,
+    ),
+    500: error_response(
+        "Erro interno",
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        examples=PLACED_BET_DETAIL_INTERNAL_ERROR_EXAMPLE,
+    ),
 }
 
 PLACED_BET_DETAIL_RESPONSES = {
@@ -208,7 +271,8 @@ PLACED_BET_DETAIL_RESPONSES = {
 }
 
 PLACED_BETS_ERROR_RESPONSES = {
-    status_code: PLACED_BET_DETAIL_ERROR_RESPONSES[status_code] for status_code in (400, 500)
+    400: error_response("Requisição inválida", ErrorCode.BAD_REQUEST),
+    500: error_response("Erro interno", ErrorCode.INTERNAL_SERVER_ERROR),
 }
 
 PLACED_BETS_RESPONSES = {
@@ -268,7 +332,7 @@ def list_portal_bets(
     ),
     lottery_modality: str | None = Query(
         default=None,
-        description=f"Modalidade: {ALL}, {', '.join(modality.name for modality in LotteryModality)}.",
+        description=f"Modalidade: {', '.join(PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES)}.",
         examples=[LotteryModality.MEGA_SENA.name],
     ),
     draw_type: str | None = Query(

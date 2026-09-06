@@ -328,7 +328,7 @@ curl "http://localhost:8000/api/v1/bets?bet_type=INDIVIDUAL&lottery_modality=MEG
 Parâmetros opcionais:
 
 - `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`.
-- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `QUINA_ESPECIAL`, `LOTECA`, `LOTECA_ESPECIAL`, `LOTOFACIL`, `LOTOFACIL_ESPECIAL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
+- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `LOTECA`, `LOTOFACIL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
 - `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`.
 - `month_year`: `LAST_7_DAYS`, `LAST_15_DAYS`, `LAST_30_DAYS`, `LAST_45_DAYS`, `LAST_90_DAYS` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
 - `status`: `ALL`, `PAID` ou `EXPIRED`.
@@ -360,7 +360,7 @@ Diferença de escopo: `/api/v1/bets` consulta ao vivo a sessão autenticada do p
 
 Campos obrigatórios:
 
-- `lottery_modality`: `ALL` ou o nome de um membro de `LotteryModality`, como `MEGA_SENA`;
+- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `LOTECA`, `LOTOFACIL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`;
 - `start_date`: início do período no formato `YYYY-MM-DD`;
 - `end_date`: fim do período no formato `YYYY-MM-DD`.
 
@@ -379,7 +379,7 @@ curl -X POST http://localhost:8000/api/v1/bets/check_draws `
   -d '{"lottery_modality":"MEGA_SENA","start_date":"2026-07-27","end_date":"2026-07-27","bet_type":"INDIVIDUAL","draw_type":"ALL","month_year":"LAST_7_DAYS","status":"ALL"}'
 ```
 
-A correlação usa exatamente a modalidade canônica, a sequência posicional dos números selecionados e o número textual do concurso. A ordem e os zeros à esquerda são preservados; situação e datas não participam da chave.
+A correlação usa exatamente a modalidade canônica, a sequência posicional dos números selecionados e o número textual do concurso. Quando `draw_type` é `SPECIAL`, o filtro do histórico usa a variante `_ESPECIAL` existente da modalidade, como `QUINA_ESPECIAL`; modalidades sem essa variante permanecem inalteradas. A ordem e os zeros à esquerda são preservados; situação e datas não participam da chave.
 
 Quando houver correspondências, todas são reunidas em uma única mensagem. O WhatsApp é tentado primeiro e, se estiver desabilitado, fechado ou não confirmar o envio, o mesmo conteúdo é enviado por e-mail. Um WhatsApp bem-sucedido não gera e-mail.
 

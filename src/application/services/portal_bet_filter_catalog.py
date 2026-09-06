@@ -34,6 +34,9 @@ INVALID_DATE_MESSAGE = "Valor inválido. Utilize o formato YYYY-MM-DD."
 INVALID_DRAW_NUMBER_MESSAGE = "Valor inválido. Informe número maior que zero."
 
 LOTTERY_MODALITY_ALLOWED_VALUES = [ALL, *LotteryModality.__members__]
+PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES = [
+    value for value in LOTTERY_MODALITY_ALLOWED_VALUES if not value.endswith("_ESPECIAL")
+]
 
 
 def parse_catalog_value[T: Enum](parameter: str, value: str | None, enum_type: type[T]) -> T | None:
@@ -61,26 +64,37 @@ def _allowed_catalog_values(enum_type: type[Enum]) -> list[str]:
     return [member.name for member in enum_type]
 
 
-def parse_portal_lottery_modality(value: str | None, allow_all: bool = True) -> LotteryModality | None:
+def parse_portal_lottery_modality(
+    value: str | None,
+    allow_all: bool = True,
+    allow_special: bool = True,
+) -> LotteryModality | None:
     if value is None:
         return None
 
     stripped = value.strip()
-    if stripped in LotteryModality.__members__:
+    if stripped in LotteryModality.__members__ and (allow_special or not stripped.endswith("_ESPECIAL")):
         return LotteryModality[stripped]
 
     if allow_all and stripped == ALL:
         return None
 
-    allowed = ", ".join(LOTTERY_MODALITY_ALLOWED_VALUES)
+    allowed_values = LOTTERY_MODALITY_ALLOWED_VALUES if allow_special else PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES
+    allowed = ", ".join(allowed_values)
     raise ValueError(f"Parâmetro lottery_modality inválido. Valores permitidos: {allowed}.")
 
 
-def invalid_lottery_modality_detail(parameter: str, value: str) -> ValidationErrorDetail:
+def invalid_lottery_modality_detail(
+    parameter: str,
+    value: str,
+    allow_special: bool = True,
+) -> ValidationErrorDetail:
     return ValidationErrorDetail(
         field=parameter,
         rejected_value=value,
-        allowed_values=list(LOTTERY_MODALITY_ALLOWED_VALUES),
+        allowed_values=list(
+            LOTTERY_MODALITY_ALLOWED_VALUES if allow_special else PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES
+        ),
         message=INVALID_VALUE_MESSAGE,
     )
 

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from application import PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES
 from domain import LotteryModality, NotificationChannel
 
 
@@ -51,7 +52,11 @@ class CheckBetDrawsRequest(BaseModel):
         json_schema_extra={
             "required": ["lottery_modality", "start_date", "end_date"],
             "properties": {
-                "lottery_modality": {"type": "string", "examples": [LotteryModality.MEGA_SENA.name, "ALL"]},
+                "lottery_modality": {
+                    "type": "string",
+                    "enum": PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES,
+                    "examples": [LotteryModality.MEGA_SENA.name, "ALL"],
+                },
                 "start_date": {"type": "string", "format": "date", "examples": ["2026-07-27"]},
                 "end_date": {"type": "string", "format": "date", "examples": ["2026-07-27"]},
                 "bet_type": {"type": ["string", "null"], "examples": ["INDIVIDUAL"]},

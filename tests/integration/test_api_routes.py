@@ -184,7 +184,7 @@ async def test_openapi_error_responses_match_route_failures():
         "503",
     }
     assert set(paths["/api/v1/history/bets"]["get"]["responses"]) == {"200", "400", "500"}
-    assert set(paths["/api/v1/history/bets/{bet_id}"]["get"]["responses"]) == {"200", "400", "404", "500"}
+    assert set(paths["/api/v1/history/bets/{bet_id}"]["get"]["responses"]) == {"200", "400", "500"}
 
     start_409_examples = paths["/api/v1/sessions/start"]["get"]["responses"]["409"]["content"][
         "application/json; charset=utf-8"
@@ -200,6 +200,61 @@ async def test_openapi_error_responses_match_route_failures():
         "APOSTA_TEMPORARIAMENTE_DESABILITADA",
     }
     assert start_409_examples["SESSAO_JA_ABERTA"]["value"]["error"]["status_code"] == 409
+
+    check_draws_400 = paths["/api/v1/bets/check_draws"]["post"]["responses"]["400"]
+    assert check_draws_400["description"] == "Campos inválidos"
+    assert set(check_draws_400["content"]["application/json; charset=utf-8"]["examples"]) == {"REQUISICAO_INVALIDA"}
+
+    portal_bets_400 = paths["/api/v1/bets"]["get"]["responses"]["400"]
+    assert portal_bets_400["content"]["application/json; charset=utf-8"]["examples"]["REQUISICAO_INVALIDA"][
+        "value"
+    ] == {
+        "error": {
+            "timestamp": "2026-06-16T10:00:00-03:00",
+            "status_code": 400,
+            "code": "REQUISICAO_INVALIDA",
+            "message": "Parâmetros inválidos",
+            "details": [
+                {
+                    "field": "lottery_modality",
+                    "rejected_value": "abc",
+                    "allowed_values": [
+                        "MEGA_SENA",
+                        "QUINA",
+                        "LOTECA",
+                        "LOTOFACIL",
+                        "MAIS_MILIONARIA",
+                        "LOTOMANIA",
+                        "TIMEMANIA",
+                        "DUPLA_SENA",
+                        "DIA_DE_SORTE",
+                        "SUPER_SETE",
+                    ],
+                    "message": "Valor inválido.",
+                }
+            ],
+        }
+    }
+
+    placed_bet_detail_responses = paths["/api/v1/history/bets/{bet_id}"]["get"]["responses"]
+    assert placed_bet_detail_responses["400"]["content"]["application/json; charset=utf-8"]["examples"][
+        "REQUISICAO_INVALIDA"
+    ]["value"] == {
+        "error": {
+            "status_code": 400,
+            "code": "REQUISICAO_INVALIDA",
+            "message": "Identificador da aposta inválido.",
+        }
+    }
+    assert placed_bet_detail_responses["500"]["content"]["application/json; charset=utf-8"]["examples"]["ERRO_INTERNO"][
+        "value"
+    ] == {
+        "error": {
+            "status_code": 500,
+            "code": "ERRO_INTERNO",
+            "message": "Erro interno. Resultado da execução do fluxo de consulta de aposta não retornado.",
+        }
+    }
 
 
 @pytest.mark.anyio

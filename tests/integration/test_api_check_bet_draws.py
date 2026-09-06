@@ -37,6 +37,19 @@ async def test_check_bet_draws_openapi_documents_required_fields_and_named_succe
     request_schema = schema["components"]["schemas"]["CheckBetDrawsRequest"]
 
     assert request_schema["required"] == ["lottery_modality", "start_date", "end_date"]
+    assert request_schema["properties"]["lottery_modality"]["enum"] == [
+        "ALL",
+        "MEGA_SENA",
+        "QUINA",
+        "LOTECA",
+        "LOTOFACIL",
+        "MAIS_MILIONARIA",
+        "LOTOMANIA",
+        "TIMEMANIA",
+        "DUPLA_SENA",
+        "DIA_DE_SORTE",
+        "SUPER_SETE",
+    ]
     assert set(request_schema["properties"]) == {
         "lottery_modality",
         "start_date",
@@ -162,6 +175,32 @@ async def test_check_bet_draws_route_rejects_invalid_field_types_before_use_case
         "code": "REQUISICAO_INVALIDA",
         "message": "Corpo da requisição inválido.",
     }
+    assert use_case.calls == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("lottery_modality", ["QUINA_ESPECIAL", "LOTECA_ESPECIAL", "LOTOFACIL_ESPECIAL"])
+async def test_check_bet_draws_route_rejects_special_lottery_modalities(lottery_modality: str) -> None:
+    use_case = FakeCheckBetDraws()
+    app.dependency_overrides[get_container] = lambda: SimpleNamespace(check_bet_draws=use_case)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/v1/bets/check_draws",
+                json={
+                    "lottery_modality": lottery_modality,
+                    "start_date": "2026-07-27",
+                    "end_date": "2026-07-27",
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    detail = response.json()["error"]["details"][0]
+    assert detail["rejected_value"] == lottery_modality
+    assert all(not value.endswith("_ESPECIAL") for value in detail["allowed_values"])
     assert use_case.calls == []
 
 
