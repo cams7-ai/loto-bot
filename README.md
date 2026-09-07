@@ -1,54 +1,253 @@
 # LotoBot
 
-LotoBot é uma API REST em Python 3.12 para controlar uma sessão persistente do Chromium e executar, de forma observável e protegida, o fluxo de aposta no portal Loterias Online CAIXA.
+<div align="center">
 
-O código segue Clean Architecture: domínio e casos de uso não dependem de FastAPI, Playwright, HTTP, PyMongo ou Beanie. Integrações externas ficam em adapters de infraestrutura e podem ser substituídas por fakes nos testes.
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-1.44+-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)
+![Beanie](https://img.shields.io/badge/Beanie-1.26+-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-7.4+-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
 
-## Recursos
+</div>
 
-- `GET /health`: verifica a disponibilidade da API.
-- `GET /api/v1/sessions/start`: inicia a sessão do navegador e tenta iniciar o WhatsApp Web.
-- `GET /api/v1/sessions/stop`: encerra o navegador e o WhatsApp Web.
-- `GET /api/v1/sessions/status`: consulta o estado da sessão.
-- `POST /api/v1/bets/run`: executa o fluxo principal de aposta.
-- `POST /api/v1/bets/check_draws`: confere apostas persistidas contra os resultados atuais do portal e notifica as correspondências.
-- `GET /api/v1/bets`: consulta ao vivo as apostas exibidas no portal.
-- `GET /api/v1/history/bets`: lista apostas persistidas no MongoDB, com filtros opcionais.
-- `GET /api/v1/history/bets/{bet_id}`: consulta uma aposta persistida pelo identificador.
-- Swagger UI em `/docs`, ReDoc em `/redoc` e OpenAPI em `/openapi.json`.
+<div align="center">
+  <p><strong>API REST para automatizar, de forma controlada e observável, apostas no portal Loterias Online CAIXA</strong></p>
+  <p>
+    <a href="#visão-geral">Visão Geral</a> •
+    <a href="#arquitetura">Arquitetura</a> •
+    <a href="#pré-requisitos">Pré-requisitos</a> •
+    <a href="#quickstart">Quickstart</a> •
+    <a href="#api-endpoints">API Endpoints</a> •
+    <a href="#testes-e-qualidade">Testes</a> •
+    <a href="#documentação">Documentação</a> •
+    <a href="#monitoramento-e-observabilidade">Monitoramento</a>
+  </p>
+</div>
+
+> O LotoBot controla uma sessão persistente do Chromium, executa o fluxo de aposta, consulta apostas do portal, persiste histórico opcionalmente e confere resultados com notificação por WhatsApp ou e-mail.
+
+> [!CAUTION]
+> A confirmação real do pagamento é bloqueada por padrão. Mantenha `CONFIRM_PAYMENT=false` durante desenvolvimento e testes. Nunca versione CPF, senha, CVV, dados de cartão, tokens ou códigos reais.
+
+## Visão Geral
+
+O LotoBot centraliza a automação do portal Loterias Online CAIXA atrás de uma API HTTP. O projeto usa Python 3.12, FastAPI e Playwright, com MongoDB opcional para o histórico de apostas.
+
+### Principais características
+
+- **Clean Architecture**: domínio e casos de uso independentes de FastAPI, Playwright, HTTP, PyMongo e Beanie.
+- **Sessão persistente**: perfil do Chromium reutilizado entre operações.
+- **Fluxo protegido**: pagamento real depende de autorização explícita por configuração.
+- **Consulta ao vivo**: leitura das apostas exibidas na sessão autenticada do portal.
+- **Persistência opcional**: histórico de apostas finalizadas em MongoDB.
+- **Conferência de resultados**: correlação entre histórico e portal, com notificação consolidada.
+- **Fallback de notificação**: WhatsApp como canal primário e e-mail como alternativa.
+- **Validação acumulada**: erros estruturados com todos os campos ou parâmetros inválidos.
+- **Documentação automática**: Swagger UI, ReDoc e OpenAPI.
+- **Testes determinísticos**: fakes e `httpx.MockTransport`, sem Chromium ou acesso ao portal real.
+
+### Arquitetura de comunicação
+
+```mermaid
+flowchart LR
+    C[Cliente HTTP] -->|REST| API[FastAPI]
+    API --> APP[Casos de uso]
+    APP -->|BrowserPort| PW[Playwright]
+    PW --> CAIXA[Portal Loterias CAIXA]
+    APP -->|BetRepositoryPort| MDB[(MongoDB)]
+    APP -->|ValidationCodePort| GMAIL[Gmail Reader]
+    APP -->|NotificationPort| WA[WhatsApp Notify]
+    APP -->|Fallback| MAIL[Mail Sender]
+
+    style API fill:#009688,stroke:#00695C,color:#fff
+    style APP fill:#3776AB,stroke:#234E70,color:#fff
+    style CAIXA fill:#1976D2,stroke:#0D47A1,color:#fff
+    style MDB fill:#47A248,stroke:#2E7D32,color:#fff
+```
 
 ## Arquitetura
 
-O projeto separa responsabilidades em quatro camadas principais:
+O projeto segue **Clean Architecture**, com dependências direcionadas para o domínio e contratos definidos por portas.
 
-- `domain`: entidades, enums, value objects, constantes e exceções de domínio.
-- `application`: casos de uso, portas, DTOs, serviços de aplicação e montagem de mensagens operacionais.
-- `infrastructure`: adapters concretos para Playwright, clients HTTP, configuração, logging, seletores e banco.
-- `api`: rotas FastAPI, schemas, handlers HTTP, mappers e composição de dependências.
+```mermaid
+flowchart TD
+    subgraph Entrada[API - ENTRADA]
+        R[Rotas FastAPI]
+        S[Schemas, parsers e mappers]
+    end
+    subgraph Aplicacao[APPLICATION]
+        U[Casos de uso]
+        P[Portas e serviços]
+    end
+    subgraph Dominio[DOMAIN]
+        E[Entidades e enums]
+        V[Value objects e exceções]
+    end
+    subgraph Infra[INFRASTRUCTURE]
+        B[Playwright]
+        DB[Beanie / MongoDB]
+        HC[Clients HTTP]
+        CFG[Configuração e logs]
+    end
 
-As regras de dependência são validadas por testes de arquitetura com `grimp`:
+    Entrada --> Aplicacao
+    Aplicacao --> Dominio
+    Infra --> Aplicacao
+    Infra --> Dominio
 
-- `domain` não pode depender de `application`, `api` ou `infrastructure`.
-- `application` não pode depender de `api` ou `infrastructure`.
-- `infrastructure` não pode depender de `api`.
-- `api` não pode acessar diretamente Playwright, PyMongo, Beanie ou clients HTTP.
-- Frameworks externos proibidos por camada também são checados nos testes.
-
-Para executar apenas os testes de arquitetura:
-
-```powershell
-python -m pytest tests/unit/test_architecture.py
+    style Dominio fill:#E8F5E9,stroke:#388E3C,stroke-width:3px
+    style Aplicacao fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    style Entrada fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    style Infra fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
 ```
 
-## Exemplos da API
+As regras são verificadas com `grimp`:
 
-### Saúde
+- `domain` não depende de `application`, `api` ou `infrastructure`;
+- `application` não depende de `api` ou `infrastructure`;
+- `infrastructure` não depende de `api`;
+- `api` não acessa diretamente Playwright, PyMongo, Beanie ou clients HTTP;
+- frameworks externos proibidos também são verificados por camada.
+
+### Estrutura do projeto
+
+```text
+loto-bot/
+├── src/
+│   ├── api/                         # FastAPI, contratos e tratamento HTTP
+│   ├── application/
+│   │   ├── use_cases/               # Casos de uso
+│   │   ├── ports/                   # Contratos de entrada e saída
+│   │   ├── services/                # Serviços de aplicação
+│   │   └── notification/            # Construção de notificações
+│   ├── domain/                      # Entidades, enums, VOs e exceções
+│   ├── infrastructure/
+│   │   ├── browser/                 # Automação Playwright
+│   │   ├── clients/                 # Gmail, e-mail e WhatsApp
+│   │   ├── database/                # MongoDB, Beanie e repositórios
+│   │   ├── selectors/               # Seletores centralizados do portal
+│   │   ├── config/                  # Configuração do ambiente
+│   │   └── logging/                 # Logging da aplicação
+│   └── shared/                      # Utilitários compartilhados
+├── tests/
+│   ├── unit/                        # Testes unitários e de arquitetura
+│   └── integration/                 # Testes dos contratos HTTP
+├── .env.example                     # Modelo de configuração local
+├── ARCHITECTURE.md                  # Decisões arquiteturais
+├── DEVELOPMENT.md                   # Guia de desenvolvimento
+└── pyproject.toml                   # Dependências e ferramentas
+```
+
+### Fluxo principal de aposta
+
+```mermaid
+sequenceDiagram
+    participant Cliente
+    participant API
+    participant CasoDeUso
+    participant Portal
+    participant Serviços
+
+    Cliente->>API: POST /api/v1/bets/run
+    API->>CasoDeUso: executar(modalidade)
+    CasoDeUso->>Portal: iniciar sessão e autenticar
+    Portal->>Serviços: obter código de validação
+    Serviços-->>Portal: código
+    CasoDeUso->>Portal: selecionar jogo e pagamento
+    CasoDeUso->>CasoDeUso: verificar CONFIRM_PAYMENT
+    CasoDeUso->>Portal: confirmar e validar compra
+    CasoDeUso-->>API: sessão, status e compra
+    API-->>Cliente: 200 OK
+```
+
+Em caso de falha, o fluxo registra o erro, tenta notificar e encerra os recursos. Consulte [ARCHITECTURE.md](ARCHITECTURE.md) para mais detalhes.
+
+## Pré-requisitos
+
+| Requisito | Versão | Descrição |
+|---|---:|---|
+| Python | 3.12+ | Runtime da aplicação |
+| pip | Atual | Instalação das dependências |
+| Chromium | Compatível com Playwright | Navegador controlado pela automação |
+| Git | Atual | Controle de versão |
+| MongoDB | Compatível com o driver configurado | Opcional; usado quando a persistência está habilitada |
+| Gmail Reader | Local | Obtém o código de validação |
+| Mail Sender | Local | Fallback de notificação |
+| WhatsApp Notify | Local | Canal primário quando habilitado |
+
+## Quickstart
+
+### Clone e instalação
+
+```powershell
+git clone <url-do-repositorio>
+cd loto-bot
+
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+python -m playwright install chromium
+```
+
+### Configuração local
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Preencha os placeholders apenas no ambiente local. Para uma primeira execução segura, mantenha:
+
+```env
+CONFIRM_PAYMENT=false
+MONGODB_ENABLED=false
+```
+
+### Execução
+
+```powershell
+python -m uvicorn api.server:app --app-dir src --host 0.0.0.0 --port 8000 --reload
+```
+
+Ou:
+
+```powershell
+python src/main.py
+```
+
+**Acessos locais:**
+
+- Health: <http://localhost:8000/health>
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+- OpenAPI: <http://localhost:8000/openapi.json>
+
+## API Endpoints
+
+| Método | Endpoint | Descrição | Dependência operacional |
+|---|---|---|---|
+| `GET` | `/health` | Verifica a disponibilidade | Nenhuma |
+| `GET` | `/api/v1/sessions/start` | Inicia Chromium e tenta iniciar WhatsApp Web | Serviços configurados |
+| `GET` | `/api/v1/sessions/stop` | Encerra Chromium e WhatsApp Web | Sessão aberta |
+| `GET` | `/api/v1/sessions/status` | Consulta o estado da sessão | Nenhuma |
+| `POST` | `/api/v1/bets/run` | Executa o fluxo completo de aposta | Portal e autenticação |
+| `GET` | `/api/v1/bets` | Consulta apostas ao vivo no portal | Sessão autenticada |
+| `POST` | `/api/v1/bets/check_draws` | Confere histórico e notifica | MongoDB e, se necessário, sessão aberta |
+| `GET` | `/api/v1/history/bets` | Lista apostas persistidas | MongoDB habilitado |
+| `GET` | `/api/v1/history/bets/{bet_id}` | Consulta uma aposta persistida | MongoDB habilitado |
+
+### Exemplos de uso
+
+<details>
+<summary>Saúde e controle de sessão</summary>
 
 ```powershell
 curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/sessions/start
+curl http://localhost:8000/api/v1/sessions/status
+curl http://localhost:8000/api/v1/sessions/stop
 ```
 
-Resposta:
+Resposta do health:
 
 ```json
 {
@@ -56,22 +255,24 @@ Resposta:
   "application": "LotoBot"
 }
 ```
+</details>
 
-### Executar Fluxo de Aposta
+<details>
+<summary>Executar o fluxo de aposta</summary>
+
+Sem corpo, a API usa `SELECTED_LOTTERY_MODALITY`:
 
 ```powershell
 curl -X POST http://localhost:8000/api/v1/bets/run
 ```
 
-Opcionalmente, informe a modalidade no corpo da requisição. Quando omitida, a API usa `SELECTED_LOTTERY_MODALITY`.
+Com modalidade explícita:
 
 ```powershell
 curl -X POST http://localhost:8000/api/v1/bets/run `
   -H "Content-Type: application/json" `
   -d '{"selected_lottery_modality":"MEGA_SENA"}'
 ```
-
-Resposta:
 
 ```json
 {
@@ -82,261 +283,25 @@ Resposta:
   "purchase_number": "123456"
 }
 ```
+</details>
 
-Quando `selected_lottery_modality` for inválido, a API retorna `400` com detalhes estruturados:
+<details>
+<summary>Consultar apostas ao vivo</summary>
 
-```json
-{
-  "error": {
-    "timestamp": "2026-06-16T10:00:00-03:00",
-    "status_code": 400,
-    "code": "REQUISICAO_INVALIDA",
-    "message": "Campos inválidos",
-    "details": [
-      {
-        "field": "selected_lottery_modality",
-        "rejected_value": "abc",
-        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
-        "message": "Valor inválido."
-      }
-    ]
-  }
-}
-```
-
-### Listar Histórico de Apostas
-
-```powershell
-curl "http://localhost:8000/api/v1/history/bets"
-```
-
-Resposta:
-
-```json
-[
-  {
-    "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-    "lottery_modality": "MEGA_SENA",
-    "selected_numbers": ["01", "02", "03", "04", "05", "06"],
-    "draw_number": "1234",
-    "status": "Efetivada",
-    "bet_amount": "5.00",
-    "purchase_number": "123456",
-    "bet_date": "2026-07-12T18:08:14"
-  }
-]
-```
-
-Filtros opcionais:
-
-```powershell
-curl "http://localhost:8000/api/v1/history/bets?lottery_modality=MEGA_SENA&draw_number=1234&start_date=2026-07-01&end_date=2026-07-31"
-```
-
-Parâmetros aceitos:
-
-- `lottery_modality`: modalidade da loteria, por exemplo `MEGA_SENA`.
-- `draw_number`: número inteiro do concurso, maior que zero.
-- `start_date`: início do intervalo de `bet_date`, no formato `YYYY-MM-DD`.
-- `end_date`: fim do intervalo de `bet_date`, no formato `YYYY-MM-DD`.
-
-Quando filtros forem inválidos, a API retorna `400` com todos os detalhes acumulados:
-
-```json
-{
-  "error": {
-    "timestamp": "2026-06-16T10:00:00-03:00",
-    "status_code": 400,
-    "code": "REQUISICAO_INVALIDA",
-    "message": "Parâmetros inválidos",
-    "details": [
-      {
-        "field": "lottery_modality",
-        "rejected_value": "abc",
-        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
-        "message": "Valor inválido."
-      },
-      {
-        "field": "draw_number",
-        "rejected_value": "abc",
-        "message": "Valor inválido. Informe número maior que zero."
-      },
-      {
-        "field": "start_date",
-        "rejected_value": "abc",
-        "message": "Valor inválido. Utilize o formato YYYY-MM-DD."
-      },
-      {
-        "field": "end_date",
-        "rejected_value": "abc",
-        "message": "Valor inválido. Utilize o formato YYYY-MM-DD."
-      }
-    ]
-  }
-}
-```
-
-### Consultar Aposta por Identificador
-
-```powershell
-curl http://localhost:8000/api/v1/history/bets/64ef8f7a6f9a8f0f8f0f8f0f
-```
-
-Resposta:
-
-```json
-{
-  "bet_id": "64ef8f7a6f9a8f0f8f0f8f0f",
-  "lottery_modality": "MEGA_SENA",
-  "selected_numbers": ["01", "02", "03", "04", "05", "06"],
-  "draw_number": "1234",
-  "status": "Efetivada",
-  "bet_amount": "5.00",
-  "purchase_number": "123456",
-  "bet_date": "2026-07-12T18:08:14"
-}
-```
-
-Quando o identificador for inválido, a API retorna `400`. Quando a aposta não existir, a API retorna `404`.
-
-## Respostas de Erro
-
-As exceções de domínio carregam o `status_code` como `http.HTTPStatus`. O `ApiExceptionMapper` usa esse valor para transformar falhas de automação em respostas HTTP padronizadas.
-
-O corpo de erro segue o formato:
-
-```json
-{
-  "error": {
-    "status_code": 409,
-    "code": "SESSAO_FECHADA",
-    "message": "A sessão de navegador já está fechada"
-  }
-}
-```
-
-Quando houver erro de validação acumulada de parâmetros ou campos, a API retorna `details`:
-
-```json
-{
-  "error": {
-    "timestamp": "2026-06-16T10:00:00-03:00",
-    "status_code": 400,
-    "code": "REQUISICAO_INVALIDA",
-    "message": "Parâmetros inválidos",
-    "details": [
-      {
-        "field": "lottery_modality",
-        "rejected_value": "abc",
-        "allowed_values": ["ALL", "MEGA_SENA", "QUINA", "QUINA_ESPECIAL", "LOTECA", "LOTECA_ESPECIAL", "LOTOFACIL", "LOTOFACIL_ESPECIAL", "MAIS_MILIONARIA", "LOTOMANIA", "TIMEMANIA", "DUPLA_SENA", "DIA_DE_SORTE", "SUPER_SETE"],
-        "message": "Valor inválido."
-      }
-    ]
-  }
-}
-```
-
-O campo `timestamp` é gerado no momento da resposta com timezone `America/Sao_Paulo`.
-
-O OpenAPI documenta exemplos específicos por código de erro em cada status HTTP, incluindo:
-
-- `400`: `REQUISICAO_INVALIDA`, `CPF_INVALIDO`.
-- `403`: `CONFIRMACAO_PAGAMENTO_DESABILITADA`.
-- `404`: `ROTA_NAO_ENCONTRADA`.
-- `409`: `SESSAO_JA_ABERTA`, `SESSAO_FECHADA`, `REGISTRO_APOSTA_INDIVIDUAL_FECHADO`, `APOSTA_TEMPORARIAMENTE_DESABILITADA`.
-- `429`: `LIMITE_MAXIMO_DIARIO_DE_COMPRAS`.
-- `500`: `FALHA_NA_AUTOMACAO`, `ERRO_INTERNO`.
-- `502`: `ERRO_NO_REDIRECIONAMENTO_DA_PAGINA`.
-- `503`: `SERVICO_EXTERNO_INDISPONIVEL`.
-
-## Instalação
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python -m playwright install chromium
-```
-
-## Configuração
-
-Copie `.env.example` para `.env` e preencha apenas localmente. Nunca versione CPF, senha, CVV, dados de cartão, tokens ou códigos reais.
-
-`CONFIRM_PAYMENT=false` é o padrão seguro. O clique real de confirmação de pagamento só é executado quando `CONFIRM_PAYMENT=true`.
-
-`MONGODB_ENABLED=false` também é o padrão seguro. Com esse valor, o fluxo local comum não exige MongoDB. Para persistir e consultar apostas finalizadas, configure:
-
-```env
-MONGODB_ENABLED=true
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=loto_bot
-```
-
-As variáveis `BROWSER_PROFILE_DIR`, `BROWSER_HEADLESS` e `BROWSER_TIMEOUT_SECONDS` controlam o Chromium do Playwright. O diretório de perfil persistente é criado automaticamente e caminhos relativos são resolvidos a partir da raiz local do projeto.
-
-## Execução
-
-```powershell
-python -m uvicorn api.server:app --app-dir src --host 0.0.0.0 --port 8000
-```
-
-Ou:
-
-```powershell
-python src/main.py
-```
-
-## Testes
-
-```powershell
-python -m pytest
-```
-
-Os testes usam fakes e `httpx.MockTransport`. Nenhum teste abre o Chromium nem acessa `ONLINE_LOTTERY_URL`.
-
-Além dos testes unitários e de integração, a suíte inclui testes de arquitetura com `grimp` para impedir dependências indevidas entre camadas.
-
-## Formatação e Qualidade
-
-O projeto usa Ruff para formatação e correções automáticas de lint.
-
-```powershell
-python -m ruff format src tests
-python -m ruff check --fix src tests
-```
-
-A configuração fica em `pyproject.toml`, com Python alvo `py312`, largura de linha `120` e regras básicas de lint para erros, imports, modernização, bugs comuns e simplificações.
-
-## Integrações Locais
-
-- Gmail Reader: `GET /api/v1/validation-code`
-- Mail Sender: `POST /api/v1/mail/send`
-- WhatsApp Notify: endpoints `/whatsapp/session/*` e `/whatsapp/messages/send`
-
-Falhas operacionais tentam notificar pelo WhatsApp Web e usam e-mail como fallback.
-
-## Consulta Ao Vivo de Apostas no Portal
-
-`GET /api/v1/bets` consulta as apostas exibidas no portal Loterias Online CAIXA usando a sessão persistente já autenticada. Antes de chamar essa rota, execute `GET /api/v1/sessions/start`. A rota não inicia, autentica, reinicia, fecha ou persiste dados automaticamente.
-
-Exemplo:
+A sessão deve estar aberta e autenticada. A rota não inicia, reinicia, encerra ou persiste dados automaticamente.
 
 ```powershell
 curl "http://localhost:8000/api/v1/bets?bet_type=INDIVIDUAL&lottery_modality=MEGA_SENA&draw_type=NORMAL&month_year=LAST_7_DAYS&status=PAID&sort_by=DATE_DESC"
 ```
 
-Parâmetros opcionais:
+Filtros opcionais:
 
-- `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`.
-- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `LOTECA`, `LOTOFACIL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`.
-- `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`.
-- `month_year`: `LAST_7_DAYS`, `LAST_15_DAYS`, `LAST_30_DAYS`, `LAST_45_DAYS`, `LAST_90_DAYS` ou `YYYY-MM` dentro do mês corrente em `America/Sao_Paulo` e cinco meses anteriores.
-- `status`: `ALL`, `PAID` ou `EXPIRED`.
+- `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`;
+- `lottery_modality`: `ALL` ou uma modalidade suportada;
+- `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`;
+- `month_year`: período relativo ou `YYYY-MM` dentro da janela aceita;
+- `status`: `ALL`, `PAID` ou `EXPIRED`;
 - `sort_by`: `DATE_ASC` ou `DATE_DESC`.
-
-Resposta:
-
-Na resposta, modalidades reconhecidas são serializadas pelo nome de `LotteryModality`, por exemplo `MEGA_SENA`. Rótulos desconhecidos do portal são preservados literalmente.
 
 ```json
 [
@@ -349,29 +314,21 @@ Na resposta, modalidades reconhecidas são serializadas pelo nome de `LotteryMod
   }
 ]
 ```
+</details>
 
-Quando filtros forem inválidos, a API retorna `400` com `details` e sem `fields` ou `messages`.
+<details>
+<summary>Consultar o histórico persistido</summary>
 
-Diferença de escopo: `/api/v1/bets` consulta ao vivo a sessão autenticada do portal; `/api/v1/history/bets` consulta somente o histórico persistido no MongoDB.
+```powershell
+curl "http://localhost:8000/api/v1/history/bets?lottery_modality=MEGA_SENA&draw_number=1234&start_date=2026-07-01&end_date=2026-07-31"
+curl http://localhost:8000/api/v1/history/bets/64ef8f7a6f9a8f0f8f0f8f0f
+```
 
-## Conferir Resultados das Apostas
+Filtros opcionais: `lottery_modality`, `draw_number`, `start_date` e `end_date`. Datas usam `YYYY-MM-DD`; o concurso deve ser maior que zero.
+</details>
 
-`POST /api/v1/bets/check_draws` consulta primeiro o histórico persistido e, quando houver apostas no período, usa a sessão autenticada já aberta para consultar o portal uma única vez. O endpoint não inicia nem encerra o navegador ou o WhatsApp.
-
-Campos obrigatórios:
-
-- `lottery_modality`: `ALL`, `MEGA_SENA`, `QUINA`, `LOTECA`, `LOTOFACIL`, `MAIS_MILIONARIA`, `LOTOMANIA`, `TIMEMANIA`, `DUPLA_SENA`, `DIA_DE_SORTE` ou `SUPER_SETE`;
-- `start_date`: início do período no formato `YYYY-MM-DD`;
-- `end_date`: fim do período no formato `YYYY-MM-DD`.
-
-Campos opcionais:
-
-- `bet_type`: `ALL`, `INDIVIDUAL` ou `POOL`;
-- `draw_type`: `ALL`, `NORMAL` ou `SPECIAL`;
-- `month_year`: período relativo, `YYYY-MM` na janela aceita pelo portal ou rótulo localizado `MM/YYYY`;
-- `status`: `ALL`, `PAID` ou `EXPIRED`.
-
-`sort_by` não faz parte desse contrato. Quando os campos opcionais são omitidos, o portal usa seus padrões atuais: todos os tipos, modalidades, concursos e situações, últimos sete dias e data decrescente.
+<details>
+<summary>Conferir resultados e notificar</summary>
 
 ```powershell
 curl -X POST http://localhost:8000/api/v1/bets/check_draws `
@@ -379,11 +336,7 @@ curl -X POST http://localhost:8000/api/v1/bets/check_draws `
   -d '{"lottery_modality":"MEGA_SENA","start_date":"2026-07-27","end_date":"2026-07-27","bet_type":"INDIVIDUAL","draw_type":"ALL","month_year":"LAST_7_DAYS","status":"ALL"}'
 ```
 
-A correlação usa exatamente a modalidade canônica, a sequência posicional dos números selecionados e o número textual do concurso. Quando `draw_type` é `SPECIAL`, o filtro do histórico usa a variante `_ESPECIAL` existente da modalidade, como `QUINA_ESPECIAL`; modalidades sem essa variante permanecem inalteradas. A ordem e os zeros à esquerda são preservados; situação e datas não participam da chave.
-
-Quando houver correspondências, todas são reunidas em uma única mensagem. O WhatsApp é tentado primeiro e, se estiver desabilitado, fechado ou não confirmar o envio, o mesmo conteúdo é enviado por e-mail. Um WhatsApp bem-sucedido não gera e-mail.
-
-Resposta com WhatsApp:
+Obrigatórios: `lottery_modality`, `start_date` e `end_date`. Opcionais: `bet_type`, `draw_type`, `month_year` e `status`. `sort_by` não faz parte desse contrato.
 
 ```json
 {
@@ -394,26 +347,219 @@ Resposta com WhatsApp:
 }
 ```
 
-Resposta com fallback para e-mail:
+O histórico é consultado primeiro. Se estiver vazio, o portal não é acessado. Correspondências são reunidas em uma mensagem; o WhatsApp é tentado primeiro e o e-mail é o fallback. Se ambos falharem, a API retorna `503`.
+</details>
+
+### Regras de correlação
+
+A conferência usa modalidade canônica, sequência posicional dos números e número textual do concurso. A ordem e os zeros à esquerda são preservados; situação e datas não participam da chave. Para `draw_type=SPECIAL`, o histórico usa a variante `_ESPECIAL` disponível, como `QUINA_ESPECIAL`.
+
+### Respostas de erro
 
 ```json
 {
-  "matched_bets": 1,
-  "notification_sent": true,
-  "notification_channel": "EMAIL",
-  "message": "Conferência concluída e notificação enviada por e-mail."
+  "error": {
+    "timestamp": "2026-06-16T10:00:00-03:00",
+    "status_code": 400,
+    "code": "REQUISICAO_INVALIDA",
+    "message": "Parâmetros inválidos",
+    "details": [
+      {
+        "field": "lottery_modality",
+        "rejected_value": "abc",
+        "allowed_values": ["ALL", "MEGA_SENA", "QUINA"],
+        "message": "Valor inválido."
+      }
+    ]
+  }
 }
 ```
 
-Quando o histórico estiver vazio, a sessão do navegador nem sequer é consultada. Quando o histórico contiver apostas, mas nenhuma chave corresponder ao portal, também não há notificação:
+O `timestamp` usa `America/Sao_Paulo`.
 
-```json
-{
-  "matched_bets": 0,
-  "notification_sent": false,
-  "notification_channel": "NONE",
-  "message": "Conferência concluída. Nenhuma aposta correspondente foi encontrada."
-}
+| Status | Situações |
+|---:|---|
+| `400` | Requisição, parâmetros, campos ou identificador inválidos |
+| `403` | Confirmação de pagamento desabilitada |
+| `404` | Rota não encontrada |
+| `409` | Estado inválido da sessão ou aposta indisponível |
+| `429` | Limite máximo diário de compras |
+| `500` | Falha de automação ou erro interno |
+| `502` | Erro de comunicação ou redirecionamento no portal |
+| `503` | Serviço externo indisponível |
+
+## Configuração
+
+As configurações são carregadas do ambiente e do arquivo `.env` por `pydantic-settings`.
+
+| Variável | Descrição | Padrão no código |
+|---|---|---|
+| `BETTOR_CPF` | CPF usado na autenticação | Placeholder |
+| `BETTOR_PASSWORD` | Senha do apostador | Placeholder |
+| `SELECTED_LOTTERY_MODALITY` | Modalidade padrão | `mega-sena` |
+| `CONFIRM_PAYMENT` | Autoriza pagamento real | `false` |
+| `BROWSER_PROFILE_DIR` | Perfil persistente do Chromium | `.lotobot-profile` |
+| `BROWSER_HEADLESS` | Chromium sem interface | `true` |
+| `BROWSER_TIMEOUT_SECONDS` | Timeout padrão do navegador | `5` |
+| `MONGODB_ENABLED` | Habilita persistência | `false` |
+| `MONGODB_URI` | URI do MongoDB | `mongodb://localhost:27017` |
+| `MONGODB_DATABASE` | Banco da aplicação | `loto_bot` |
+| `GMAIL_READER_URL` | Serviço do código de validação | `http://localhost:8001` |
+| `MAIL_SENDER_URL` | Serviço de e-mail | `http://localhost:8002` |
+| `WHATSAPP_NOTIFY_URL` | Serviço de WhatsApp | `http://localhost:8003` |
+| `WHATSAPP_ENABLED` | Habilita o WhatsApp | `false` |
+| `MAIL_TO` | Destinatário do fallback | Placeholder |
+
+Consulte [.env.example](.env.example) para a lista completa.
+
+Para habilitar o histórico:
+
+```env
+MONGODB_ENABLED=true
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DATABASE=loto_bot
 ```
 
-Entradas inválidas retornam `400` com todos os detalhes acumulados antes de qualquer acesso ao repositório, navegador ou serviço de notificação. Uma sessão fechada retorna `409` somente quando a consulta ao portal for necessária. Se WhatsApp e e-mail falharem, a API retorna `503` e não informa sucesso falso.
+`BROWSER_PROFILE_DIR` é criado automaticamente. Caminhos relativos são resolvidos a partir da raiz do projeto. Booleanos aceitam `true/false`, `yes/no`, `sim/não` e `1/0`.
+
+## Testes e Qualidade
+
+```powershell
+python -m pytest
+python -m pytest --cov=src --cov-report=term-missing
+python -m pytest tests/unit/test_architecture.py
+```
+
+Os testes não abrem o Chromium nem acessam `ONLINE_LOTTERY_URL`. A cobertura mínima configurada é de **100%**, descontados os módulos omitidos em `pyproject.toml`.
+
+Formatação e lint:
+
+```powershell
+python -m ruff format src tests
+python -m ruff check --fix src tests
+```
+
+O Ruff usa Python alvo `py312`, largura de 120 caracteres e regras para erros, imports, modernização, bugs e simplificações.
+
+## Documentação
+
+| Recurso | Local |
+|---|---|
+| Swagger UI | <http://localhost:8000/docs> |
+| ReDoc | <http://localhost:8000/redoc> |
+| OpenAPI JSON | <http://localhost:8000/openapi.json> |
+| Arquitetura | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Desenvolvimento | [DEVELOPMENT.md](DEVELOPMENT.md) |
+
+## Monitoramento e Observabilidade
+
+| Endpoint | Descrição | URL local |
+|---|---|---|
+| Health | Disponibilidade da aplicação | <http://localhost:8000/health> |
+
+- O nível de log é definido por `LOG_LEVEL`.
+- Eventos registram operação, processo e thread.
+- Dados sensíveis devem permanecer mascarados.
+- Falhas operacionais geram tentativa de notificação.
+
+Exemplo de probes:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+## Segurança
+
+- Nunca versione `.env` nem credenciais reais.
+- Mantenha `CONFIRM_PAYMENT=false` em desenvolvimento e CI.
+- Não registre CPF, senha, CVV, código de validação ou cartão.
+- Use conta e ambiente controlados para validar a automação.
+- Revise seletores antes de autorizar qualquer pagamento.
+- Não execute testes automatizados contra o portal real.
+
+## Contribuição
+
+1. Preserve as dependências da Clean Architecture.
+2. Não coloque regras de negócio em handlers FastAPI.
+3. Mantenha seletores em `infrastructure/selectors`.
+4. Atualize README, OpenAPI e exemplos ao alterar contratos.
+5. Inclua testes para cada comportamento alterado.
+6. Use Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:` e `test:`.
+
+### Antes de submeter um Pull Request
+
+- [ ] Todos os testes passam.
+- [ ] A cobertura permanece em 100% no escopo configurado.
+- [ ] Ruff não encontra violações.
+- [ ] Nenhum segredo ou dado pessoal foi incluído.
+- [ ] Contratos REST e exemplos foram revisados.
+- [ ] A confirmação de pagamento continua segura por padrão.
+
+```powershell
+python -m ruff format --check src tests
+python -m ruff check src tests
+python -m pytest --cov=src --cov-report=term-missing
+```
+
+## Troubleshooting
+
+<details>
+<summary>Chromium não está instalado</summary>
+
+```powershell
+python -m playwright install chromium
+```
+</details>
+
+<details>
+<summary>Porta 8000 em uso</summary>
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000
+python -m uvicorn api.server:app --app-dir src --port 8001
+```
+</details>
+
+<details>
+<summary>Sessão já aberta ou fechada</summary>
+
+```powershell
+curl http://localhost:8000/api/v1/sessions/status
+```
+</details>
+
+<details>
+<summary>Pagamento retorna 403</summary>
+
+Esse é o comportamento seguro quando `CONFIRM_PAYMENT=false`. Somente altere a variável após revisar o ambiente, os dados e a aposta.
+</details>
+
+<details>
+<summary>Histórico indisponível</summary>
+
+Verifique se o MongoDB está acessível e se `MONGODB_ENABLED`, `MONGODB_URI` e `MONGODB_DATABASE` estão consistentes.
+</details>
+
+<details>
+<summary>Falha no código de validação ou nas notificações</summary>
+
+Confirme se os serviços estão ativos nas URLs definidas por `GMAIL_READER_URL`, `WHATSAPP_NOTIFY_URL` e `MAIL_SENDER_URL`.
+</details>
+
+<details>
+<summary>Falha após mudança no portal</summary>
+
+Use `LOG_LEVEL=DEBUG`, inspecione o ponto da falha e revise `src/infrastructure/selectors`. Não habilite o pagamento enquanto o fluxo não estiver validado.
+</details>
