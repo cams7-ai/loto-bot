@@ -75,7 +75,7 @@ class NotificationMessageBuilder:
     @classmethod
     def build_draw_results_whatsapp_message(cls, bets: list[PortalBetResult]) -> str:
         blocks = [cls._draw_result_text(bet) for bet in bets]
-        return "Resultado da conferência de apostas\n\n" + "\n\n---\n\n".join(blocks)
+        return "🔎 Resultado da conferência de apostas\n\n" + "\n\n---\n\n".join(blocks)
 
     @classmethod
     def build_draw_results_email_message(cls, bets: list[PortalBetResult]) -> str:
