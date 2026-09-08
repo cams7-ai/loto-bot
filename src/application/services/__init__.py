@@ -1,3 +1,4 @@
+from application.services.lottery_modality_builder import LotteryModalityBuilder
 from application.services.placed_bet_service import PlacedBetService
 from application.services.portal_bet_filter_catalog import (
     ALL,
@@ -8,7 +9,6 @@ from application.services.portal_bet_filter_catalog import (
     invalid_catalog_detail,
     invalid_lottery_modality_detail,
     invalid_month_year_detail,
-    normalize_public_value,
     parse_catalog_value,
     parse_portal_lottery_modality,
     parse_portal_month_year,
@@ -31,9 +31,9 @@ __all__ = [
     "PORTAL_LOTTERY_MODALITY_ALLOWED_VALUES",
     "current_and_previous_months",
     "invalid_lottery_modality_detail",
-    "normalize_public_value",
     "parse_portal_lottery_modality",
     "parse_positive_int",
+    "LotteryModalityBuilder",
     "invalid_catalog_detail",
     "invalid_month_year_detail",
     "parse_catalog_value",

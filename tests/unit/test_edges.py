@@ -283,6 +283,7 @@ def test_lotobot_browser_settings_parse_like_whatsapp_notify(tmp_path, monkeypat
     project_root = Path(__file__).resolve().parents[2]
     assert settings.browser_profile_dir == (project_root / "perfil-local").resolve()
     assert Settings(BROWSER_HEADLESS="").browser_headless is False
+    assert Settings(BROWSER_HEADLESS="no").browser_headless is False
 
 
 def test_lotobot_browser_settings_reject_invalid_values():

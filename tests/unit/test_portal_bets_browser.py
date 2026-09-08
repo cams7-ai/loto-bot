@@ -6,11 +6,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from application import LotteryModalityBuilder
 from application.dto import PortalBetSearchFilters
 from domain import AutomationError, LotteryModality
 from domain.enums import PortalBetSortOrder, PortalYearMonth
 from infrastructure.browser.portal_bets_browser import PortalBetsBrowserMixin
-from infrastructure.selectors import LotteryModalityBuilder, PortalBetFilterBuilder
+from infrastructure.selectors import PortalBetFilterBuilder
 
 
 def _row_with_cells(cell_count: int, *, colspan: str | None = None) -> Mock:

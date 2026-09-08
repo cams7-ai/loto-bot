@@ -235,6 +235,28 @@ def test_parse_check_bet_draws_accumulates_raw_validation_details_in_contract_or
     ]
 
 
+def test_parse_check_bet_draws_reports_non_text_optional_values() -> None:
+    class Request:
+        @staticmethod
+        def model_dump() -> dict[str, object]:
+            return {
+                "lottery_modality": "MEGA_SENA",
+                "start_date": "2026-07-01",
+                "end_date": "2026-07-31",
+                "bet_type": 1,
+                "month_year": 2,
+            }
+
+    with pytest.raises(PortalBetFiltersValidationError) as captured:
+        BetRequestParser.parse_check_bet_draws(Request(), today=date(2026, 7, 28))
+
+    details = captured.value.details
+    assert [detail.field for detail in details] == ["bet_type", "month_year"]
+    assert [detail.rejected_value for detail in details] == [1, 2]
+    assert details[0].allowed_values == ["ALL", "INDIVIDUAL", "POOL"]
+    assert details[1].allowed_values is None
+
+
 @pytest.mark.parametrize("payload_model", [None, CheckBetDrawsRequest(), CheckBetDrawsRequest(lottery_modality="   ")])
 def test_parse_check_bet_draws_reports_all_required_fields(payload_model: CheckBetDrawsRequest | None) -> None:
     with pytest.raises(PortalBetFiltersValidationError) as captured:
@@ -392,8 +414,9 @@ def test_draw_result_messages_include_all_fields_convert_timezone_and_escape_htm
     email = build_draw_results_email_message([bet])
 
     assert "27/07/2026 23:14:44" in whatsapp
-    assert "Modalidade: MEGA_SENA" in whatsapp
-    assert "Números selecionados: 02, <20>" in whatsapp
+    assert "Modalidade: LotteryModality.MEGA_SENA" in whatsapp
+    assert "Modalidade: mega-sena" in whatsapp
+    assert "Números: 02, <20>" in whatsapp
     assert "Concurso: 3037&" in whatsapp
     assert "Situação: <Concurso não apurado>" in whatsapp
     assert "\n\n---\n\n" in whatsapp

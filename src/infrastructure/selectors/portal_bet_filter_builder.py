@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from application import LotteryModalityBuilder
 from application.dto import PortalBetSearchFilters
 from application.services.portal_bet_filter_catalog import portal_year_month_label
 from domain import LotteryModality
@@ -11,7 +12,6 @@ from domain.enums import (
     PortalDrawType,
     PortalYearMonth,
 )
-from infrastructure.selectors.lottery_modality_builder import LotteryModalityBuilder
 
 
 class PortalLotteryModalityBuilder:

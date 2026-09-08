@@ -2,7 +2,8 @@ from html import escape
 
 from application.dto import PortalBetResult, PurchaseResult
 from application.notification.error_message_builder import ErrorMessageBuilder
-from domain import AutomationError, BrlCurrencyFormatter, LotteryModality
+from application.services import LotteryModalityBuilder
+from domain import AutomationError, BrlCurrencyFormatter
 from shared import with_sao_paulo_timezone
 
 
@@ -83,7 +84,7 @@ class NotificationMessageBuilder:
             "<section>"
             f"<p><strong>Data/hora da compra:</strong> {escape(cls._purchase_datetime(bet))}</p>"
             f"<p><strong>Modalidade:</strong> {escape(cls._lottery_modality(bet))}</p>"
-            f"<p><strong>Números selecionados:</strong> "
+            f"<p><strong>Números:</strong> "
             f"{escape(', '.join(str(number) for number in bet.selected_numbers))}</p>"
             f"<p><strong>Concurso:</strong> {escape(str(bet.draw_number))}</p>"
             f"<p><strong>Situação:</strong> {escape(str(bet.status))}</p>"
@@ -97,7 +98,7 @@ class NotificationMessageBuilder:
         return (
             f"Data/hora da compra: {cls._purchase_datetime(bet)}\n"
             f"Modalidade: {cls._lottery_modality(bet)}\n"
-            f"Números selecionados: {', '.join(str(number) for number in bet.selected_numbers)}\n"
+            f"Números: {', '.join(str(number) for number in bet.selected_numbers)}\n"
             f"Concurso: {bet.draw_number}\n"
             f"Situação: {bet.status}"
         )
@@ -109,6 +110,7 @@ class NotificationMessageBuilder:
 
     @staticmethod
     def _lottery_modality(bet: PortalBetResult) -> str:
-        if isinstance(bet.lottery_modality, LotteryModality):
-            return bet.lottery_modality.name
-        return str(bet.lottery_modality)
+        lottery_modality = LotteryModalityBuilder.from_portal_label(str(bet.lottery_modality))
+        if lottery_modality is None:
+            return str(bet.lottery_modality)
+        return LotteryModalityBuilder.get_lottery_modality(lottery_modality) or "-"

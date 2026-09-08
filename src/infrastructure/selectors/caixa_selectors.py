@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from application import LotteryModalityBuilder
 from domain import LotteryModality
-from infrastructure.selectors.lottery_modality_builder import LotteryModalityBuilder
 
 
 class Selectors(StrEnum):

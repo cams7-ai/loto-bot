@@ -19,6 +19,7 @@ from application import (
     BetResult,
     BetSearchFilters,
     ListPortalBetsUseCase,
+    LotteryModalityBuilder,
     PortalBetResult,
     PortalBetSearchFilters,
     PurchaseResult,
@@ -47,7 +48,7 @@ from infrastructure import NotificationGateway, Selectors, Settings
 from infrastructure.database.connection import MongoDatabase
 from infrastructure.database.models import BetModel
 from infrastructure.database.repositories.beanie_bet_repository import BeanieBetRepository
-from infrastructure.selectors import LotteryModalityBuilder, PortalBetFilterBuilder
+from infrastructure.selectors import PortalBetFilterBuilder
 from shared import with_sao_paulo_timezone
 
 
@@ -133,6 +134,21 @@ def test_success_notification_builders_with_and_without_bets():
     assert "01, 02" in NotificationMessageBuilder.build_success_email_message(purchase(bets=[bet]))
     assert "01, 02" in NotificationMessageBuilder.build_success_whatsapp_message(purchase(bets=[bet]))
     assert "Número da compra" in NotificationMessageBuilder.build_success_whatsapp_message(purchase())
+
+
+def test_draw_result_message_keeps_unknown_lottery_modality():
+    bet = PortalBetResult(
+        purchase_datetime=datetime(2026, 8, 23, 12, 30),
+        lottery_modality="Modalidade futura",
+        selected_numbers=["01", "02"],
+        draw_number="100",
+        status="Premiada",
+    )
+
+    assert "Modalidade: Modalidade futura" in NotificationMessageBuilder.build_draw_results_whatsapp_message([bet])
+    assert "Modalidade:</strong> Modalidade futura" in NotificationMessageBuilder.build_draw_results_email_message(
+        [bet]
+    )
 
 
 def test_datetime_timezone_naive_and_aware_paths():

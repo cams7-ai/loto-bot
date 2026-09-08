@@ -3,7 +3,7 @@ from infrastructure.clients import GmailReaderClient, MailSenderClient, Notifica
 from infrastructure.config import Settings, get_settings
 from infrastructure.database import BeanieBetRepository, BetModel, MongoDatabase
 from infrastructure.logging import configure_logging
-from infrastructure.selectors import Selectors, get_lottery_modality
+from infrastructure.selectors import Selectors
 
 __all__ = [
     "Settings",
@@ -17,6 +17,5 @@ __all__ = [
     "BeanieBetRepository",
     "BetModel",
     "Selectors",
-    "get_lottery_modality",
     "PlaywrightBrowserAutomation",
 ]

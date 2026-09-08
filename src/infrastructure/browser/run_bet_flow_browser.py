@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import Page
 
+from application import LotteryModalityBuilder
 from application.dto import BetResult, PurchaseResult
 from domain import (
     AutomationError,
@@ -23,7 +24,7 @@ from domain import (
 )
 from infrastructure.browser.playwright_common import PlaywrightBrowserBase
 from infrastructure.browser.portal_data import Bet, PurchaseDetails, PurchaseTotals
-from infrastructure.selectors import Selectors, get_lottery_modality
+from infrastructure.selectors import Selectors
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,7 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
             extra=Operation.executed_operation(session.executed_operation),
         )
         return PurchaseResult(
-            lottery_modality=get_lottery_modality(lottery_modality),
+            lottery_modality=LotteryModalityBuilder.get_lottery_modality(lottery_modality),
             bets=[
                 BetResult(
                     numbers=bet.numbers,

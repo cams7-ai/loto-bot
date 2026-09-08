@@ -4,12 +4,13 @@ import logging
 from datetime import UTC, datetime
 
 from application import (
+    LotteryModalityBuilder,
     PortalBetResult,
     PortalBetSearchFilters,
 )
 from domain import AutomationError, AutomationSession, PortalBetSortOrder, PortalYearMonth
 from infrastructure.browser.playwright_common import PlaywrightBrowserBase
-from infrastructure.selectors import LotteryModalityBuilder, PortalBetFilterBuilder, Selectors
+from infrastructure.selectors import PortalBetFilterBuilder, Selectors
 from shared import parse_sao_paulo_datetime
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 import re
 
-from application import normalize_public_value
+from application.services.portal_bet_filter_catalog import normalize_public_value
 from domain import LotteryModality
 
 
