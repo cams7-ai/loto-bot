@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,8 +33,11 @@ class Settings(BaseSettings):
         default="/auth/realms/internet/protocol/openid-connect/auth", alias="OPENID_CONNECT_AUTH_PATH"
     )
 
+    integration_mode: Literal["LOCAL", "AWS"] = Field(default="LOCAL", alias="INTEGRATION_MODE")
     gmail_reader_url: str = Field(default="http://localhost:8001", alias="GMAIL_READER_URL")
     mail_sender_url: str = Field(default="http://localhost:8002", alias="MAIL_SENDER_URL")
+    gmail_reader_function_name: str = Field(default="gmail-reader", alias="GMAIL_READER_FUNCTION_NAME")
+    mail_sender_function_name: str = Field(default="mail-sender", alias="MAIL_SENDER_FUNCTION_NAME")
     whatsapp_notify_url: str = Field(default="http://localhost:8003", alias="WHATSAPP_NOTIFY_URL")
 
     validation_code_wait_timeout_seconds: int = Field(default=30, alias="VALIDATION_CODE_WAIT_TIMEOUT_SECONDS")

@@ -404,8 +404,11 @@ As configurações são carregadas do ambiente e do arquivo `.env` por `pydantic
 | `MONGODB_ENABLED` | Habilita persistência | `false` |
 | `MONGODB_URI` | URI do MongoDB | `mongodb://localhost:27017` |
 | `MONGODB_DATABASE` | Banco da aplicação | `loto_bot` |
-| `GMAIL_READER_URL` | Serviço do código de validação | `http://localhost:8001` |
-| `MAIL_SENDER_URL` | Serviço de e-mail | `http://localhost:8002` |
+| `INTEGRATION_MODE` | Transporte de Gmail Reader e Mail Sender: `LOCAL` ou `AWS` | `LOCAL` |
+| `GMAIL_READER_URL` | API HTTP usada em `LOCAL` | `http://localhost:8001` |
+| `MAIL_SENDER_URL` | API HTTP usada em `LOCAL` | `http://localhost:8002` |
+| `GMAIL_READER_FUNCTION_NAME` | Nome ou ARN da Lambda usado em `AWS` | `gmail-reader` |
+| `MAIL_SENDER_FUNCTION_NAME` | Nome ou ARN da Lambda usado em `AWS` | `mail-sender` |
 | `WHATSAPP_NOTIFY_URL` | Serviço de WhatsApp | `http://localhost:8003` |
 | `WHATSAPP_ENABLED` | Habilita o WhatsApp | `false` |
 | `MAIL_TO` | Destinatário do fallback | Placeholder |
@@ -421,6 +424,8 @@ MONGODB_DATABASE=loto_bot
 ```
 
 `BROWSER_PROFILE_DIR` é criado automaticamente. Caminhos relativos são resolvidos a partir da raiz do projeto. Booleanos aceitam `true/false`, `yes/no`, `sim/não` e `1/0`.
+
+Com `INTEGRATION_MODE=LOCAL`, o Gmail Reader e o Mail Sender são acessados por HTTP nas URLs configuradas. Com `INTEGRATION_MODE=AWS`, essas URLs são ignoradas e o SDK AWS invoca diretamente as funções indicadas por `GMAIL_READER_FUNCTION_NAME` e `MAIL_SENDER_FUNCTION_NAME`.
 
 ## Testes e Qualidade
 
@@ -555,7 +560,7 @@ Verifique se o MongoDB está acessível e se `MONGODB_ENABLED`, `MONGODB_URI` e 
 <details>
 <summary>Falha no código de validação ou nas notificações</summary>
 
-Confirme se os serviços estão ativos nas URLs definidas por `GMAIL_READER_URL`, `WHATSAPP_NOTIFY_URL` e `MAIL_SENDER_URL`.
+Confirme `WHATSAPP_NOTIFY_URL` e, conforme `INTEGRATION_MODE`, verifique as APIs em `GMAIL_READER_URL`/`MAIL_SENDER_URL` (`LOCAL`) ou as permissões e funções em `GMAIL_READER_FUNCTION_NAME`/`MAIL_SENDER_FUNCTION_NAME` (`AWS`).
 </details>
 
 <details>

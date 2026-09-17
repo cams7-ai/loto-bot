@@ -20,6 +20,10 @@ class Selectors(StrEnum):
     CPF_INVALID_ALERT = "//div[@id='username-alert' and @style='display: block;']"
     # Solicita o código de acesso
     RECEIVE_CODE_BUTTON = "//*[@id='form-login']//button[@name='login']"
+    LINK_DEVICE_NO_BUTTON = (
+        "//form[.//h4[normalize-space(.)='Vincular Dispositivo']]"
+        "//button[@name='login' and contains(concat(' ', normalize-space(@class), ' '), ' button-secondary ')]"
+    )
     # Informa o código de acesso
     CODE_FIELD = "//input[@id='codigo']"
     CODE_SEND_BUTTON = "//*[@id='form-login']//button[@name='login']"

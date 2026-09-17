@@ -41,3 +41,8 @@ desktop.ini
 
 artefatos/
 db/
+application-secret.json
+
+# AWS SAM
+.aws-sam/
+samconfig.toml

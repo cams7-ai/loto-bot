@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+import json
+import sys
+from io import BytesIO
+from types import SimpleNamespace
+
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from domain import (
     AutomationError,
@@ -28,36 +35,82 @@ def test_mask_sensitive_value():
     assert mask_sensitive_value(None) == ""
 
 
+def test_integration_mode_accepts_only_local_or_aws():
+    assert Settings(INTEGRATION_MODE="LOCAL").integration_mode == "LOCAL"
+    assert Settings(INTEGRATION_MODE="AWS").integration_mode == "AWS"
+    with pytest.raises(ValidationError):
+        Settings(INTEGRATION_MODE="OTHER")
+
+
+class FakeLambdaClient:
+    def __init__(self, payload: dict | None = None, error: Exception | None = None, function_error: str | None = None):
+        self.payload = payload or {"statusCode": 200, "body": json.dumps({"code": "123456"})}
+        self.error = error
+        self.function_error = function_error
+        self.calls = []
+
+    def invoke(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error:
+            raise self.error
+        result = {"Payload": BytesIO(json.dumps(self.payload).encode())}
+        if self.function_error:
+            result["FunctionError"] = self.function_error
+        return result
+
+
+def test_aws_clients_are_created_lazily(monkeypatch):
+    lambda_client = FakeLambdaClient()
+    boto3 = SimpleNamespace(client=lambda service: lambda_client if service == "lambda" else None)
+    monkeypatch.setitem(sys.modules, "boto3", boto3)
+
+    settings = Settings(INTEGRATION_MODE="AWS")
+    gmail_client = GmailReaderClient(settings)
+    mail_client = MailSenderClient(settings)
+
+    assert gmail_client._lambda_client() is lambda_client
+    assert mail_client._lambda_client() is lambda_client
+
+
+def test_http_clients_are_created_lazily(monkeypatch):
+    created_clients = []
+
+    def build_client(*, timeout):
+        client = SimpleNamespace(timeout=timeout)
+        created_clients.append(client)
+        return client
+
+    monkeypatch.setattr(httpx, "Client", build_client)
+    settings = Settings(INTEGRATION_MODE="LOCAL", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15)
+
+    assert GmailReaderClient(settings)._http_client().timeout == 20
+    assert MailSenderClient(settings)._http_client().timeout == 10
+    assert len(created_clients) == 2
+
+
 def test_gmail_reader_client_reads_code():
-    settings = Settings(GMAIL_READER_URL="http://gmail.local")
-    transport = httpx.MockTransport(lambda request: response(200, {"code": "123456"}))
-    client = GmailReaderClient(settings, httpx.Client(transport=transport))
+    lambda_client = FakeLambdaClient()
+    settings = Settings(INTEGRATION_MODE="AWS", GMAIL_READER_FUNCTION_NAME="gmail-reader")
+    client = GmailReaderClient(settings, lambda_client)
 
     assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "123456"
+    assert lambda_client.calls[0]["FunctionName"] == "gmail-reader"
 
 
 def test_gmail_reader_client_sends_wait_timeout_and_read_timeout():
-    seen = {}
-
-    def handler(request):
-        seen["url"] = str(request.url)
-        seen["timeout"] = request.extensions["timeout"]
-        return response(200, {"code": "123456"})
-
-    settings = Settings(GMAIL_READER_URL="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=45)
-    client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+    lambda_client = FakeLambdaClient()
+    settings = Settings(
+        INTEGRATION_MODE="AWS", GMAIL_READER_FUNCTION_NAME="gmail-reader", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15
+    )
+    client = GmailReaderClient(settings, lambda_client)
 
     assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "123456"
-    assert "waitTimeoutSeconds=45" in seen["url"]
-    assert seen["timeout"]["read"] == 50
+    assert json.loads(lambda_client.calls[0]["Payload"])["waitTimeoutSeconds"] == 15
 
 
 def test_gmail_reader_client_maps_http_timeout():
-    def handler(request):
-        raise httpx.ReadTimeout("timeout", request=request)
-
-    settings = Settings(GMAIL_READER_URL="http://gmail.local")
-    client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+    settings = Settings(INTEGRATION_MODE="AWS", GMAIL_READER_FUNCTION_NAME="gmail-reader")
+    client = GmailReaderClient(settings, FakeLambdaClient(error=TimeoutError()))
 
     try:
         client.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
@@ -68,9 +121,8 @@ def test_gmail_reader_client_maps_http_timeout():
 
 
 def test_gmail_reader_client_rejects_error():
-    settings = Settings(GMAIL_READER_URL="http://gmail.local")
-    transport = httpx.MockTransport(lambda request: response(500, {"error": {"message": "erro"}}))
-    client = GmailReaderClient(settings, httpx.Client(transport=transport))
+    settings = Settings(INTEGRATION_MODE="AWS", GMAIL_READER_FUNCTION_NAME="gmail-reader")
+    client = GmailReaderClient(settings, FakeLambdaClient(payload={"statusCode": 500, "body": "{}"}))
 
     try:
         client.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
@@ -81,17 +133,54 @@ def test_gmail_reader_client_rejects_error():
 
 
 def test_mail_sender_client_posts_payload():
+    lambda_client = FakeLambdaClient(payload={"statusCode": 200, "body": "{}"})
+    settings = Settings(INTEGRATION_MODE="AWS", MAIL_SENDER_FUNCTION_NAME="mail-sender", MAIL_TO="destino@example.com")
+    client = MailSenderClient(settings, lambda_client)
+
+    client.send(Operation.UNKNOWN_OPERATION, "Assunto", "<p>Body</p>")
+    assert lambda_client.calls[0]["FunctionName"] == "mail-sender"
+    assert json.loads(lambda_client.calls[0]["Payload"])["to"] == "destino@example.com"
+
+
+def test_gmail_reader_client_uses_http_api_in_local_mode():
     seen = {}
 
     def handler(request):
-        seen["payload"] = request.content
+        seen["url"] = str(request.url)
+        return response(200, {"code": "654321"})
+
+    settings = Settings(
+        INTEGRATION_MODE="LOCAL", GMAIL_READER_URL="http://gmail.local", VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15
+    )
+    client = GmailReaderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+
+    assert client.get_validation_code(Operation.REQUEST_VALIDATION_CODE) == "654321"
+    assert seen["url"] == "http://gmail.local/api/v1/validation-code?waitTimeoutSeconds=15"
+
+
+def test_gmail_reader_client_rejects_http_error_in_local_mode():
+    settings = Settings(INTEGRATION_MODE="LOCAL", GMAIL_READER_URL="http://gmail.local")
+    transport = httpx.MockTransport(lambda request: response(500, {"message": "error"}))
+    client = GmailReaderClient(settings, httpx.Client(transport=transport))
+
+    with pytest.raises(ExternalServiceError):
+        client.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
+
+
+def test_mail_sender_client_uses_http_api_in_local_mode():
+    seen = {}
+
+    def handler(request):
+        seen["url"] = str(request.url)
+        seen["payload"] = json.loads(request.content)
         return response(200, {"message": "ok"})
 
-    settings = Settings(MAIL_SENDER_URL="http://mail.local", MAIL_TO="destino@example.com")
+    settings = Settings(INTEGRATION_MODE="LOCAL", MAIL_SENDER_URL="http://mail.local", MAIL_TO="to@example.com")
     client = MailSenderClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
 
-    client.send(Operation.UNKNOWN_OPERATION, "Assunto", "<p>Body</p>")
-    assert b"destino@example.com" in seen["payload"]
+    client.send(Operation.UNKNOWN_OPERATION, "Assunto", "Mensagem")
+    assert seen["url"] == "http://mail.local/api/v1/mail/send"
+    assert seen["payload"]["to"] == "to@example.com"
 
 
 def test_whatsapp_notify_client_maps_success_and_error():

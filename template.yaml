@@ -1,0 +1,406 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: LotoBot on one persistent EC2 instance - preserves the Playwright browser profile and restricts external integrations
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@2
+  com.aws.cloudformation.Context:
+    arch: restricted client -> SSM tunnel or HTTPS -> EC2 -> CAIXA + Gmail Reader + Mail Sender + WhatsApp Notify
+    must:
+      - keep one application worker per browser profile
+      - keep payment confirmation disabled until an explicitly approved production deployment
+      - keep bettor and payment data in Secrets Manager, never template parameters or artifacts
+      - attach the independently managed integration security group used as the source identity for WhatsApp Notify
+    ref:
+      - at: docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md
+        has: deployment, integration, security, cost and rollback procedures
+        scope: local
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  AmiId:
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues:
+      - t3.micro
+      - t3.small
+  AllowedCidr:
+    Type: String
+    Default: 0.0.0.0/32
+    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$
+    Description: Client CIDR allowed to reach HTTPS; use 0.0.0.0/32 for SSM-only access.
+  ArtifactBucket:
+    Type: String
+    AllowedPattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
+  ArtifactKey:
+    Type: String
+    AllowedPattern: ^loto-bot/releases/[^\\]+\.zip$
+  ArtifactSha256:
+    Type: String
+    AllowedPattern: ^[a-fA-F0-9]{64}$
+  ApplicationSecretArn:
+    Type: String
+    Description: Secrets Manager ARN with bettor_cpf, bettor_password, credit_card_last_digits, credit_card_security_code and mail_to.
+    AllowedPattern: ^arn:(aws[a-zA-Z-]*)?:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+$
+  GmailReaderFunctionArn:
+    Type: String
+    Description: FunctionArn output from gmail-reader-aws.
+    AllowedPattern: ^arn:(aws[a-zA-Z-]*)?:lambda:[a-z0-9-]+:[0-9]{12}:function:.+$
+  MailSenderFunctionArn:
+    Type: String
+    Description: FunctionArn output from mail-sender-aws.
+    AllowedPattern: ^arn:(aws[a-zA-Z-]*)?:lambda:[a-z0-9-]+:[0-9]{12}:function:.+$
+  WhatsAppNotifyUrl:
+    Type: String
+    Description: Private HTTP base URL for whatsapp-notify, without a trailing slash.
+    AllowedPattern: ^http://[^/]+(:[0-9]+)?$
+  IntegrationSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Independently managed Security Group used as the LotoBot source identity for WhatsApp Notify.
+  ConfirmPayment:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+  MongoDbEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+  RootVolumeSize:
+    Type: Number
+    Default: 20
+    MinValue: 16
+    MaxValue: 30
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: lets EC2 use SSM, download only LotoBot releases and read only its application secret
+        must:
+          - do not grant access to unrelated S3 prefixes or secrets
+        mutable: change-with-constraints
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: ReadLotoBotBootstrapInputs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DownloadRelease
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}/loto-bot/releases/*
+              - Sid: ReadApplicationSecret
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref ApplicationSecretArn
+              - Sid: InvokeInternalFunctions
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !Ref GmailReaderFunctionArn
+                  - !Ref MailSenderFunctionArn
+      Tags:
+        - Key: Application
+          Value: loto-bot
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  ApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: accepts only restricted HTTPS and permits the bot to call its public HTTPS dependencies
+        must:
+          - never widen ingress to 0.0.0.0/0
+          - retain outbound TCP 443 for CAIXA and the three integration APIs
+        mutable: change-with-constraints
+    Properties:
+      GroupDescription: Restricted access for LotoBot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: HTTPS from the authorized client
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedCidr
+      SecurityGroupEgress:
+        - Description: HTTP for operating-system package repositories and redirects
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - Description: HTTPS for AWS APIs, CAIXA and application integrations
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - Description: DNS UDP
+          IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+        - Description: DNS TCP
+          IpProtocol: tcp
+          FromPort: 53
+          ToPort: 53
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Application
+          Value: loto-bot
+
+  LambdaEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: limits the private Lambda interface endpoint to the LotoBot instance
+        must:
+          - accept TCP 443 only from ApplicationSecurityGroup
+    Properties:
+      GroupDescription: Private Lambda endpoint access from LotoBot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+
+  LambdaVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: keeps Lambda Invoke traffic on the AWS private network via Private DNS
+        must:
+          - keep PrivateDnsEnabled true
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref SubnetId]
+      SecurityGroupIds: [!Ref LambdaEndpointSecurityGroup]
+
+  ApplicationInstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: persistent single-host runtime keeps Chromium process and profile stable across API calls
+        must:
+          - exactly one uvicorn worker
+          - encrypted persistent browser profile outside release directory
+          - IMDSv2 required
+          - attach IntegrationSecurityGroupId together with the application security group
+        mutable: change-with-constraints
+        mutability:
+          ImageId: review-required
+          InstanceType: review-required
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref ApplicationSecurityGroup
+        - !Ref IntegrationSecurityGroupId
+      CreditSpecification:
+        CPUCredits: standard
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 1
+      Monitoring: false
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: !Ref RootVolumeSize
+            VolumeType: gp3
+      Tags:
+        - Key: Name
+          Value: loto-bot
+        - Key: Application
+          Value: loto-bot
+        - Key: Environment
+          Value: free-tier
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          exec > >(tee /var/log/loto-bot-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+          signal_failure() {
+            /opt/cfn-bootstrap/bin/cfn-signal --exit-code 1 --stack "${AWS::StackName}" --resource ApplicationInstance --region "${AWS::Region}" || true
+          }
+          trap signal_failure ERR
+
+          apt-get update
+          apt-get install -y curl jq nginx python3.12 python3.12-venv python3-pip unzip
+          python3.12 -m venv /opt/cfn-bootstrap
+          /opt/cfn-bootstrap/bin/pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          curl --fail --location --retry 3 https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip --output /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          /tmp/aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli
+          rm -rf /tmp/aws /tmp/awscliv2.zip
+
+          id loto-bot >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/loto-bot --shell /usr/sbin/nologin loto-bot
+          install -d -m 755 -o loto-bot -g loto-bot /opt/loto-bot/app /opt/loto-bot/data
+          install -d -m 700 -o loto-bot -g loto-bot /opt/loto-bot/data/.lotobot-profile
+
+          if [ ! -f /swapfile ]; then
+            fallocate -l 2G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+
+          aws s3 cp 's3://${ArtifactBucket}/${ArtifactKey}' /tmp/loto-bot.zip
+          echo '${ArtifactSha256}  /tmp/loto-bot.zip' | sha256sum -c -
+          unzip -q /tmp/loto-bot.zip -d /opt/loto-bot/app
+          rm -f /tmp/loto-bot.zip
+          chown -R loto-bot:loto-bot /opt/loto-bot/app
+          cd /opt/loto-bot/app
+          sudo -u loto-bot python3.12 -m venv .venv
+          sudo -u loto-bot .venv/bin/python -m pip install --upgrade pip
+          sudo -u loto-bot .venv/bin/pip install .
+          .venv/bin/playwright install-deps chromium
+          sudo -u loto-bot .venv/bin/playwright install chromium
+
+          secret_json="$(aws secretsmanager get-secret-value --secret-id '${ApplicationSecretArn}' --query SecretString --output text --region '${AWS::Region}')"
+          install -m 600 -o root -g root /dev/null /etc/loto-bot.env
+          {
+            printf 'BETTOR_CPF=%q\n' "$(jq -er .bettor_cpf <<<"$secret_json")"
+            printf 'BETTOR_PASSWORD=%q\n' "$(jq -er .bettor_password <<<"$secret_json")"
+            printf 'CREDIT_CARD_LAST_DIGITS=%q\n' "$(jq -er .credit_card_last_digits <<<"$secret_json")"
+            printf 'CREDIT_CARD_SECURITY_CODE=%q\n' "$(jq -er .credit_card_security_code <<<"$secret_json")"
+            printf 'MAIL_TO=%q\n' "$(jq -er .mail_to <<<"$secret_json")"
+            echo 'INTEGRATION_MODE=AWS'
+            echo 'GMAIL_READER_FUNCTION_NAME=${GmailReaderFunctionArn}'
+            echo 'MAIL_SENDER_FUNCTION_NAME=${MailSenderFunctionArn}'
+            echo 'WHATSAPP_NOTIFY_URL=${WhatsAppNotifyUrl}'
+            echo 'CONFIRM_PAYMENT=${ConfirmPayment}'
+            echo 'MONGODB_ENABLED=${MongoDbEnabled}'
+            echo 'MONGODB_URI=mongodb://localhost:27017'
+            echo 'MONGODB_DATABASE=loto_bot'
+            echo 'WHATSAPP_ENABLED=true'
+            echo 'WHATSAPP_HEADLESS=true'
+            echo 'VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15'
+            echo 'BROWSER_HEADLESS=true'
+            echo 'BROWSER_PROFILE_DIR=/opt/loto-bot/data/.lotobot-profile'
+            echo 'API_HOST=127.0.0.1'
+            echo 'API_PORT=8000'
+            echo 'LOG_LEVEL=INFO'
+          } >> /etc/loto-bot.env
+          unset secret_json
+
+          cat >/etc/systemd/system/loto-bot.service <<'EOF'
+          [Unit]
+          Description=LotoBot API
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=loto-bot
+          Group=loto-bot
+          WorkingDirectory=/opt/loto-bot/app
+          EnvironmentFile=/etc/loto-bot.env
+          Environment=PYTHONPATH=/opt/loto-bot/app/src
+          ExecStart=/opt/loto-bot/app/.venv/bin/uvicorn api.server:app --host 127.0.0.1 --port 8000 --workers 1
+          Restart=on-failure
+          RestartSec=5
+          TimeoutStopSec=60
+          KillSignal=SIGTERM
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=strict
+          ProtectHome=true
+          ReadWritePaths=/opt/loto-bot/data
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          cat >/etc/nginx/sites-available/loto-bot <<'EOF'
+          server {
+              listen 80 default_server;
+              server_name _;
+              client_max_body_size 64k;
+              location / {
+                  proxy_pass http://127.0.0.1:8000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_connect_timeout 5s;
+                  proxy_read_timeout 180s;
+                  proxy_send_timeout 180s;
+              }
+          }
+          EOF
+          rm -f /etc/nginx/sites-enabled/default
+          ln -sf /etc/nginx/sites-available/loto-bot /etc/nginx/sites-enabled/loto-bot
+          systemctl daemon-reload
+          systemctl enable --now loto-bot
+          nginx -t
+          systemctl enable --now nginx
+
+          for attempt in {1..20}; do
+            if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8000/health; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              systemctl status loto-bot --no-pager || true
+              journalctl -u loto-bot -n 100 --no-pager || true
+              exit 1
+            fi
+            sleep 3
+          done
+          /opt/cfn-bootstrap/bin/cfn-signal --exit-code 0 --stack "${AWS::StackName}" --resource ApplicationInstance --region "${AWS::Region}"
+          trap - ERR
+
+Outputs:
+  InstanceId:
+    Description: EC2 instance managed by the stack.
+    Value: !Ref ApplicationInstance
+  PublicIp:
+    Description: Auto-assigned public IPv4; changes after stop/start.
+    Value: !GetAtt ApplicationInstance.PublicIp
+  SessionManagerCommand:
+    Description: Command to open an SSM shell.
+    Value: !Sub aws ssm start-session --target ${ApplicationInstance} --region ${AWS::Region}
+  PortForwardCommand:
+    Description: SSM port-forward command for local access to the API.
+    Value: !Sub >-
+      aws ssm start-session --target ${ApplicationInstance} --region ${AWS::Region}
+      --document-name AWS-StartPortForwardingSession
+      --parameters portNumber=80,localPortNumber=8080
+  SecurityGroupId:
+    Description: Application Security Group managed by this stack.
+    Value: !Ref ApplicationSecurityGroup
+  IntegrationSecurityGroupId:
+    Description: External integration Security Group attached to LotoBot and referenced by WhatsApp Notify.
+    Value: !Ref IntegrationSecurityGroupId

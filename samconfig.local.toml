@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+stack_name = "loto-bot"
+resolve_s3 = true
+s3_prefix = "loto-bot"
+region = "sa-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+profile = "<perfil-aws>"
+parameter_overrides = "VpcId=\"<vpc-id>\" SubnetId=\"<subnet-id>\" AmiId=\"<ami-id>\" InstanceType=\"<instance-type>\" IntegrationSecurityGroupId=\"<security-group-id>\" ArtifactBucket=\"<artifact-bucket>\" ArtifactKey=\"<artifact-key>\" ArtifactSha256=\"<artifact-sha256>\" RootVolumeSize=16"
