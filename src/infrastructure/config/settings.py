@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="BROWSER_PROFILE_DIR")
     browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
     browser_timeout_seconds: int = Field(default=5, alias="BROWSER_TIMEOUT_SECONDS")
+    browser_proxy_server: str | None = Field(default=None, alias="BROWSER_PROXY_SERVER")
     validation_code_lookup_lead_seconds: int = Field(default=1, alias="VALIDATION_CODE_LOOKUP_LEAD_SECONDS")
 
     @field_validator(

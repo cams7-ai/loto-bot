@@ -677,3 +677,105 @@ def test_notification_gateway_stop_warning_and_timezone_fallback(monkeypatch):
     enabled_gateway = NotificationGateway(failing_start, mail, whatsapp_enabled=True)
     enabled_gateway.start_whatsapp_session(session)
     assert session.whatsapp_enabled is False
+
+
+def test_session_browser_start_with_proxy(monkeypatch, tmp_path):
+    page = Page()
+
+    context = SimpleNamespace(
+        pages=[page],
+        set_default_timeout=Mock(),
+        add_init_script=Mock(),
+        new_page=Mock(return_value=page),
+        close=Mock(),
+    )
+
+    chromium = SimpleNamespace(
+        launch_persistent_context=Mock(return_value=context),
+    )
+
+    playwright = SimpleNamespace(
+        chromium=chromium,
+        stop=Mock(),
+    )
+
+    starter = SimpleNamespace(
+        start=Mock(return_value=playwright),
+    )
+
+    import infrastructure.browser.playwright_browser as playwright_browser
+
+    monkeypatch.setattr(
+        playwright_browser,
+        "sync_playwright",
+        Mock(return_value=starter),
+    )
+
+    settings = Settings(
+        BROWSER_PROFILE_DIR=tmp_path,
+        BROWSER_PROXY_SERVER="socks5://127.0.0.1:1080",
+        BROWSER_TIMEOUT_SECONDS=1,
+    )
+
+    browser = SessionControlBrowserMixin(settings)
+
+    browser._start(AutomationSession())
+
+    chromium.launch_persistent_context.assert_called_once()
+
+    kwargs = chromium.launch_persistent_context.call_args.kwargs
+
+    assert kwargs["proxy"] == {
+        "server": "socks5://127.0.0.1:1080",
+    }
+
+    browser._stop()
+
+
+def test_session_browser_start_without_proxy(monkeypatch, tmp_path):
+    page = Page()
+
+    context = SimpleNamespace(
+        pages=[page],
+        set_default_timeout=Mock(),
+        add_init_script=Mock(),
+        new_page=Mock(return_value=page),
+        close=Mock(),
+    )
+
+    chromium = SimpleNamespace(
+        launch_persistent_context=Mock(return_value=context),
+    )
+
+    playwright = SimpleNamespace(
+        chromium=chromium,
+        stop=Mock(),
+    )
+
+    starter = SimpleNamespace(
+        start=Mock(return_value=playwright),
+    )
+
+    import infrastructure.browser.playwright_browser as playwright_browser
+
+    monkeypatch.setattr(
+        playwright_browser,
+        "sync_playwright",
+        Mock(return_value=starter),
+    )
+
+    settings = Settings(
+        BROWSER_PROFILE_DIR=tmp_path,
+        BROWSER_PROXY_SERVER=None,
+        BROWSER_TIMEOUT_SECONDS=1,
+    )
+
+    browser = SessionControlBrowserMixin(settings)
+
+    browser._start(AutomationSession())
+
+    kwargs = chromium.launch_persistent_context.call_args.kwargs
+
+    assert kwargs["proxy"] is None
+
+    browser._stop()

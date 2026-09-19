@@ -41,6 +41,8 @@ desktop.ini
 
 artefatos/
 db/
+scripts/socks5-aws-state.json
+scripts/browser-proxy-aws-state.json
 application-secret.json
 
 # AWS SAM
