@@ -678,3 +678,17 @@ def test_playwright_browser_confirms_purchase_after_payment_page_redirect():
 
     assert clicks[0] == ("url", ".*/pagamento.*", 5000)
     assert clicks[-1] == {}
+
+
+def test_browser_proxy_settings():
+    settings = Settings(
+        BROWSER_PROXY_SERVER="socks5://127.0.0.1:1080",
+    )
+
+    assert settings.browser_proxy_server == "socks5://127.0.0.1:1080"
+
+
+def test_browser_proxy_settings_default():
+    settings = Settings(_env_file=None)
+
+    assert settings.browser_proxy_server is None

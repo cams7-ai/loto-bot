@@ -42,6 +42,12 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
             if self._settings.browser_headless:
                 viewport = {"width": 1280, "height": 900}
 
+            proxy = None
+            if self._settings.browser_proxy_server:
+                proxy = {
+                    "server": self._settings.browser_proxy_server,
+                }
+
             self._context = self._playwright.chromium.launch_persistent_context(
                 user_data_dir=str(self._settings.browser_profile_dir),
                 headless=self._settings.browser_headless,
@@ -49,6 +55,7 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
                 args=self._launch_args(self._settings.browser_headless),
                 user_agent=self._user_agent(),
                 locale="pt-BR",
+                proxy=proxy,
             )
             self._context.set_default_timeout(self._timeout_ms)
             self._add_init_script(self._context)
