@@ -41,5 +41,6 @@ desktop.ini
 
 artefatos/
 db/
-scripts/socks5-aws-state.json
-scripts/browser-proxy-aws-state.json
+scripts/socks5-ipv4-aws-state.json
+scripts/browser-socks5-ipv4-aws-state.json
+scripts/browser-socks5-ipv6-aws-state.json

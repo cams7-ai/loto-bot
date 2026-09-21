@@ -994,7 +994,7 @@ usa `DeleteOnTermination=true`, portanto é removido com a instância. O IPv4
 público é atribuído automaticamente, não é um Elastic IP e é liberado quando a
 instância é terminada.
 
-## 22.2 Testar `test_browser_proxy.py` em uma EC2 descartável
+## 22.2 Testar `test_browser_proxy.py` em uma EC2 descartável via IPv4
 
 O script `start-browser-socks5-ipv4-aws.ps1` cria a mesma infraestrutura descartável
 do teste anterior, estabelece o túnel SSH reverso e executa
@@ -1077,6 +1077,72 @@ inicialização:
 Execute a finalização mesmo quando o teste falhar. O estado parcial é salvo no
 JSON para que o script de parada possa remover os recursos que já tiverem sido
 criados. Se a limpeza reportar pendências, corrija o erro e repita o mesmo
+comando antes de excluir o arquivo de estado manualmente.
+
+## 22.3 Testar `test_browser_proxy.py` em uma EC2 descartável via IPv6
+
+Para validar o mesmo fluxo usando SSH sobre IPv6, use os scripts
+`start-browser-socks5-ipv6-aws.ps1` e `stop-socks5-ipv6-aws.ps1`. O script de
+inicialização cria uma VPC com bloco IPv6, uma sub-rede IPv6 pública e uma EC2
+sem IPv4 público. A instância recebe um IPv6 público, e o acesso SSH é liberado
+somente para o IPv6 `/128` da máquina local. O túnel reverso e a validação do
+SOCKS5 são iguais aos do passo 22.2.
+
+Esse procedimento exige que a máquina local tenha conectividade IPv6 pública.
+O endereço é descoberto pelo script com `api64.ipify.org`; sem IPv6 funcional,
+o script não consegue liberar nem testar o SSH na EC2.
+
+No Windows, valide a conectividade IPv6 antes de iniciar o teste:
+
+```powershell
+ping -6 google.com
+
+curl.exe -6 https://api64.ipify.org
+```
+
+O segundo comando deve retornar um endereço IPv6 público, por exemplo:
+
+```text
+2804:xxxx:xxxx:xxxx::1234
+```
+
+Se o `ping` ou o `curl.exe` falhar, corrija a conectividade IPv6 local antes de
+executar o script da EC2.
+
+Abra o PowerShell no diretório dos scripts e desbloqueie os arquivos baixados,
+caso necessário:
+
+```powershell
+cd $YourDir\loto-bot\scripts
+
+Unblock-File -LiteralPath .\start-browser-socks5-ipv6-aws.ps1
+Unblock-File -LiteralPath .\stop-socks5-ipv6-aws.ps1
+```
+
+Execute o teste informando o perfil, a região e o tipo da instância:
+
+```powershell
+.\start-browser-socks5-ipv6-aws.ps1 `
+  -AwsProfile "<perfil>" `
+  -AwsRegion "us-east-1" `
+  -InstanceType "t3.micro" `
+  -StateFile ".\browser-socks5-ipv6-aws-state.json"
+```
+
+Por padrão, o script envia `test_browser_proxy.py` do diretório `scripts`,
+instala Python, Playwright, Chromium e Xvfb na EC2 e executa a validação pelo
+túnel SOCKS5 reverso. O endereço IPv6 é usado automaticamente pelo `ssh` e pelo
+`scp`; não é necessário informá-lo manualmente.
+
+O script encerra o túnel após a validação, mas mantém a EC2 e os demais recursos
+ativos para auditoria. Execute a limpeza mesmo quando o teste falhar:
+
+```powershell
+.\stop-socks5-ipv6-aws.ps1 -StateFile ".\browser-socks5-ipv6-aws-state.json"
+```
+
+O arquivo de estado preserva os IDs da VPC, da sub-rede, do Security Group e da
+instância. Se a limpeza reportar pendências, corrija o erro e repita o mesmo
 comando antes de excluir o arquivo de estado manualmente.
 
 ---

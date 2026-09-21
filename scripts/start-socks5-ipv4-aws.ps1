@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$TestId = "socks-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+$TestId = "socks5-ipv4-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 $MyPublicIp = (curl.exe -fsS https://api.ipify.org).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($MyPublicIp)) {
     throw "Não foi possível descobrir o IP público desta máquina."
