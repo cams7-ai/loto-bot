@@ -3,12 +3,17 @@ param(
     [string]$AwsProfile = "<perfil>",
     [string]$AwsRegion = "us-east-1",
     [string]$InstanceType = "t3.micro",
-    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-aws-state.json")
+    [string]$BrowserTestScript = (Join-Path $PSScriptRoot "test_browser_proxy.py"),
+    [string]$StateFile = (Join-Path $PSScriptRoot "browser-socks5-ipv4-aws-state.json")
 )
 
 $ErrorActionPreference = "Stop"
 
-$TestId = "socks-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+if (-not (Test-Path -LiteralPath $BrowserTestScript -PathType Leaf)) {
+    throw "Script de teste do navegador não encontrado: '$BrowserTestScript'."
+}
+
+$TestId = "browser-socks5-ipv4-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 $MyPublicIp = (curl.exe -fsS https://api.ipify.org).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($MyPublicIp)) {
     throw "Não foi possível descobrir o IP público desta máquina."
@@ -219,8 +224,26 @@ try {
 
     if (-not $SshReady) { throw "A instância ficou saudável, mas o SSH não respondeu." }
 
-    & ssh @SshOptions "$RemoteUser@$PublicIp" "sudo apt-get update -qq && sudo apt-get install -y -qq curl"
-    if ($LASTEXITCODE -ne 0) { throw "Não foi possível instalar/verificar curl na instância." }
+    Write-Host "Instalando Python, Playwright, Chromium e Xvfb na EC2..."
+    $ProvisionCommand = @'
+set -eu
+sudo apt-get update -qq
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv xvfb xauth
+python3 -m venv /tmp/lotobot-browser-proxy-venv
+/tmp/lotobot-browser-proxy-venv/bin/pip install --quiet playwright
+sudo /tmp/lotobot-browser-proxy-venv/bin/python -m playwright install-deps chromium
+/tmp/lotobot-browser-proxy-venv/bin/python -m playwright install chromium
+'@
+
+    $ProvisionCommand | & ssh @SshOptions "$RemoteUser@$PublicIp" "sed 's/\r$//' | bash -s"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Não foi possível preparar Python, Playwright, Chromium e Xvfb na instância."
+    }
+
+    & scp @SshOptions -- $BrowserTestScript "${RemoteUser}@${PublicIp}:/tmp/test_browser_proxy.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Não foi possível enviar '$BrowserTestScript' para a instância."
+    }
 
     # Libera a porta 1080 na EC2, caso exista túnel antigo
     # & ssh @SshOptions "$RemoteUser@$PublicIp" "sudo fuser -k 1080/tcp >/dev/null 2>&1 || true"
@@ -243,50 +266,28 @@ try {
 
     if ($TunnelProcess.HasExited) { throw "O processo do túnel SSH terminou antes da validação." }
 
-    $RemoteCommand = @'
+    $BrowserTestCommand = @'
 set -eu
-
 LISTENER="$(ss -lnt | awk '$4 == "127.0.0.1:1080" {print $4}')"
 test "$LISTENER" = "127.0.0.1:1080"
-
-DIRECT_IP="$(curl -fsS --max-time 20 https://api.ipify.org)"
-PROXY_IP="$(curl -fsS --max-time 20 \
-    --socks5-hostname 127.0.0.1:1080 \
-    https://api.ipify.org)"
-
-DIRECT_CAIXA_STATUS="$(curl -sS -L \
-    -o /dev/null \
-    -w '%{http_code}' \
-    --max-time 20 \
-    'https://www.loteriasonline.caixa.gov.br/silce-web/#/termos-de-uso')"
-
-PROXY_CAIXA_STATUS="$(curl -sS -L \
-    -o /dev/null \
-    -w '%{http_code}' \
-    --max-time 20 \
-    --socks5-hostname 127.0.0.1:1080 \
-    'https://www.loteriasonline.caixa.gov.br/silce-web/#/termos-de-uso')"
-
-printf 'Listener: %s\nIP direto da EC2: %s\nIP pelo SOCKS5: %s\nStatus CAIXA direto: %s\nStatus CAIXA pelo SOCKS5: %s\n' \
-    "$LISTENER" \
-    "$DIRECT_IP" \
-    "$PROXY_IP" \
-    "$DIRECT_CAIXA_STATUS" \
-    "$PROXY_CAIXA_STATUS"
+printf 'Listener: %s\n' "$LISTENER"
+xvfb-run -a env BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080 \
+    /tmp/lotobot-browser-proxy-venv/bin/python \
+    /tmp/test_browser_proxy.py
 '@
 
-    $ValidationOutput = $RemoteCommand | & ssh @SshOptions "$RemoteUser@$PublicIp" "sed 's/\r$//' | bash -s"
+    $ValidationOutput = $BrowserTestCommand | & ssh @SshOptions "$RemoteUser@$PublicIp" "sed 's/\r$//' | bash -s"
     $ValidationExitCode = $LASTEXITCODE
     if ($ValidationExitCode -ne 0) {
-        throw "Falha ao validar o túnel SOCKS5. Exit code: $ValidationExitCode"
+        throw "Falha ao executar test_browser_proxy.py pelo SOCKS5. Exit code: $ValidationExitCode"
     }
     $ValidationOutput | Out-Host
 
-    $ProxyIp = ($ValidationOutput |
-        Where-Object { $_ -like "IP pelo SOCKS5:*" } |
-        Select-Object -First 1).Split(":", 2)[1].Trim()
-    if ($ProxyIp -ne $MyPublicIp) {
-        throw "O SOCKS5 retornou $ProxyIp, mas a saída local esperada era $MyPublicIp. Verifique a rota de Internet do Windows."
+    $CaixaSuccessLine = $ValidationOutput |
+        Where-Object { $_ -eq "Teste CAIXA via Chromium: OK" } |
+        Select-Object -First 1
+    if ([string]::IsNullOrWhiteSpace($CaixaSuccessLine)) {
+        throw "test_browser_proxy.py não confirmou o carregamento da página de Termos de Uso da CAIXA."
     }
 
     Stop-Process -Id $TunnelProcess.Id -Force
@@ -295,15 +296,28 @@ printf 'Listener: %s\nIP direto da EC2: %s\nIP pelo SOCKS5: %s\nStatus CAIXA dir
     $TunnelProcessId = $null
     Save-State
 
-    & ssh @SshOptions "$RemoteUser@$PublicIp" "! curl -fsS --max-time 5 --socks5-hostname 127.0.0.1:1080 https://api.ipify.org"
-    if ($LASTEXITCODE -ne 0) {
-        throw "O teste fail-closed falhou: houve resposta após encerrar o túnel."
+    $PreviousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $FailClosedOutput = & ssh @SshOptions "$RemoteUser@$PublicIp" `
+            "timeout 45s xvfb-run -a env BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080 /tmp/lotobot-browser-proxy-venv/bin/python /tmp/test_browser_proxy.py" 2>&1
+        $FailClosedExitCode = $LASTEXITCODE
     }
+    finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
+
+    if ($FailClosedExitCode -eq 0) {
+        $FailClosedOutput | Out-Host
+        throw "O teste fail-closed falhou: o Chromium navegou após encerrar o túnel."
+    }
+
+    Write-Host "Falha sem fallback confirmada após encerrar o túnel."
 
     $Status = "ready-for-cleanup"
     Save-State
 
-    Write-Host "Teste aprovado: listener local, IP pelo Windows e falha sem fallback confirmados."
+    Write-Host "Teste aprovado: a página de Termos de Uso da CAIXA abriu pelo SOCKS5 e falhou sem fallback."
     Write-Host "Os recursos continuam ativos. Para apagá-los, execute:"
     Write-Host ".\stop-socks5-aws.ps1 -StateFile `"$StateFile`""
 }
