@@ -3,7 +3,7 @@ param(
     [string]$AwsProfile = "<perfil>",
     [string]$AwsRegion = "us-east-1",
     [string]$InstanceType = "t3.micro",
-    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-aws-state.json")
+    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-ipv4-aws-state.json")
 )
 
 $ErrorActionPreference = "Stop"

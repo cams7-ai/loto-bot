@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-aws-state.json"),
+    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-ipv4-aws-state.json"),
     [string]$AwsProfile,
     [string]$AwsRegion
 )

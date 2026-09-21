@@ -4,7 +4,7 @@ param(
     [string]$AwsRegion = "us-east-1",
     [string]$InstanceType = "t3.micro",
     [string]$BrowserTestScript = (Join-Path $PSScriptRoot "test_browser_proxy.py"),
-    [string]$StateFile = (Join-Path $PSScriptRoot "socks5-aws-state.json")
+    [string]$StateFile = (Join-Path $PSScriptRoot "browser-socks5-ipv4-aws-state.json")
 )
 
 $ErrorActionPreference = "Stop"

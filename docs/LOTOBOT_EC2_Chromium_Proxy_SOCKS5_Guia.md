@@ -903,8 +903,8 @@ Manager. Portanto, não há recursos desses tipos para limpar.
 
 Os scripts usados neste procedimento já estão no diretório `scripts`:
 
-- `start-socks5-aws.ps1` cria os recursos, testa o túnel e grava o estado;
-- `stop-socks5-aws.ps1` lê esse estado, encerra o túnel e remove os recursos.
+- `start-socks5-ipv4-aws.ps1` cria os recursos, testa o túnel e grava o estado;
+- `stop-socks5-ipv4-aws.ps1` lê esse estado, encerra o túnel e remove os recursos.
 
 Abra o PowerShell e entre no diretório dos scripts. Substitua `$YourDir` pelo
 diretório que contém o repositório `loto-bot`:
@@ -912,19 +912,19 @@ diretório que contém o repositório `loto-bot`:
 ```powershell
 cd $YourDir\loto-bot\scripts
 
-Unblock-File -LiteralPath .\start-socks5-aws.ps1
-Unblock-File -LiteralPath .\stop-socks5-aws.ps1
+Unblock-File -LiteralPath .\start-socks5-ipv4-aws.ps1
+Unblock-File -LiteralPath .\stop-socks5-ipv4-aws.ps1
 ```
 
 Inicie o teste informando o perfil, a região e o tipo da instância. O exemplo
 abaixo usa o perfil `<perfil>`, a região `us-east-1` e uma `t3.small`:
 
 ```powershell
-.\start-socks5-aws.ps1 -AwsProfile "<perfil>" -AwsRegion "us-east-1" -InstanceType "t3.small"
+.\start-socks5-ipv4-aws.ps1 -AwsProfile "<perfil>" -AwsRegion "us-east-1" -InstanceType "t3.small"
 ```
 
 O script cria, no mesmo diretório, o arquivo padrão
-`socks5-aws-state.json`. Ele contém os IDs dos recursos, o perfil e a região
+`socks5-ipv4-aws-state.json`. Ele contém os IDs dos recursos, o perfil e a região
 necessários à limpeza. O arquivo não contém a chave privada, mas não deve ser
 editado nem removido manualmente antes da limpeza.
 
@@ -941,7 +941,7 @@ Mesmo após um teste aprovado, os recursos AWS permanecem ativos e podem gerar
 cobrança. Remova-os assim que terminar:
 
 ```powershell
-.\stop-socks5-aws.ps1
+.\stop-socks5-ipv4-aws.ps1
 ```
 
 O script de limpeza recupera o perfil e a região do arquivo de estado, termina a
@@ -952,19 +952,19 @@ Para escolher explicitamente outro arquivo de estado, passe o mesmo caminho aos
 dois scripts. Por exemplo:
 
 ```powershell
-.\start-socks5-aws.ps1 -AwsProfile "<perfil>" -AwsRegion "us-east-1" -InstanceType "t3.small" -StateFile ".\socks5-aws-state.json"
-.\stop-socks5-aws.ps1 -StateFile ".\socks5-aws-state.json"
+.\start-socks5-ipv4-aws.ps1 -AwsProfile "<perfil>" -AwsRegion "us-east-1" -InstanceType "t3.small" -StateFile ".\socks5-ipv4-aws-state.json"
+.\stop-socks5-ipv4-aws.ps1 -StateFile ".\socks5-ipv4-aws-state.json"
 ```
 
-Como `socks5-aws-state.json` já é o padrão, também é válido iniciar o segundo
+Como `socks5-ipv4-aws-state.json` já é o padrão, também é válido iniciar o segundo
 teste solicitado apenas com o parâmetro explícito abaixo; perfil, região e tipo
 de instância assumirão os padrões definidos no script (`<perfil>`, `us-east-1` e
 `t3.micro`). Na prática, informe `-AwsProfile` sempre que não tiver substituído o
 placeholder no script:
 
 ```powershell
-.\start-socks5-aws.ps1 -StateFile "socks5-aws-state.json"
-.\stop-socks5-aws.ps1 -StateFile "socks5-aws-state.json"
+.\start-socks5-ipv4-aws.ps1 -StateFile "socks5-ipv4-aws-state.json"
+.\stop-socks5-ipv4-aws.ps1 -StateFile "socks5-ipv4-aws-state.json"
 ```
 
 Não inicie outro teste usando o mesmo arquivo enquanto ele existir. Primeiro
@@ -978,14 +978,14 @@ Se a limpeza terminar com pendências, o script preserva o arquivo de estado par
 uma nova tentativa. Corrija a causa indicada na saída e execute novamente:
 
 ```powershell
-.\stop-socks5-aws.ps1 -StateFile ".\socks5-aws-state.json"
+.\stop-socks5-ipv4-aws.ps1 -StateFile ".\socks5-ipv4-aws-state.json"
 ```
 
 Se for necessário substituir o perfil ou a região gravados no JSON, o script de
 parada também aceita esses parâmetros:
 
 ```powershell
-.\stop-socks5-aws.ps1 -StateFile ".\socks5-aws-state.json" -AwsProfile "<perfil>" -AwsRegion "us-east-1"
+.\stop-socks5-ipv4-aws.ps1 -StateFile ".\socks5-ipv4-aws-state.json" -AwsProfile "<perfil>" -AwsRegion "us-east-1"
 ```
 
 Confira a auditoria exibida ao final: nenhuma VPC do teste deve ser retornada e
@@ -996,7 +996,7 @@ instância é terminada.
 
 ## 22.2 Testar `test_browser_proxy.py` em uma EC2 descartável
 
-O script `start-browser-proxy-aws.ps1` cria a mesma infraestrutura descartável
+O script `start-browser-socks5-ipv4-aws.ps1` cria a mesma infraestrutura descartável
 do teste anterior, estabelece o túnel SSH reverso e executa
 `scripts/test_browser_proxy.py` na EC2. Ele prepara automaticamente a instância
 com Python, ambiente virtual, Playwright, Chromium e Xvfb. A execução remota usa
@@ -1020,19 +1020,19 @@ caso necessário:
 ```powershell
 cd $YourDir\loto-bot\scripts
 
-Unblock-File -LiteralPath .\start-browser-proxy-aws.ps1
-Unblock-File -LiteralPath .\stop-socks5-aws.ps1
+Unblock-File -LiteralPath .\start-browser-socks5-ipv4-aws.ps1
+Unblock-File -LiteralPath .\stop-socks5-ipv4-aws.ps1
 ```
 
 Execute o teste. Uma `t3.micro` é usada no exemplo para dar mais folga à
 instalação e à inicialização do Chromium:
 
 ```powershell
-.\start-browser-proxy-aws.ps1 `
+.\start-browser-socks5-ipv4-aws.ps1 `
   -AwsProfile "<perfil>" `
   -AwsRegion "us-east-1" `
   -InstanceType "t3.micro" `
-  -StateFile ".\browser-proxy-aws-state.json"
+  -StateFile ".\browser-socks5-ipv4-aws-state.json"
 ```
 
 Por padrão, o arquivo Python enviado à EC2 é o
@@ -1067,11 +1067,11 @@ seja anexado ao último argumento, transformando, por exemplo, `chromium` em
 
 O script encerra o túnel ao concluir a validação, mas mantém a EC2 e os demais
 recursos ativos para permitir auditoria. A finalização continua sendo feita pelo
-mesmo `stop-socks5-aws.ps1`; use exatamente o arquivo de estado informado na
+mesmo `stop-socks5-ipv4-aws.ps1`; use exatamente o arquivo de estado informado na
 inicialização:
 
 ```powershell
-.\stop-socks5-aws.ps1 -StateFile ".\browser-proxy-aws-state.json"
+.\stop-socks5-ipv4-aws.ps1 -StateFile ".\browser-socks5-ipv4-aws-state.json"
 ```
 
 Execute a finalização mesmo quando o teste falhar. O estado parcial é salvo no
