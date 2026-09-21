@@ -43,7 +43,7 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
                 viewport = {"width": 1280, "height": 900}
 
             proxy = None
-            if self._settings.browser_proxy_server:
+            if self._settings.integration_mode == "AWS":
                 proxy = {
                     "server": self._settings.browser_proxy_server,
                 }

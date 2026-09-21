@@ -712,6 +712,7 @@ def test_session_browser_start_with_proxy(monkeypatch, tmp_path):
     )
 
     settings = Settings(
+        INTEGRATION_MODE="AWS",
         BROWSER_PROFILE_DIR=tmp_path,
         BROWSER_PROXY_SERVER="socks5://127.0.0.1:1080",
         BROWSER_TIMEOUT_SECONDS=1,
@@ -765,6 +766,7 @@ def test_session_browser_start_without_proxy(monkeypatch, tmp_path):
     )
 
     settings = Settings(
+        INTEGRATION_MODE="LOCAL",
         BROWSER_PROFILE_DIR=tmp_path,
         BROWSER_PROXY_SERVER=None,
         BROWSER_TIMEOUT_SECONDS=1,
