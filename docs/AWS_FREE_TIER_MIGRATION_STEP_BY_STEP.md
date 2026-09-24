@@ -159,7 +159,7 @@ sam deploy `
     MailSenderFunctionArn=$MailSenderFunctionArn `
     WhatsAppNotifyUrl=$WhatsAppNotifyUrl `
     IntegrationSecurityGroupId=$SecurityGroupId `
-    ConfirmPayment=false MongoDbEnabled=false RootVolumeSize=20
+    ConfirmPayment=false DynamoDbTableName=loto-bot-bets RootVolumeSize=20
 ```
 
 Mantenha `ConfirmPayment=false` até concluir os testes controlados. `AllowedCidr=0.0.0.0/32` mantém o acesso externo fechado e usa somente SSM. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração.

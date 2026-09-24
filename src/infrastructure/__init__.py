@@ -1,7 +1,7 @@
 from infrastructure.browser import PlaywrightBrowserAutomation
 from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
 from infrastructure.config import Settings, get_settings
-from infrastructure.database import BeanieBetRepository, BetModel, MongoDatabase
+from infrastructure.database import BeanieBetRepository, BetModel, DynamoDbBetRepository, MongoDatabase
 from infrastructure.logging import configure_logging
 from infrastructure.selectors import Selectors
 
@@ -15,6 +15,7 @@ __all__ = [
     "NotificationGateway",
     "MongoDatabase",
     "BeanieBetRepository",
+    "DynamoDbBetRepository",
     "BetModel",
     "Selectors",
     "PlaywrightBrowserAutomation",

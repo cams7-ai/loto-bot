@@ -58,9 +58,10 @@ class Settings(BaseSettings):
     credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
     credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
     confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
-    mongodb_enabled: bool = Field(default=False, alias="MONGODB_ENABLED")
+    persistence_enabled: bool = Field(default=True, alias="PERSISTENCE_ENABLED")
     mongodb_uri: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URI")
     mongodb_database: str = Field(default="loto_bot", alias="MONGODB_DATABASE")
+    dynamodb_table_name: str = Field(default="loto-bot-bets", alias="DYNAMODB_TABLE_NAME")
     bet_processing_path: str = Field(default="/processamento", alias="BET_PROCESSING_PATH")
     bet_tracking_path: str = Field(default="/acompanhamento/{purchase_number}", alias="BET_TRACKING_PATH")
     bet_purchase_path: str = Field(default="/compras/{purchase_number}", alias="BET_PURCHASE_PATH")
@@ -76,7 +77,7 @@ class Settings(BaseSettings):
         "whatsapp_headless",
         "whatsapp_enabled",
         "confirm_payment",
-        "mongodb_enabled",
+        "persistence_enabled",
         "browser_headless",
         mode="before",
     )

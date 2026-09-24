@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: LotoBot on one persistent EC2 instance - routes Chromium through a local SOCKS5 proxy over restricted IPv6 SSH
+Description: LotoBot on EC2 with LOCAL MongoDB or an independently managed AWS DynamoDB table
 
 Metadata:
   AWSToolsMetrics:
@@ -12,6 +12,7 @@ Metadata:
       - keep payment confirmation disabled until an explicitly approved production deployment
       - keep bettor and payment data in Secrets Manager, never template parameters or artifacts
       - attach the independently managed integration security group used as the source identity for WhatsApp Notify
+      - keep the DynamoDB bet-history table outside this stack lifecycle
       - keep SSH restricted to the proxy host IPv6 /128; never assign a public IPv4 to the instance
       - the shared VPC must provide a CloudFormation interface endpoint with Private DNS before any EC2 stack uses cfn-signal
     ref:
@@ -77,10 +78,11 @@ Parameters:
     Type: String
     Default: "false"
     AllowedValues: ["false", "true"]
-  MongoDbEnabled:
+  DynamoDbTableName:
     Type: String
-    Default: "false"
-    AllowedValues: ["false", "true"]
+    Default: loto-bot-bets
+    MinLength: 3
+    Description: Existing DynamoDB table used by LotoBot.
   RootVolumeSize:
     Type: Number
     Default: 20
@@ -125,6 +127,14 @@ Resources:
                 Resource:
                   - !Ref GmailReaderFunctionArn
                   - !Ref MailSenderFunctionArn
+              - Sid: PersistBetsInDynamoDb
+                Effect: Allow
+                Action:
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Scan
+                Resource: !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDbTableName}
       Tags:
         - Key: Application
           Value: loto-bot
@@ -372,14 +382,13 @@ Resources:
             printf 'CREDIT_CARD_SECURITY_CODE=%q\n' "$(jq -er .credit_card_security_code <<<"$secret_json")"
             printf 'MAIL_TO=%q\n' "$(jq -er .mail_to <<<"$secret_json")"
             echo 'INTEGRATION_MODE=AWS'
+            echo 'PERSISTENCE_ENABLED=true'
+            echo 'DYNAMODB_TABLE_NAME=${DynamoDbTableName}'
             echo 'AWS_DEFAULT_REGION=${AWS::Region}'
             echo 'GMAIL_READER_FUNCTION_NAME=${GmailReaderFunctionArn}'
             echo 'MAIL_SENDER_FUNCTION_NAME=${MailSenderFunctionArn}'
             echo 'WHATSAPP_NOTIFY_URL=${WhatsAppNotifyUrl}'
             echo 'CONFIRM_PAYMENT=${ConfirmPayment}'
-            echo 'MONGODB_ENABLED=${MongoDbEnabled}'
-            echo 'MONGODB_URI=mongodb://localhost:27017'
-            echo 'MONGODB_DATABASE=loto_bot'
             echo 'WHATSAPP_ENABLED=true'
             echo 'WHATSAPP_HEADLESS=true'
             echo 'VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15'
@@ -488,3 +497,6 @@ Outputs:
   IntegrationSecurityGroupId:
     Description: External integration Security Group attached to LotoBot and referenced by WhatsApp Notify.
     Value: !Ref IntegrationSecurityGroupId
+  DynamoDbBetTableName:
+    Description: Existing DynamoDB table used by LotoBot; the stack does not own its lifecycle.
+    Value: !Ref DynamoDbTableName

@@ -4,6 +4,30 @@ Este guia descreve a arquitetura vigente do `loto-bot` e deve ser usado junto co
 
 ## 1. Arquitetura
 
+### Persistência de apostas
+
+`INTEGRATION_MODE=LOCAL` usa MongoDB com Beanie. `INTEGRATION_MODE=AWS` usa DynamoDB com boto3. Em ambos os casos, `PERSISTENCE_ENABLED` habilita ou desabilita a gravação sem escolher o backend.
+
+```text
+PowerShell local
+      |
+      +--> create-dynamodb-aws.ps1
+      |          |
+      |          v
+      |      DynamoDB ACTIVE
+      +--> build/package artifact
+      +--> upload S3
+      +--> sam validate --lint
+      +--> sam deploy
+                 |
+                 v
+                EC2
+                 +--> INTEGRATION_MODE=AWS
+                 +--> DYNAMODB_TABLE_NAME=loto-bot-bets
+                 v
+              LotoBot
+```
+
 O `loto-bot` é executado em uma única instância EC2 para preservar o processo do Chromium e o perfil persistente do Playwright. O Chromium usa `socks5://127.0.0.1:1080`, encaminhado por um túnel SSH reverso para um proxy SOCKS5 na máquina local. As integrações são:
 
 - `mail-sender-aws`: Lambda na mesma VPC/subnet dual-stack, invocada diretamente pelo SDK AWS;
@@ -29,7 +53,8 @@ Não configure `X-API-Key`, `INTEGRATION_API_TOKEN` ou segredo compartilhado ent
 - projetos `mail-sender-aws` e `gmail-reader-aws` disponíveis localmente para implantação depois da criação da rede;
 - bucket S3 privado para os artefatos;
 - segredo no Secrets Manager para os dados do `loto-bot`;
-- permissões para CloudFormation, EC2, IAM, S3, SSM, Secrets Manager e VPC Endpoint.
+- permissões para CloudFormation, EC2, IAM, S3, SSM, Secrets Manager e VPC Endpoint;
+- permissões administrativas `dynamodb:CreateTable`, `dynamodb:DescribeTable`, `dynamodb:TagResource` e `dynamodb:DeleteTable` para os scripts locais. A EC2 recebe somente `BatchWriteItem`, `GetItem`, `PutItem` e `Scan`.
 
 ```powershell
 $AwsProfile = "<perfil>"
@@ -38,6 +63,7 @@ $AwsCommon = @("--region", $AwsRegion, "--profile", $AwsProfile)
 $AppName = "loto-bot"
 $StackName = $AppName
 $InstanceType = "t3.micro"
+$DynamoDbTableName = "loto-bot-bets"
 $RemoteUser = "ubuntu"
 $KeyName = $StackName
 $KeyFile = Join-Path $HOME ".ssh\$KeyName.pem"
@@ -480,6 +506,25 @@ O valor deve começar com `http://` e apontar para o DNS privado da EC2.
 
 ## 11. Implantar o `loto-bot`
 
+Antes do `sam deploy`, crie ou valide obrigatoriamente a tabela persistente, que não pertence à stack:
+
+```powershell
+Unblock-File -LiteralPath .\scripts\create-dynamodb-aws.ps1
+
+.\scripts\create-dynamodb-aws.ps1 `
+  -AwsProfile $AwsProfile `
+  -AwsRegion $AwsRegion `
+  -DynamoDbTableName $DynamoDbTableName
+
+$TableStatus = aws dynamodb describe-table --table-name $DynamoDbTableName --query "Table.TableStatus" --output text @AwsCommon
+if ($TableStatus -ne "ACTIVE") { throw "Tabela DynamoDB não está ACTIVE: $TableStatus" }
+
+$HashKey = aws dynamodb describe-table --table-name $DynamoDbTableName --query "Table.KeySchema[?KeyType=='HASH'].AttributeName | [0]" --output text @AwsCommon
+if ($HashKey -ne "bet_id") { throw "Partition Key incompatível: $HashKey" }
+```
+
+Se usar `samconfig.local.toml`, mantenha `DynamoDbTableName="<dynamodb-table-name>"` em `parameter_overrides` com exatamente o mesmo valor de `$DynamoDbTableName`.
+
 ```powershell
 sam validate --lint --template-file template.yaml
 sam build --template-file template.yaml
@@ -500,7 +545,7 @@ sam deploy `
     MailSenderFunctionArn=$MailSenderFunctionArn `
     WhatsAppNotifyUrl=$WhatsAppNotifyUrl `
     IntegrationSecurityGroupId=$SecurityGroupId `
-    ConfirmPayment=false MongoDbEnabled=false RootVolumeSize=20
+    ConfirmPayment=false DynamoDbTableName=$DynamoDbTableName RootVolumeSize=20
 ```
 
 Mantenha `ConfirmPayment=false` até concluir os testes controlados. `AllowedCidr=0.0.0.0/32` mantém o acesso externo fechado e usa somente SSM. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração.
@@ -772,6 +817,33 @@ Monitore transferência, EBS, CloudWatch e o VPC Endpoint de interface para Lamb
 - [ ] Falha sem fallback confirmada.
 
 ## 20. Checklist
+
+### Diagnóstico e ciclo de vida do DynamoDB
+
+```powershell
+aws dynamodb describe-table --table-name $DynamoDbTableName @AwsCommon
+aws dynamodb describe-table --table-name $DynamoDbTableName --query "Table.ItemCount" --output text @AwsCommon
+aws dynamodb scan --table-name $DynamoDbTableName --max-items 10 @AwsCommon
+```
+
+> A tabela `loto-bot-bets` possui ciclo de vida independente da stack SAM. `sam delete`, a recriação da EC2 e o cleanup do proxy não removem o histórico de apostas.
+
+A exclusão permanente é uma ação separada e explícita:
+
+```powershell
+.\scripts\delete-dynamodb-aws.ps1 `
+  -AwsProfile $AwsProfile `
+  -AwsRegion $AwsRegion `
+  -DynamoDbTableName $DynamoDbTableName `
+  -Force
+```
+
+Configuração final de persistência:
+
+```text
+LOCAL: INTEGRATION_MODE=LOCAL, PERSISTENCE_ENABLED=true, MONGODB_URI e MONGODB_DATABASE
+AWS:   INTEGRATION_MODE=AWS, PERSISTENCE_ENABLED=true, DYNAMODB_TABLE_NAME=loto-bot-bets
+```
 
 - [ ] Outputs `FunctionArn` das duas Lambdas obtidos.
 - [ ] Stacks `mail-sender-aws` e `gmail-reader-aws` implantadas com o mesmo `VpcId` e `SubnetId` do `loto-bot`.

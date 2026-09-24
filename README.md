@@ -31,7 +31,7 @@
 
 ## Visão Geral
 
-O LotoBot centraliza a automação do portal Loterias Online CAIXA atrás de uma API HTTP. O projeto usa Python 3.12, FastAPI e Playwright, com MongoDB opcional para o histórico de apostas.
+O LotoBot centraliza a automação do portal Loterias Online CAIXA atrás de uma API HTTP. O projeto usa Python 3.12, FastAPI e Playwright, com persistência opcional em MongoDB (LOCAL) ou DynamoDB (AWS).
 
 ### Principais características
 
@@ -54,7 +54,7 @@ flowchart LR
     API --> APP[Casos de uso]
     APP -->|BrowserPort| PW[Playwright]
     PW --> CAIXA[Portal Loterias CAIXA]
-    APP -->|BetRepositoryPort| MDB[(MongoDB)]
+    APP -->|BetRepositoryPort| MDB[(MongoDB LOCAL / DynamoDB AWS)]
     APP -->|ValidationCodePort| GMAIL[Gmail Reader]
     APP -->|NotificationPort| WA[WhatsApp Notify]
     APP -->|Fallback| MAIL[Mail Sender]
@@ -66,6 +66,17 @@ flowchart LR
 ```
 
 ## Arquitetura
+
+### Persistência
+
+O backend é escolhido exclusivamente por `INTEGRATION_MODE`; `PERSISTENCE_ENABLED` controla apenas se novas apostas serão persistidas.
+
+| `INTEGRATION_MODE` | Banco | Adapter |
+|---|---|---|
+| `LOCAL` | MongoDB | `BeanieBetRepository` |
+| `AWS` | DynamoDB | `DynamoDbBetRepository` |
+
+No ambiente AWS, a tabela usa `bet_id` (String) como partition key e possui ciclo de vida independente da stack SAM.
 
 O projeto segue **Clean Architecture**, com dependências direcionadas para o domínio e contratos definidos por portas.
 
@@ -199,7 +210,7 @@ Preencha os placeholders apenas no ambiente local. Para uma primeira execução 
 
 ```env
 CONFIRM_PAYMENT=false
-MONGODB_ENABLED=false
+PERSISTENCE_ENABLED=false
 ```
 
 ### Execução
@@ -401,7 +412,8 @@ As configurações são carregadas do ambiente e do arquivo `.env` por `pydantic
 | `BROWSER_PROFILE_DIR` | Perfil persistente do Chromium | `.lotobot-profile` |
 | `BROWSER_HEADLESS` | Chromium sem interface | `true` |
 | `BROWSER_TIMEOUT_SECONDS` | Timeout padrão do navegador | `5` |
-| `MONGODB_ENABLED` | Habilita persistência | `false` |
+| `PERSISTENCE_ENABLED` | Habilita persistência, independentemente do backend | `true` |
+| `DYNAMODB_TABLE_NAME` | Tabela de apostas usada em AWS | `loto-bot-bets` |
 | `MONGODB_URI` | URI do MongoDB | `mongodb://localhost:27017` |
 | `MONGODB_DATABASE` | Banco da aplicação | `loto_bot` |
 | `INTEGRATION_MODE` | Transporte de Gmail Reader e Mail Sender: `LOCAL` ou `AWS` | `LOCAL` |
@@ -418,7 +430,7 @@ Consulte [.env.example](.env.example) para a lista completa.
 Para habilitar o histórico:
 
 ```env
-MONGODB_ENABLED=true
+PERSISTENCE_ENABLED=true
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=loto_bot
 ```
@@ -554,7 +566,7 @@ Esse é o comportamento seguro quando `CONFIRM_PAYMENT=false`. Somente altere a 
 <details>
 <summary>Histórico indisponível</summary>
 
-Verifique se o MongoDB está acessível e se `MONGODB_ENABLED`, `MONGODB_URI` e `MONGODB_DATABASE` estão consistentes.
+Em `LOCAL`, verifique se o MongoDB está acessível e se `PERSISTENCE_ENABLED`, `MONGODB_URI` e `MONGODB_DATABASE` estão consistentes. Em `AWS`, verifique `DYNAMODB_TABLE_NAME` e as permissões IAM.
 </details>
 
 <details>
