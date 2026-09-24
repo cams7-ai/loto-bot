@@ -33,7 +33,7 @@ Não configure `X-API-Key`, `INTEGRATION_API_TOKEN` ou segredo compartilhado ent
 
 ```powershell
 $AwsProfile = "<perfil>"
-$AwsRegion = "sa-east-1"
+$AwsRegion = "us-east-1"
 $StackName = "loto-bot"
 $VpcId = "<vpc-id>"
 $SubnetId = "<subnet-id>"
@@ -49,16 +49,16 @@ Use a mesma VPC para `loto-bot` e `whatsapp-notify`. A subnet precisa resolver D
 Crie o grupo fora das stacks de aplicação para que nenhuma delas dependa da outra. Ele não precisa de regras de entrada: será anexado ao `loto-bot` como identidade de origem e referenciado pelo `whatsapp-notify` em sua regra de entrada.
 
 ```powershell
-$IntegrationSecurityGroupName = "lotobot-internal-integration"
-$IntegrationSecurityGroupId = aws ec2 create-security-group `
-  --group-name $IntegrationSecurityGroupName `
+$SecurityGroupName = "lotobot-internal-integration"
+$SecurityGroupId = aws ec2 create-security-group `
+  --group-name $SecurityGroupName `
   --description "Shared source identity for LotoBot internal integrations" `
   --vpc-id $VpcId `
   --query GroupId --output text `
   --region $AwsRegion --profile $AwsProfile
 
 aws ec2 create-tags `
-  --resources $IntegrationSecurityGroupId `
+  --resources $SecurityGroupId `
   --tags Key=Application,Value=lotobot Key=Purpose,Value=internal-integration `
   --region $AwsRegion --profile $AwsProfile
 ```
@@ -66,8 +66,8 @@ aws ec2 create-tags `
 Não adicione regras de entrada nem anexe esse grupo à EC2 do `loto-bot`. Caso ele já exista, recupere-o pela VPC e pelo nome:
 
 ```powershell
-$IntegrationSecurityGroupId = aws ec2 describe-security-groups `
-  --filters "Name=vpc-id,Values=$VpcId" "Name=group-name,Values=$IntegrationSecurityGroupName" `
+$SecurityGroupId = aws ec2 describe-security-groups `
+  --filters "Name=vpc-id,Values=$VpcId" "Name=group-name,Values=$SecurityGroupName" `
   --query "SecurityGroups[0].GroupId" --output text `
   --region $AwsRegion --profile $AwsProfile
 ```
@@ -128,7 +128,7 @@ aws s3 cp $ArtifactFile "s3://$ArtifactBucket/$ArtifactKey" --region $AwsRegion 
 
 ## 7. Implantar o `whatsapp-notify`
 
-Siga o guia do projeto `whatsapp-notify`, usando a mesma VPC, uma subnet com conectividade entre as instâncias e `IntegrationSecurityGroupId=$IntegrationSecurityGroupId`. Esse deploy não depende da existência da stack do `loto-bot`.
+Siga o guia do projeto `whatsapp-notify`, usando a mesma VPC, uma subnet com conectividade entre as instâncias e `IntegrationSecurityGroupId=$SecurityGroupId`. Esse deploy não depende da existência da stack do `loto-bot`.
 
 ```powershell
 $WhatsAppNotifyUrl = aws cloudformation describe-stacks `
@@ -158,7 +158,7 @@ sam deploy `
     GmailReaderFunctionArn=$GmailReaderFunctionArn `
     MailSenderFunctionArn=$MailSenderFunctionArn `
     WhatsAppNotifyUrl=$WhatsAppNotifyUrl `
-    IntegrationSecurityGroupId=$IntegrationSecurityGroupId `
+    IntegrationSecurityGroupId=$SecurityGroupId `
     ConfirmPayment=false MongoDbEnabled=false RootVolumeSize=20
 ```
 

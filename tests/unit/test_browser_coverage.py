@@ -207,11 +207,12 @@ def test_run_bet_browser_public_wrappers_and_happy_path(monkeypatch):
     browser = immediate(RunBetFlowBrowserMixin(browser_settings()))
     browser._page = Page()
     browser._check_redirected_page = Mock()
-    browser._click = Mock(return_value=False)
+    browser._click = Mock(side_effect=[True, False])
     browser._type = Mock(return_value=True)
     session = AutomationSession()
 
     browser.select_lottery_modality(session, LotteryModality.MEGA_SENA)
+    browser._click = Mock(return_value=False)
     browser.place_bet(session, LotteryModality.MEGA_SENA)
     browser.confirm_purchase(session)
     browser.confirm_payment()
@@ -240,8 +241,23 @@ def test_select_lottery_modality_error_branches(monkeypatch):
     with pytest.raises(BetTemporarilyDisabledError):
         browser._select_lottery_modality(session, LotteryModality.MEGA_SENA)
 
+    browser._click = Mock(side_effect=[False, False])
+    with pytest.raises(AutomationError, match="Não foi possível selecionar"):
+        browser._select_lottery_modality(session, LotteryModality.MEGA_SENA)
+
     browser._click = Mock(side_effect=[True, True])
     with pytest.raises(IndividualBetRegistrationClosedError):
+        browser._select_lottery_modality(session, LotteryModality.MEGA_SENA)
+
+    browser._click = Mock(side_effect=[True, False])
+    browser._select_lottery_modality(session, LotteryModality.MEGA_SENA)
+    assert browser._check_redirected_page.call_args.args[-1] == "/mega-sena"
+
+    browser._click = Mock(side_effect=[True, False])
+    browser._check_redirected_page = Mock(
+        side_effect=[None, PageRedirectionError("/mega-sena", Operation.SELECT_LOTTERY_MODALITY)]
+    )
+    with pytest.raises(PageRedirectionError):
         browser._select_lottery_modality(session, LotteryModality.MEGA_SENA)
 
 

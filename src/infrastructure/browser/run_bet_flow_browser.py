@@ -44,13 +44,19 @@ class RunBetFlowBrowserMixin(PlaywrightBrowserBase):
                 operation=Operation.SELECT_LOTTERY_MODALITY,
             )
 
-        if not self._click(page, short_timeout_ms, selector):
-            selector = Selectors.disabled_modality_button(lottery_modality.value)
-            if selector is not None and self._click(page, short_timeout_ms, selector):
+        if not self._click(page, self._timeout_ms, selector):
+            disabled_selector = Selectors.disabled_modality_button(lottery_modality.value)
+            if disabled_selector is not None and self._click(page, short_timeout_ms, disabled_selector):
                 raise BetTemporarilyDisabledError(lottery_modality.value)
+            raise AutomationError(
+                ErrorMessage.LOTTERY_MODALITY_SELECTION_FAILED.format(modality=lottery_modality.value),
+                operation=Operation.SELECT_LOTTERY_MODALITY,
+            )
 
         if self._click(page, short_timeout_ms, Selectors.CLOSE_BET_REGISTRATION_ALERT_BUTTON):
             raise IndividualBetRegistrationClosedError()
+        bet_page_path = self._settings.bet_page_path.format(lottery_modality=lottery_modality.value)
+        self._check_redirected_page(page, self._timeout_ms, session, bet_page_path)
 
     def place_bet(self, session: AutomationSession, lottery_modality: LotteryModality) -> None:
         self._run_on_browser_thread(self._place_bet, session, lottery_modality)

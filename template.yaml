@@ -1,20 +1,22 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: LotoBot on one persistent EC2 instance - preserves the Playwright browser profile and restricts external integrations
+Description: LotoBot on one persistent EC2 instance - routes Chromium through a local SOCKS5 proxy over restricted IPv6 SSH
 
 Metadata:
   AWSToolsMetrics:
     AWSAgentToolkit: aws-cloudformation@2
   com.aws.cloudformation.Context:
-    arch: restricted client -> SSM tunnel or HTTPS -> EC2 -> CAIXA + Gmail Reader + Mail Sender + WhatsApp Notify
+    arch: local SOCKS5 -> reverse SSH over IPv6 -> EC2 Chromium; EC2 -> Lambda + WhatsApp Notify privately
     must:
       - keep one application worker per browser profile
       - keep payment confirmation disabled until an explicitly approved production deployment
       - keep bettor and payment data in Secrets Manager, never template parameters or artifacts
       - attach the independently managed integration security group used as the source identity for WhatsApp Notify
+      - keep SSH restricted to the proxy host IPv6 /128; never assign a public IPv4 to the instance
+      - the shared VPC must provide a CloudFormation interface endpoint with Private DNS before any EC2 stack uses cfn-signal
     ref:
-      - at: docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md
-        has: deployment, integration, security, cost and rollback procedures
+      - at: docs/AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md
+        has: dual-stack network, IPv6 SSH, local SOCKS5 proxy and fail-closed procedures
         scope: local
 
 Parameters:
@@ -35,6 +37,14 @@ Parameters:
     Default: 0.0.0.0/32
     AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$
     Description: Client CIDR allowed to reach HTTPS; use 0.0.0.0/32 for SSM-only access.
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 key pair used only for the restricted IPv6 SSH tunnel.
+  AllowedSshIpv6Cidr:
+    Type: String
+    AllowedPattern: ^[0-9A-Fa-f:]+/128$
+    ConstraintDescription: Must be one IPv6 address with the /128 prefix.
+    Description: Public IPv6 /128 of the local host that maintains the reverse SOCKS5 tunnel.
   ArtifactBucket:
     Type: String
     AllowedPattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
@@ -128,9 +138,10 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Metadata:
       com.aws.cloudformation.Context:
-        why: accepts only restricted HTTPS and permits the bot to call its public HTTPS dependencies
+        why: accepts restricted HTTPS plus SSH from one IPv6 host; permits private IPv4 integrations and IPv6 bootstrap traffic
         must:
           - never widen ingress to 0.0.0.0/0
+          - keep SSH source restricted to AllowedSshIpv6Cidr /128
           - retain outbound TCP 443 for CAIXA and the three integration APIs
         mutable: change-with-constraints
     Properties:
@@ -142,6 +153,11 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: !Ref AllowedCidr
+        - Description: SSH over IPv6 from the local SOCKS5 proxy host
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIpv6: !Ref AllowedSshIpv6Cidr
       SecurityGroupEgress:
         - Description: HTTP for operating-system package repositories and redirects
           IpProtocol: tcp
@@ -163,6 +179,26 @@ Resources:
           FromPort: 53
           ToPort: 53
           CidrIp: 0.0.0.0/0
+        - Description: HTTP over IPv6 for operating-system package repositories and redirects
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIpv6: ::/0
+        - Description: HTTPS over IPv6 for AWS APIs and package repositories
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIpv6: ::/0
+        - Description: DNS UDP over IPv6
+          IpProtocol: udp
+          FromPort: 53
+          ToPort: 53
+          CidrIpv6: ::/0
+        - Description: DNS TCP over IPv6
+          IpProtocol: tcp
+          FromPort: 53
+          ToPort: 53
+          CidrIpv6: ::/0
       Tags:
         - Key: Application
           Value: loto-bot
@@ -208,10 +244,20 @@ Resources:
           - encrypted persistent browser profile outside release directory
           - IMDSv2 required
           - attach IntegrationSecurityGroupId together with the application security group
+          - assign exactly one public IPv6 and no public IPv4
+          - use the supplied key pair only for the reverse SOCKS5 tunnel
+          - bootstrap AWS calls use dual-stack endpoints because the subnet has no IPv4 internet route
+          - cfn-signal reaches the standard CloudFormation hostname through the shared interface VPC endpoint and Private DNS
+          - do not persist AWS_USE_DUALSTACK_ENDPOINT at runtime; Lambda Invoke uses the interface endpoint Private DNS
+          - set AWS_DEFAULT_REGION in the systemd environment so boto3 can invoke the regional Lambda endpoint
+          - allow a longer browser navigation timeout for the IPv6 SOCKS5 tunnel while keeping payment confirmation explicit
+          - start through the loto-bot entry point so LOG_LEVEL and the application log format take effect
         mutable: change-with-constraints
         mutability:
           ImageId: review-required
           InstanceType: review-required
+          Ipv6AddressCount: review-required
+          KeyName: review-required
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -219,6 +265,8 @@ Resources:
     Properties:
       ImageId: !Ref AmiId
       InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      Ipv6AddressCount: 1
       IamInstanceProfile: !Ref InstanceProfile
       SubnetId: !Ref SubnetId
       SecurityGroupIds:
@@ -249,17 +297,43 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euo pipefail
+          # Bootstrap uses public dual-stack endpoints because this subnet has no IPv4 internet route.
+          # Do not persist this setting in /etc/loto-bot.env: Lambda Invoke must keep using Private DNS.
+          export AWS_USE_DUALSTACK_ENDPOINT=true
           exec > >(tee /var/log/loto-bot-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
 
           signal_failure() {
-            /opt/cfn-bootstrap/bin/cfn-signal --exit-code 1 --stack "${AWS::StackName}" --resource ApplicationInstance --region "${AWS::Region}" || true
+            if [ -x /opt/cfn-bootstrap/bin/cfn-signal ]; then
+              /opt/cfn-bootstrap/bin/cfn-signal --exit-code 1 \
+                --stack "${AWS::StackName}" \
+                --resource ApplicationInstance \
+                --region "${AWS::Region}" \
+                --url "https://cloudformation.${AWS::Region}.${AWS::URLSuffix}" || true
+            else
+              echo "cfn-signal is unavailable; bootstrap failed before aws-cfn-bootstrap was installed."
+            fi
           }
           trap signal_failure ERR
+
+          for attempt in {1..60}; do
+            if ip -6 -o addr show scope global | grep -q 'inet6' && \
+               ip -6 route show default | grep -q '^default'; then
+              echo "Global IPv6 address and default route are ready."
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "IPv6 was not ready after 120 seconds."
+              ip -6 addr show || true
+              ip -6 route show || true
+              exit 1
+            fi
+            sleep 2
+          done
 
           apt-get update
           apt-get install -y curl jq nginx python3.12 python3.12-venv python3-pip unzip
           python3.12 -m venv /opt/cfn-bootstrap
-          /opt/cfn-bootstrap/bin/pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+          /opt/cfn-bootstrap/bin/pip install https://s3.dualstack.${AWS::Region}.${AWS::URLSuffix}/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
           curl --fail --location --retry 3 https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip --output /tmp/awscliv2.zip
           unzip -q /tmp/awscliv2.zip -d /tmp
           /tmp/aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli
@@ -298,6 +372,7 @@ Resources:
             printf 'CREDIT_CARD_SECURITY_CODE=%q\n' "$(jq -er .credit_card_security_code <<<"$secret_json")"
             printf 'MAIL_TO=%q\n' "$(jq -er .mail_to <<<"$secret_json")"
             echo 'INTEGRATION_MODE=AWS'
+            echo 'AWS_DEFAULT_REGION=${AWS::Region}'
             echo 'GMAIL_READER_FUNCTION_NAME=${GmailReaderFunctionArn}'
             echo 'MAIL_SENDER_FUNCTION_NAME=${MailSenderFunctionArn}'
             echo 'WHATSAPP_NOTIFY_URL=${WhatsAppNotifyUrl}'
@@ -309,6 +384,8 @@ Resources:
             echo 'WHATSAPP_HEADLESS=true'
             echo 'VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15'
             echo 'BROWSER_HEADLESS=true'
+            echo 'BROWSER_TIMEOUT_SECONDS=20'
+            echo 'BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080'
             echo 'BROWSER_PROFILE_DIR=/opt/loto-bot/data/.lotobot-profile'
             echo 'API_HOST=127.0.0.1'
             echo 'API_PORT=8000'
@@ -329,7 +406,7 @@ Resources:
           WorkingDirectory=/opt/loto-bot/app
           EnvironmentFile=/etc/loto-bot.env
           Environment=PYTHONPATH=/opt/loto-bot/app/src
-          ExecStart=/opt/loto-bot/app/.venv/bin/uvicorn api.server:app --host 127.0.0.1 --port 8000 --workers 1
+          ExecStart=/opt/loto-bot/app/.venv/bin/loto-bot
           Restart=on-failure
           RestartSec=5
           TimeoutStopSec=60
@@ -379,16 +456,23 @@ Resources:
             fi
             sleep 3
           done
-          /opt/cfn-bootstrap/bin/cfn-signal --exit-code 0 --stack "${AWS::StackName}" --resource ApplicationInstance --region "${AWS::Region}"
+          /opt/cfn-bootstrap/bin/cfn-signal --exit-code 0 \
+            --stack "${AWS::StackName}" \
+            --resource ApplicationInstance \
+            --region "${AWS::Region}" \
+            --url "https://cloudformation.${AWS::Region}.${AWS::URLSuffix}"
           trap - ERR
 
 Outputs:
   InstanceId:
     Description: EC2 instance managed by the stack.
     Value: !Ref ApplicationInstance
-  PublicIp:
-    Description: Auto-assigned public IPv4; changes after stop/start.
-    Value: !GetAtt ApplicationInstance.PublicIp
+  Ipv6LookupCommand:
+    Description: Command that returns the IPv6 assigned to the EC2 primary network interface.
+    Value: !Sub >-
+      aws ec2 describe-instances --instance-ids ${ApplicationInstance} --region ${AWS::Region}
+      --query "Reservations[0].Instances[0].NetworkInterfaces[0].Ipv6Addresses[0].Ipv6Address"
+      --output text
   SessionManagerCommand:
     Description: Command to open an SSM shell.
     Value: !Sub aws ssm start-session --target ${ApplicationInstance} --region ${AWS::Region}
