@@ -34,7 +34,7 @@ O `loto-bot` é executado em uma única instância EC2 para preservar o processo
 - `gmail-reader-aws`: Lambda na mesma VPC/subnet dual-stack, invocada diretamente pelo SDK AWS;
 - `whatsapp-notify`: HTTP privado na porta 80, dentro da VPC;
 - portal CAIXA e repositórios de sistema: saída pela internet;
-- administração: AWS Systems Manager Session Manager e túnel de porta.
+- administração: conexão SSH iniciada no ambiente local, restrita ao IPv6 público `/128` autorizado.
 
 O seletor `INTEGRATION_MODE` aceita somente `LOCAL` ou `AWS`. Use `LOCAL` no desenvolvimento para chamar `GMAIL_READER_URL` e `MAIL_SENDER_URL` por HTTP. O template desta stack sempre grava `INTEGRATION_MODE=AWS`, usando `GMAIL_READER_FUNCTION_NAME` e `MAIL_SENDER_FUNCTION_NAME` para invocação direta.
 
@@ -548,7 +548,7 @@ sam deploy `
     ConfirmPayment=false DynamoDbTableName=$DynamoDbTableName RootVolumeSize=20
 ```
 
-Mantenha `ConfirmPayment=false` até concluir os testes controlados. `AllowedCidr=0.0.0.0/32` mantém o acesso externo fechado e usa somente SSM. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração.
+Mantenha `ConfirmPayment=false` até concluir os testes controlados. `AllowedCidr=0.0.0.0/32` mantém fechado o acesso HTTPS direto à instância. A administração é feita por SSH sobre IPv6, limitado ao endereço `/128` informado em `AllowedSshIpv6Cidr`. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração.
 
 ## 12. Validação operacional
 
@@ -557,16 +557,16 @@ $InstanceId = aws cloudformation describe-stacks `
   --stack-name $StackName `
   --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" `
   --output text --region $AwsRegion --profile $AwsProfile
-aws ssm start-session --target $InstanceId --region $AwsRegion --profile $AwsProfile
-```
 
-Na instância:
+$InstanceIpv6 = aws ec2 describe-instances `
+  --instance-ids $InstanceId `
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Ipv6Addresses[0].Ipv6Address" `
+  --output text --region $AwsRegion --profile $AwsProfile
 
-```bash
-sudo systemctl status loto-bot --no-pager
-sudo journalctl -u loto-bot -n 100 --no-pager
-curl -fsS http://127.0.0.1:8000/health
-curl -fsS "$WHATSAPP_NOTIFY_URL/whatsapp/session/status"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo systemctl status loto-bot --no-pager"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo journalctl -u loto-bot -n 100 --no-pager"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS http://127.0.0.1:8000/health"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS '$WHATSAPP_NOTIFY_URL/whatsapp/session/status'"
 ```
 
 O serviço inicia pelo comando `loto-bot`, que aplica `LOG_LEVEL` e o formato de
@@ -577,7 +577,17 @@ Depois volte a `INFO`. O reinício interrompe a sessão
 em andamento, e logs DEBUG podem conter dados da sessão e das apostas; revise
 e oculte informações sensíveis antes de compartilhá-los.
 
-Para acesso local, execute o output `PortForwardCommand` e use `http://127.0.0.1:8080`. Nenhum cabeçalho de chave de API é necessário nas chamadas internas.
+Para acessar a API a partir do ambiente local, abra um túnel SSH local em uma janela PowerShell. Mantenha o processo ativo enquanto usar `http://127.0.0.1:8080` e encerre-o com `Ctrl+C` ao terminar:
+
+```powershell
+ssh @SshOptions `
+  -N -T `
+  -o "ExitOnForwardFailure=yes" `
+  -L "127.0.0.1:8080:127.0.0.1:8000" `
+  "$RemoteUser@$InstanceIpv6"
+```
+
+Nenhum cabeçalho de chave de API é necessário nas chamadas internas.
 
 Confirme que a role limita `lambda:InvokeFunction` aos dois ARNs, `secretsmanager:GetSecretValue` ao segredo da aplicação e `s3:GetObject` a `loto-bot/releases/*`.
 
@@ -959,17 +969,13 @@ Remove-Item -LiteralPath $KnownHostsFile -Force -ErrorAction SilentlyContinue
 
 ## 18. Validação específica do proxy
 
-Com o túnel ativo, use SSM e confira o serviço e o listener:
+Com o túnel ativo, confira o serviço e o listener por SSH IPv6:
 
 ```powershell
-aws ssm start-session --target $InstanceId --region $AwsRegion --profile $AwsProfile
-```
-
-```bash
-sudo systemctl status loto-bot --no-pager
-sudo journalctl -u loto-bot -n 100 --no-pager
-curl -fsS http://127.0.0.1:8000/health
-ss -lnt | grep '127.0.0.1:1080'
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo systemctl status loto-bot --no-pager"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo journalctl -u loto-bot -n 100 --no-pager"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS http://127.0.0.1:8000/health"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "ss -lnt | grep '127.0.0.1:1080'"
 ```
 
 Execute um fluxo controlado com `ConfirmPayment=false`, valide a CAIXA, encerre o túnel e confirme a falha sem fallback.
@@ -1037,5 +1043,5 @@ AWS:   INTEGRATION_MODE=AWS, PERSISTENCE_ENABLED=true, DYNAMODB_TABLE_NAME=loto-
 - [ ] WhatsApp aceita porta 80 somente do Security Group de integração.
 - [ ] `WHATSAPP_NOTIFY_URL` usa DNS privado e HTTP.
 - [ ] Nenhuma variável ou chamada usa chave de API compartilhada.
-- [ ] Serviços validados via SSM.
+- [ ] Serviços validados por conexão SSH local sobre IPv6.
 - [ ] Orçamento e alertas configurados.
