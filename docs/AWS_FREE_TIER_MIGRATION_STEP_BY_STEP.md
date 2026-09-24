@@ -581,6 +581,177 @@ Para acesso local, execute o output `PortForwardCommand` e use `http://127.0.0.1
 
 Confirme que a role limita `lambda:InvokeFunction` aos dois ARNs, `secretsmanager:GetSecretValue` ao segredo da aplicação e `s3:GetObject` a `loto-bot/releases/*`.
 
+### 12.1 Testes funcionais sem inserir credenciais nos comandos
+
+Os comandos abaixo não passam CPF, senha, CVV ou tokens pela linha de comando. Esses valores devem continuar somente no Secrets Manager e em `/etc/loto-bot.env`. Antes de testar o fluxo de apostas, confirme que o pagamento está desabilitado:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "grep '^CONFIRM_PAYMENT=' /etc/loto-bot.env"
+```
+
+O resultado deve ser `CONFIRM_PAYMENT=false`. Não execute o endpoint de aposta se o valor estiver diferente.
+
+Obtenha o ID da EC2 pela stack e consulte o IPv6:
+
+```powershell
+$InstanceId = aws cloudformation describe-stack-resource `
+  --stack-name $StackName `
+  --logical-resource-id ApplicationInstance `
+  --query "StackResourceDetail.PhysicalResourceId" `
+  --output text --region $AwsRegion --profile $AwsProfile
+
+$InstanceIpv6 = aws ec2 describe-instances `
+  --instance-ids $InstanceId `
+  --query "Reservations[0].Instances[0].NetworkInterfaces[0].Ipv6Addresses[0].Ipv6Address" `
+  --output text --region $AwsRegion --profile $AwsProfile
+```
+
+Confira a API e o estado inicial da sessão:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/health'"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/status'"
+```
+
+Se houver um listener antigo na porta do túnel, identifique-o antes de encerrá-lo. O comando abaixo encerra qualquer processo que esteja usando a porta 1080 e deve ser usado somente quando necessário:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo fuser -k 1080/tcp >/dev/null 2>&1 || true"
+```
+
+Inicie o túnel reverso SSH em segundo plano:
+
+```powershell
+$TunnelArguments = @(
+  "-6",
+  "-i", $KeyFile,
+  "-N", "-T",
+  "-o", "ExitOnForwardFailure=yes",
+  "-o", "ServerAliveInterval=30",
+  "-o", "ServerAliveCountMax=3",
+  "-o", "StrictHostKeyChecking=accept-new",
+  "-o", "UserKnownHostsFile=$KnownHostsFile",
+  "-R", "127.0.0.1:1080",
+  "$RemoteUser@$InstanceIpv6"
+)
+$TunnelProcess = Start-Process ssh -ArgumentList $TunnelArguments -WindowStyle Hidden -PassThru
+$TunnelProcessId = $TunnelProcess.Id
+Start-Sleep -Seconds 5
+if ($TunnelProcess.HasExited) { throw "O processo do túnel SSH terminou antes da validação." }
+Write-Host "Processo do túnel SSH `"$TunnelProcessId`""
+```
+
+Teste o listener e o acesso à internet/CAIXA pelo SOCKS5. O teste verifica o IP público de saída sem exibi-lo e mostra somente o status HTTP da CAIXA:
+
+```powershell
+$RemoteCommand = @'
+set -eu
+LISTENER="$(ss -lnt | awk '$4 == "127.0.0.1:1080" {print $4}')"
+PROXY_IP="$(curl -fsS --max-time 20 --socks5-hostname 127.0.0.1:1080 https://api.ipify.org)"
+PROXY_CAIXA_STATUS="$(curl -sS -L -o /dev/null -w '%{http_code}' --max-time 20 --socks5-hostname 127.0.0.1:1080 'https://www.loteriasonline.caixa.gov.br/silce-web/#/termos-de-uso')"
+test -n "$LISTENER"
+test -n "$PROXY_IP"
+printf 'Listener: %s\nSaída SOCKS5: OK\nStatus CAIXA pelo SOCKS5: %s\n' "$LISTENER" "$PROXY_CAIXA_STATUS"
+'@
+$Output = $RemoteCommand | & ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sed 's/\r$//' | bash -s"
+$Output | Out-Host
+```
+
+Teste iniciar, parar e consultar a sessão:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/start'"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/stop'"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/start'"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/status'"
+```
+
+Consulte as apostas do portal e o histórico persistido. As respostas podem conter números apostados, datas e identificadores reais; mantenha a saída local e não a publique sem revisar e ocultar esses campos.
+
+```powershell
+$PortalBetsAllJson = ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS 'http://127.0.0.1:8000/api/v1/bets'"
+$PortalBetsAll = $PortalBetsAllJson | ConvertFrom-Json
+Write-Host "Apostas retornadas sem filtros: $($PortalBetsAll.Count)"
+
+$PortalBetsJson = ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS 'http://127.0.0.1:8000/api/v1/bets?bet_type=ALL&lottery_modality=ALL&draw_type=ALL&month_year=LAST_90_DAYS&status=ALL&sort_by=DATE_DESC'"
+$PortalBets = $PortalBetsJson | ConvertFrom-Json
+Write-Host "Apostas retornadas pelo portal: $($PortalBets.Count)"
+
+$PlacedBetsJson = ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS 'http://127.0.0.1:8000/api/v1/history/bets'"
+$PlacedBets = $PlacedBetsJson | ConvertFrom-Json
+Write-Host "Apostas persistidas: $($PlacedBets.Count)"
+```
+
+Para testar a consulta por ID sem colocar um identificador fixo no documento, use um `bet_id` retornado pelo próprio histórico:
+
+```powershell
+if ($PlacedBets.Count -gt 0) {
+  $BetId = $PlacedBets[0].bet_id
+  $BetDetailJson = ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS 'http://127.0.0.1:8000/api/v1/history/bets/$BetId'"
+  $BetDetail = $BetDetailJson | ConvertFrom-Json
+  Write-Host "Consulta de aposta por ID concluída."
+} else {
+  Write-Host "Histórico vazio; teste de consulta por ID ignorado."
+}
+```
+
+Opcionalmente, valide o fluxo de aposta mantendo `CONFIRM_PAYMENT=false`. O JSON contém somente a modalidade; a execução pode autenticar e navegar no portal, mas não deve confirmar pagamento:
+
+```powershell
+$Json = @{ selected_lottery_modality = "QUINA" } | ConvertTo-Json -Compress
+$JsonBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Json))
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" `
+  "echo '$JsonBase64' | base64 -d | curl -i -sSL -X POST 'http://127.0.0.1:8000/api/v1/bets/run' -H 'Content-Type: application/json; charset=utf-8' --data-binary @-"
+
+$PlacedBetsJson = ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -fsS 'http://127.0.0.1:8000/api/v1/history/bets'"
+$PlacedBets = $PlacedBetsJson | ConvertFrom-Json
+Write-Host "Apostas persistidas após o fluxo: $($PlacedBets.Count)"
+```
+
+Teste a conferência do histórico com filtros sem dados pessoais:
+
+```powershell
+$Json = @{
+  lottery_modality = "ALL"
+  start_date = (Get-Date -Format "yyyy-MM-dd")
+  end_date = (Get-Date -Format "yyyy-MM-dd")
+  bet_type = "INDIVIDUAL"
+  draw_type = "ALL"
+  month_year = "LAST_7_DAYS"
+  status = "ALL"
+} | ConvertTo-Json -Compress
+$JsonBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Json))
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" `
+  "echo '$JsonBase64' | base64 -d | curl -i -sSL -X POST 'http://127.0.0.1:8000/api/v1/bets/check_draws' -H 'Content-Type: application/json; charset=utf-8' --data-binary @-"
+```
+
+Encerre a sessão do browser e o túnel ao terminar:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "curl -i -sSL 'http://127.0.0.1:8000/api/v1/sessions/stop'"
+Stop-Process -Id $TunnelProcessId -Force
+Wait-Process -Id $TunnelProcessId -ErrorAction SilentlyContinue
+```
+
+Para diagnóstico temporário, DEBUG pode registrar detalhes de sessão e apostas. Use somente durante a investigação, não compartilhe logs sem revisão e retorne a `INFO` ao final:
+
+```powershell
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo sed -i 's/^LOG_LEVEL=.*/LOG_LEVEL=DEBUG/' /etc/loto-bot.env"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo systemctl restart loto-bot"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo journalctl -u loto-bot -n 200 -f"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo sed -i 's/^LOG_LEVEL=.*/LOG_LEVEL=INFO/' /etc/loto-bot.env"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo systemctl restart loto-bot"
+```
+
+Verifique a tabela DynamoDB sem imprimir itens de apostas:
+
+```powershell
+aws dynamodb describe-table --table-name $DynamoDbTableName @AwsCommon
+aws dynamodb describe-table --table-name $DynamoDbTableName --query "Table.ItemCount" --output text @AwsCommon
+```
+
+`scan --max-items 10` retorna os dados completos dos itens. Evite usá-lo em capturas compartilhadas; se precisar inspecionar registros, faça-o localmente e oculte `selected_numbers`, `purchase_number` e outros campos antes de compartilhar.
+
 ## 13. Atualizações e rollback
 
 Para uma nova versão, execute os testes, gere outro ZIP e SHA-256, envie-o para uma chave S3 versionada, faça deploy e revise o change set. O código e o ambiente são instalados pelo User Data; uma simples alteração de parâmetro não reexecuta o script em uma EC2 existente. Durante o bootstrap, `AWS_USE_DUALSTACK_ENDPOINT=true` permite que AWS CLI, S3 e Secrets Manager usem IPv6. O `cfn-signal` usa o hostname regional padrão do CloudFormation, resolvido para IPv4 privado pelo Interface VPC Endpoint compartilhado. A variável dual-stack não é persistida em `/etc/loto-bot.env`, preservando o DNS privado dos endpoints de interface em runtime.
