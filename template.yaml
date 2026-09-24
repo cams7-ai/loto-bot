@@ -16,7 +16,7 @@ Metadata:
       - keep SSH restricted to the proxy host IPv6 /128; never assign a public IPv4 to the instance
       - the shared VPC must provide a CloudFormation interface endpoint with Private DNS before any EC2 stack uses cfn-signal
     ref:
-      - at: docs/AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md
+      - at: docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md
         has: dual-stack network, IPv6 SSH, local SOCKS5 proxy and fail-closed procedures
         scope: local
 

@@ -2178,7 +2178,7 @@ A criação, alteração estrutural e exclusão da tabela continuam sob responsa
 
 ---
 
-# 44.1 Atualizar o guia `AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md`
+# 44.1 Atualizar o guia `AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md`
 
 Também é obrigatório atualizar o arquivo:
 
@@ -3145,7 +3145,7 @@ A tarefa só estará concluída se todos estes requisitos forem atendidos:
 - [ ] `ruff check .` passa.
 - [ ] `ruff format --check .` passa.
 - [ ] `sam validate --lint` passa.
-- [ ] `docs/AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md` foi atualizado com os scripts executados antes do `sam deploy`.
+- [ ] `../docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md` foi atualizado com os scripts executados antes do `sam deploy`.
 
 ---
 
@@ -3201,7 +3201,7 @@ sam validate --lint
 
 11. resumo das alterações realizadas em `template.yaml`;
 12. resumo das alterações realizadas em `samconfig.local.toml`;
-13. resumo das alterações realizadas em `docs/AWS_FREE_TIER_MIGRATION_WITH_PROXY_SOCKS5_STEP_BY_STEP.md`;
+13. resumo das alterações realizadas em `../docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md`;
 14. qualquer limitação ou melhoria futura identificada.
 
 Não encerrar a tarefa apenas descrevendo o que deve ser feito.
