@@ -439,6 +439,8 @@ MONGODB_DATABASE=loto_bot
 
 Com `INTEGRATION_MODE=LOCAL`, o Gmail Reader e o Mail Sender são acessados por HTTP nas URLs configuradas. Com `INTEGRATION_MODE=AWS`, essas URLs são ignoradas e o SDK AWS invoca diretamente as funções indicadas por `GMAIL_READER_FUNCTION_NAME` e `MAIL_SENDER_FUNCTION_NAME`.
 
+Na EC2, os clientes Lambda usam o endpoint regional dual stack sobre IPv6. O endpoint privado Lambda da stack pode ser desativado com `UseLambdaVpcEndpoint=false` depois de validar as duas invocações e o fluxo completo na instância atualizada. O endpoint CloudFormation compartilhado permanece necessário para o sinal de bootstrap. A API da aplicação não possui entrada pública na porta 443; o acesso operacional usa SSH IPv6 restrito. Consulte [o procedimento AWS](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md) para a ordem de atualização e reversão.
+
 ## Testes e Qualidade
 
 ```powershell

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class WhatsAppNotifyClient:
     def __init__(self, settings: Settings, client: httpx.Client | None = None) -> None:
         self._settings = settings
-        self._client = client or httpx.Client(timeout=settings.whatsapp_timeout_seconds + 5)
+        self._client = client or httpx.Client(timeout=settings.whatsapp_timeout_seconds + 30)
 
     def start_session(self, operation: Operation) -> str:
         logger.info(

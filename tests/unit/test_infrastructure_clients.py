@@ -61,7 +61,13 @@ class FakeLambdaClient:
 
 def test_aws_clients_are_created_lazily(monkeypatch):
     lambda_client = FakeLambdaClient()
-    boto3 = SimpleNamespace(client=lambda service: lambda_client if service == "lambda" else None)
+    configurations = []
+
+    def make_client(service, *, config):
+        configurations.append(config)
+        return lambda_client if service == "lambda" else None
+
+    boto3 = SimpleNamespace(client=make_client)
     monkeypatch.setitem(sys.modules, "boto3", boto3)
 
     settings = Settings(INTEGRATION_MODE="AWS")
@@ -70,6 +76,8 @@ def test_aws_clients_are_created_lazily(monkeypatch):
 
     assert gmail_client._lambda_client() is lambda_client
     assert mail_client._lambda_client() is lambda_client
+    assert len(configurations) == 2
+    assert all(config.use_dualstack_endpoint for config in configurations)
 
 
 def test_http_clients_are_created_lazily(monkeypatch):
@@ -203,6 +211,20 @@ def test_whatsapp_notify_client_maps_success_and_error():
         assert "falhou" in str(exc)
     else:
         raise AssertionError("Erro externo esperado")
+
+
+def test_whatsapp_notify_start_uses_supported_timeout_parameter():
+    seen = {}
+
+    def handler(request):
+        seen["query"] = str(request.url.query)
+        return response(200, {"status": "ok"})
+
+    settings = Settings(WHATSAPP_NOTIFY_URL="http://whatsapp.local", WHATSAPP_TIMEOUT_SECONDS=60)
+    client = WhatsAppNotifyClient(settings, httpx.Client(transport=httpx.MockTransport(handler)))
+
+    assert client.start_session(Operation.UNKNOWN_OPERATION) == "ok"
+    assert "timeoutInSeconds=60" in seen["query"]
 
 
 def test_notification_gateway_uses_email_fallback():

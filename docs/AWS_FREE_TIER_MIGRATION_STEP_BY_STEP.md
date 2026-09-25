@@ -523,7 +523,11 @@ $HashKey = aws dynamodb describe-table --table-name $DynamoDbTableName --query "
 if ($HashKey -ne "bet_id") { throw "Partition Key incompatível: $HashKey" }
 ```
 
-Se usar `samconfig.local.toml`, mantenha `DynamoDbTableName="<dynamodb-table-name>"` em `parameter_overrides` com exatamente o mesmo valor de `$DynamoDbTableName`.
+Se usar `samconfig.local.toml`, mantenha `DynamoDbTableName="<dynamodb-table-name>"` em `parameter_overrides` com exatamente o mesmo valor de `$DynamoDbTableName`. Antes do deploy, valide a dependência compartilhada:
+
+```powershell
+.\scripts\test-shared-cloudformation-endpoint.ps1 -AwsProfile $AwsProfile -AwsRegion $AwsRegion -VpcId $VpcId
+```
 
 ```powershell
 sam validate --lint --template-file template.yaml
@@ -537,7 +541,7 @@ sam deploy `
   --profile $AwsProfile `
   --parameter-overrides `
     VpcId=$VpcId SubnetId=$SubnetId AmiId=$AmiId `
-    InstanceType=$InstanceType AllowedCidr=0.0.0.0/32 `
+    InstanceType=$InstanceType UseLambdaVpcEndpoint=true `
     KeyName=$KeyName AllowedSshIpv6Cidr=$AllowedSshIpv6Cidr `
     ArtifactBucket=$ArtifactBucket ArtifactKey=$ArtifactKey ArtifactSha256=$ArtifactSha256 `
     ApplicationSecretArn=$ApplicationSecretArn `
@@ -548,7 +552,7 @@ sam deploy `
     ConfirmPayment=false DynamoDbTableName=$DynamoDbTableName RootVolumeSize=20
 ```
 
-Mantenha `ConfirmPayment=false` até concluir os testes controlados. `AllowedCidr=0.0.0.0/32` mantém fechado o acesso HTTPS direto à instância. A administração é feita por SSH sobre IPv6, limitado ao endereço `/128` informado em `AllowedSshIpv6Cidr`. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração.
+Mantenha `ConfirmPayment=false` até concluir os testes controlados. A regra de entrada 443 foi removida, pois o Nginx atende na porta 80; a administração é feita por SSH sobre IPv6, limitado ao endereço `/128` informado em `AllowedSshIpv6Cidr`. O template anexa à EC2 tanto seu Security Group de aplicação quanto o grupo externo de integração. `UseLambdaVpcEndpoint=true` preserva a rota antiga durante a atualização do código.
 
 ## 12. Validação operacional
 
@@ -764,9 +768,131 @@ aws dynamodb describe-table --table-name $DynamoDbTableName --query "Table.ItemC
 
 ## 13. Atualizações e rollback
 
-Para uma nova versão, execute os testes, gere outro ZIP e SHA-256, envie-o para uma chave S3 versionada, faça deploy e revise o change set. O código e o ambiente são instalados pelo User Data; uma simples alteração de parâmetro não reexecuta o script em uma EC2 existente. Durante o bootstrap, `AWS_USE_DUALSTACK_ENDPOINT=true` permite que AWS CLI, S3 e Secrets Manager usem IPv6. O `cfn-signal` usa o hostname regional padrão do CloudFormation, resolvido para IPv4 privado pelo Interface VPC Endpoint compartilhado. A variável dual-stack não é persistida em `/etc/loto-bot.env`, preservando o DNS privado dos endpoints de interface em runtime.
+Para uma nova versão, execute os testes, gere outro ZIP e SHA-256, envie-o para uma chave S3 versionada, faça deploy e revise o change set. O código e o ambiente são instalados pelo User Data; uma simples alteração de parâmetro não reexecuta o script em uma EC2 existente. Durante o bootstrap, `AWS_USE_DUALSTACK_ENDPOINT=true` permite que AWS CLI, S3 e Secrets Manager usem IPv6. O `cfn-signal` usa o hostname regional padrão do CloudFormation, resolvido para IPv4 privado pelo Interface VPC Endpoint compartilhado. O novo cliente Lambda escolhe dual stack explicitamente, sem variável global em `/etc/loto-bot.env`.
+
+Para eliminar a cobrança do endpoint Lambda sem interromper uma instância antiga, instale primeiro a versão do LotoBot com os clientes dual stack mantendo `UseLambdaVpcEndpoint=true`. Alterar apenas `ArtifactKey` ou `ArtifactSha256` no CloudFormation não instala a nova versão na instância existente: o User Data não é executado novamente. Faça a atualização controlada da aplicação ou substitua a EC2, planejando a perda do perfil no volume raiz. Da instância já atualizada, teste as duas invocações com o endpoint regional IPv6 e confirme o fluxo completo. Só depois altere `UseLambdaVpcEndpoint=false` em `samconfig.local.toml`, faça o deploy preservando os demais parâmetros e revise o change set para confirmar a remoção de `LambdaVpcEndpoint` e seu Security Group; repita as invocações. Se falhar, restaure `true`. Mantenha o endpoint CloudFormation para `cfn-signal`.
 
 Para rollback, reaplique o `ArtifactKey` e o `ArtifactSha256` anteriores e substitua a instância de forma controlada. O perfil do navegador está no volume raiz e será perdido se a instância for substituída; planeje nova autenticação.
+
+### 13.1 Reverter uma versão implantada com `sam deploy`
+
+Se o deploy terminou com sucesso e a aplicação precisa voltar à versão anterior, reenvie a versão anterior do ZIP ao S3 ou use a chave versionada que já foi preservada. Restaure os dois valores correspondentes — `ArtifactKey` e `ArtifactSha256` — e execute novamente o `sam deploy` da etapa 11, mantendo os demais parâmetros da stack. Não apague a stack para reverter apenas uma versão da aplicação.
+
+Se a criação de uma stack nova falhou e ela terminou em `ROLLBACK_COMPLETE`, remova somente a stack `loto-bot` antes de tentar criá-la novamente:
+
+```powershell
+aws cloudformation describe-stacks `
+  --stack-name $StackName `
+  --query "Stacks[0].StackStatus" `
+  --output text @AwsCommon
+
+aws cloudformation delete-stack --stack-name $StackName @AwsCommon
+aws cloudformation wait stack-delete-complete --stack-name $StackName @AwsCommon
+```
+
+Esse procedimento remove recursos pertencentes à stack, incluindo a EC2 e, quando habilitado, o endpoint de Lambda. Não remove a tabela DynamoDB, criada e gerenciada fora da stack, nem o bucket de artefatos criado manualmente no passo 9.
+
+### 13.2 Remover a infraestrutura criada neste guia
+
+Use esta rotina somente quando a intenção for encerrar o ambiente. A ordem abaixo respeita as dependências: primeiro stacks que usam a rede, depois recursos independentes e, por fim, a VPC. Confirme que `$AwsProfile`, `$AwsRegion` e os IDs `$StackName`, `$VpcId`, `$SubnetId`, `$RouteTableId`, `$RouteAssociationId`, `$InternetGatewayId`, `$CloudFormationVpcEndpointId`, `$CloudFormationEndpointSecurityGroupId`, `$SecurityGroupId`, `$KeyName`, `$ApplicationSecretArn` e `$ArtifactBucket` ainda apontam para os recursos deste ambiente.
+
+Antes de remover a rede, remova as stacks consumidoras da VPC nesta ordem:
+
+1. Remova `whatsapp-notify`, `gmail-reader` e `mail-sender` seguindo o procedimento de exclusão de cada projeto.
+2. Remova a stack `loto-bot` com os comandos abaixo.
+
+```powershell
+aws cloudformation delete-stack --stack-name $StackName @AwsCommon
+aws cloudformation wait stack-delete-complete --stack-name $StackName @AwsCommon
+```
+
+Confirme que a exclusão terminou antes de continuar. O comando de exclusão da stack `loto-bot` só deve ser executado para a stack correta:
+
+Ele não apaga a tabela `loto-bot-bets`; preserve essa tabela e seu histórico, salvo se houver uma solicitação separada para removê-la pelo script explícito `scripts/delete-dynamodb-aws.ps1`.
+
+Remova o Security Group de integração apenas depois de todas as stacks que o anexavam ou referenciavam terem sido excluídas. Se ainda houver uma interface de rede usando o grupo, aguarde a remoção dos recursos dependentes e consulte novamente:
+
+```powershell
+aws ec2 describe-network-interfaces `
+  --filters "Name=group-id,Values=$SecurityGroupId" `
+  --query "NetworkInterfaces[].NetworkInterfaceId" `
+  --output table @AwsCommon
+
+aws ec2 delete-security-group --group-id $SecurityGroupId @AwsCommon
+```
+
+O Key Pair pode ser removido da AWS depois que nenhuma instância deste ambiente depender dele. A exclusão na AWS não remove o arquivo PEM local; mantenha-o se precisar acessar uma instância que ainda exista:
+
+```powershell
+aws ec2 delete-key-pair --key-name $KeyName @AwsCommon
+```
+
+Depois que a instância tiver sido removida e o arquivo PEM não for mais necessário para nenhum outro ambiente, a cópia local pode ser apagada explicitamente:
+
+```powershell
+Remove-Item -LiteralPath $KeyFile -Force
+```
+
+O segredo contém credenciais da aplicação. Exclua-o somente se tiver sido criado exclusivamente para este ambiente e não for usado por outra stack. A janela de recuperação de sete dias permite restaurá-lo durante esse período:
+
+```powershell
+aws secretsmanager delete-secret `
+  --secret-id $ApplicationSecretArn `
+  --recovery-window-in-days 7 `
+  @AwsCommon
+```
+
+No S3, remova apenas o artefato específico publicado no passo 9. Não use `--recursive`. Se `$ArtifactBucket` foi criado exclusivamente para este ambiente e não contém outros releases, o comando `rb` sem `--force` só removerá um bucket vazio; se houver outros objetos, ele falhará sem apagá-los:
+
+```powershell
+$CurrentArtifactKey = aws s3api list-objects-v2 --bucket $ArtifactBucket --prefix "$StackName/releases/" --query "Contents[].Key" --output text --region $AwsRegion --profile $AwsProfile
+$CurrentArtifactSha256 = aws s3api head-object --bucket $ArtifactBucket --key $CurrentArtifactKey --query "Metadata.sha256" --output text --region $AwsRegion --profile $AwsProfile
+
+aws s3api head-object --bucket $ArtifactBucket --key $CurrentArtifactKey --region $AwsRegion --profile $AwsProfile
+aws s3api delete-object --bucket $ArtifactBucket --key $CurrentArtifactKey --region $AwsRegion --profile $AwsProfile
+
+aws s3api get-bucket-versioning --bucket $ArtifactBucket --region $AwsRegion --profile $AwsProfile
+aws s3 ls "s3://$ArtifactBucket" --recursive --region $AwsRegion --profile $AwsProfile
+aws s3 rb "s3://$ArtifactBucket" --force --region $AwsRegion --profile $AwsProfile
+```
+
+Antes de continuar, confirme que não há Lambda, EC2, stack ou outro consumidor usando a VPC, subnet ou endpoint. Em seguida, remova o endpoint de CloudFormation; aguarde seu estado chegar a `deleted` antes de excluir o Security Group dedicado a ele:
+
+```powershell
+aws ec2 delete-vpc-endpoints --vpc-endpoint-ids $CloudFormationVpcEndpointId @AwsCommon
+
+do {
+  Start-Sleep -Seconds 5
+  $VpcEndpointCount = aws ec2 describe-vpc-endpoints `
+    --filters "Name=vpc-endpoint-id,Values=$CloudFormationVpcEndpointId" `
+    --query "length(VpcEndpoints)" `
+    --output text @AwsCommon
+} while ($VpcEndpointCount -ne "0")
+
+aws ec2 delete-security-group --group-id $CloudFormationEndpointSecurityGroupId @AwsCommon
+```
+
+Remova a rota pública, desassocie e exclua a tabela de rotas criada, e então exclua a subnet:
+
+```powershell
+aws ec2 delete-route `
+  --route-table-id $RouteTableId `
+  --destination-ipv6-cidr-block "::/0" @AwsCommon
+
+aws ec2 disassociate-route-table --association-id $RouteAssociationId @AwsCommon
+aws ec2 delete-route-table --route-table-id $RouteTableId @AwsCommon
+aws ec2 delete-subnet --subnet-id $SubnetId @AwsCommon
+```
+
+Por fim, desanexe e exclua o Internet Gateway e exclua a VPC. A exclusão da VPC libera o bloco IPv6 associado pela AWS:
+
+```powershell
+aws ec2 detach-internet-gateway --internet-gateway-id $InternetGatewayId --vpc-id $VpcId @AwsCommon
+aws ec2 delete-internet-gateway --internet-gateway-id $InternetGatewayId @AwsCommon
+aws ec2 delete-vpc --vpc-id $VpcId @AwsCommon
+```
+
+Se algum comando indicar uma dependência ainda existente, pare e consulte o recurso indicado antes de tentar novamente. Não force a remoção nem exclua uma VPC compartilhada por outros projetos.
 
 Uma EC2 já criada não reinstala dependências quando `pyproject.toml` ou o ZIP
 mudam. Para recuperar a instância atual após o erro `No module named 'boto3'`,
@@ -825,7 +951,7 @@ diretamente do template atualizado.
 
 - confira EC2, EBS, transferência, S3, Secrets Manager e CloudWatch Logs;
 - monitore créditos de CPU das instâncias T;
-- os VPC Endpoints de interface para Lambda e CloudFormation geram cobrança contínua;
+- o endpoint CloudFormation e, enquanto `UseLambdaVpcEndpoint=true`, o endpoint Lambda geram cobrança contínua;
 - `t3.small` e volumes acima da franquia podem gerar custo;
 - configure AWS Budgets e alertas antes do deploy.
 
@@ -1023,7 +1149,7 @@ AWS:   INTEGRATION_MODE=AWS, PERSISTENCE_ENABLED=true, DYNAMODB_TABLE_NAME=loto-
 ```
 
 - [ ] Outputs `FunctionArn` das duas Lambdas obtidos.
-- [ ] Stacks `mail-sender-aws` e `gmail-reader-aws` implantadas com o mesmo `VpcId` e `SubnetId` do `loto-bot`.
+- [ ] Stacks `mail-sender-aws` e `gmail-reader-aws` implantadas fora da VPC, com ARNs entregues ao `loto-bot`.
 - [ ] VPC criada com bloco IPv4 e bloco IPv6 fornecido pela AWS.
 - [ ] DNS support e DNS hostnames habilitados na VPC.
 - [ ] Internet Gateway criado e anexado à VPC.
@@ -1037,7 +1163,7 @@ AWS:   INTEGRATION_MODE=AWS, PERSISTENCE_ENABLED=true, DYNAMODB_TABLE_NAME=loto-
 - [ ] Segredo contém somente as cinco chaves esperadas.
 - [ ] `ConfirmPayment=false` no primeiro deploy.
 - [ ] Role limitada aos recursos necessários.
-- [ ] VPC Endpoint Lambda com DNS privado habilitado.
+- [ ] Endpoint Lambda preservado durante a troca da versão e removido somente após smoke tests IPv6 com as duas funções.
 - [ ] VPC Endpoint CloudFormation compartilhado disponível e com DNS privado habilitado antes dos deploys EC2.
 - [ ] Security Group de integração criado fora das stacks e informado nos dois deploys.
 - [ ] WhatsApp aceita porta 80 somente do Security Group de integração.

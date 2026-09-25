@@ -333,16 +333,19 @@ xvfb-run -a env BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080 \
     try {
         $ErrorActionPreference = "Continue"
         $FailClosedOutput = & ssh @SshOptions "$RemoteUser@$PublicIpv6" `
-            "timeout 45s xvfb-run -a env BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080 /tmp/lotobot-browser-proxy-venv/bin/python /tmp/test_browser_proxy.py" 2>&1
+            "timeout 45s xvfb-run -a env BROWSER_PROXY_SERVER=socks5://127.0.0.1:1080 /tmp/lotobot-browser-proxy-venv/bin/python /tmp/test_browser_proxy.py --expect-proxy-failure" 2>&1
         $FailClosedExitCode = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $PreviousErrorActionPreference
     }
 
-    if ($FailClosedExitCode -eq 0) {
+    $FailClosedSuccessLine = $FailClosedOutput |
+        Where-Object { $_ -eq "Fail-closed do Chromium com túnel desligado: OK" } |
+        Select-Object -First 1
+    if ($FailClosedExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($FailClosedSuccessLine)) {
         $FailClosedOutput | Out-Host
-        throw "O teste fail-closed falhou: o Chromium navegou após encerrar o túnel."
+        throw "O teste fail-closed não confirmou a falha do Chromium após encerrar o túnel."
     }
 
     Write-Host "Falha sem fallback confirmada após encerrar o túnel."

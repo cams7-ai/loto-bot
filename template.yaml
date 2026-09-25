@@ -6,7 +6,7 @@ Metadata:
   AWSToolsMetrics:
     AWSAgentToolkit: aws-cloudformation@2
   com.aws.cloudformation.Context:
-    arch: local SOCKS5 -> reverse SSH over IPv6 -> EC2 Chromium; EC2 -> Lambda + WhatsApp Notify privately
+    arch: local SOCKS5 -> reverse SSH over IPv6 -> EC2 Chromium; EC2 -> Lambda over IPv6 + private WhatsApp Notify
     must:
       - keep one application worker per browser profile
       - keep payment confirmation disabled until an explicitly approved production deployment
@@ -25,6 +25,11 @@ Parameters:
     Type: AWS::EC2::VPC::Id
   SubnetId:
     Type: AWS::EC2::Subnet::Id
+  UseLambdaVpcEndpoint:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Keep the private endpoint until the deployed LotoBot release passes IPv6 Lambda Invoke smoke tests.
   AmiId:
     Type: AWS::EC2::Image::Id
   InstanceType:
@@ -33,11 +38,6 @@ Parameters:
     AllowedValues:
       - t3.micro
       - t3.small
-  AllowedCidr:
-    Type: String
-    Default: 0.0.0.0/32
-    AllowedPattern: ^(\d{1,3}\.){3}\d{1,3}/(3[0-2]|[12]?\d)$
-    Description: Client CIDR allowed to reach HTTPS; use 0.0.0.0/32 for SSM-only access.
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Existing EC2 key pair used only for the restricted IPv6 SSH tunnel.
@@ -89,7 +89,45 @@ Parameters:
     MinValue: 16
     MaxValue: 30
 
+Conditions:
+  KeepLambdaVpcEndpoint: !Equals [!Ref UseLambdaVpcEndpoint, "true"]
+
 Resources:
+  LambdaEndpointSecurityGroup:
+    Condition: KeepLambdaVpcEndpoint
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: temporarily preserves the private Lambda path during the IPv6 client rollout
+        must:
+          - allow TCP 443 only from ApplicationSecurityGroup
+          - remove only after the deployed release has passed both Lambda smoke tests over IPv6
+    Properties:
+      GroupDescription: Private Lambda endpoint access from LotoBot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+
+  LambdaVpcEndpoint:
+    Condition: KeepLambdaVpcEndpoint
+    Type: AWS::EC2::VPCEndpoint
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: temporarily preserves Private DNS for the existing Lambda client during rollout
+        must:
+          - keep PrivateDnsEnabled true while provisioned
+          - disable only after the deployed release has passed both Lambda smoke tests over IPv6
+    Properties:
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref SubnetId]
+      SecurityGroupIds: [!Ref LambdaEndpointSecurityGroup]
+
   InstanceRole:
     Type: AWS::IAM::Role
     Metadata:
@@ -148,7 +186,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Metadata:
       com.aws.cloudformation.Context:
-        why: accepts restricted HTTPS plus SSH from one IPv6 host; permits private IPv4 integrations and IPv6 bootstrap traffic
+        why: accepts SSH from one IPv6 host; permits private IPv4 integrations and IPv6 bootstrap traffic
         must:
           - never widen ingress to 0.0.0.0/0
           - keep SSH source restricted to AllowedSshIpv6Cidr /128
@@ -158,11 +196,6 @@ Resources:
       GroupDescription: Restricted access for LotoBot
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-        - Description: HTTPS from the authorized client
-          IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: !Ref AllowedCidr
         - Description: SSH over IPv6 from the local SOCKS5 proxy host
           IpProtocol: tcp
           FromPort: 22
@@ -213,37 +246,6 @@ Resources:
         - Key: Application
           Value: loto-bot
 
-  LambdaEndpointSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Metadata:
-      com.aws.cloudformation.Context:
-        why: limits the private Lambda interface endpoint to the LotoBot instance
-        must:
-          - accept TCP 443 only from ApplicationSecurityGroup
-    Properties:
-      GroupDescription: Private Lambda endpoint access from LotoBot
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
-
-  LambdaVpcEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Metadata:
-      com.aws.cloudformation.Context:
-        why: keeps Lambda Invoke traffic on the AWS private network via Private DNS
-        must:
-          - keep PrivateDnsEnabled true
-    Properties:
-      VpcEndpointType: Interface
-      VpcId: !Ref VpcId
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
-      PrivateDnsEnabled: true
-      SubnetIds: [!Ref SubnetId]
-      SecurityGroupIds: [!Ref LambdaEndpointSecurityGroup]
-
   ApplicationInstance:
     Type: AWS::EC2::Instance
     Metadata:
@@ -258,7 +260,7 @@ Resources:
           - use the supplied key pair only for the reverse SOCKS5 tunnel
           - bootstrap AWS calls use dual-stack endpoints because the subnet has no IPv4 internet route
           - cfn-signal reaches the standard CloudFormation hostname through the shared interface VPC endpoint and Private DNS
-          - do not persist AWS_USE_DUALSTACK_ENDPOINT at runtime; Lambda Invoke uses the interface endpoint Private DNS
+          - Lambda Invoke uses the public dual-stack endpoint over IPv6
           - set AWS_DEFAULT_REGION in the systemd environment so boto3 can invoke the regional Lambda endpoint
           - allow a longer browser navigation timeout for the IPv6 SOCKS5 tunnel while keeping payment confirmation explicit
           - start through the loto-bot entry point so LOG_LEVEL and the application log format take effect
@@ -308,7 +310,7 @@ Resources:
           #!/bin/bash
           set -euo pipefail
           # Bootstrap uses public dual-stack endpoints because this subnet has no IPv4 internet route.
-          # Do not persist this setting in /etc/loto-bot.env: Lambda Invoke must keep using Private DNS.
+          # Runtime Lambda clients select public dual-stack endpoints explicitly.
           export AWS_USE_DUALSTACK_ENDPOINT=true
           exec > >(tee /var/log/loto-bot-bootstrap.log | logger -t user-data -s 2>/dev/console) 2>&1
 
@@ -376,11 +378,16 @@ Resources:
           secret_json="$(aws secretsmanager get-secret-value --secret-id '${ApplicationSecretArn}' --query SecretString --output text --region '${AWS::Region}')"
           install -m 600 -o root -g root /dev/null /etc/loto-bot.env
           {
-            printf 'BETTOR_CPF=%q\n' "$(jq -er .bettor_cpf <<<"$secret_json")"
-            printf 'BETTOR_PASSWORD=%q\n' "$(jq -er .bettor_password <<<"$secret_json")"
-            printf 'CREDIT_CARD_LAST_DIGITS=%q\n' "$(jq -er .credit_card_last_digits <<<"$secret_json")"
-            printf 'CREDIT_CARD_SECURITY_CODE=%q\n' "$(jq -er .credit_card_security_code <<<"$secret_json")"
-            printf 'MAIL_TO=%q\n' "$(jq -er .mail_to <<<"$secret_json")"
+            python3.12 -c 'import json, sys
+          values = json.load(sys.stdin)
+          fields = {"BETTOR_CPF": "bettor_cpf", "BETTOR_PASSWORD": "bettor_password", "CREDIT_CARD_LAST_DIGITS": "credit_card_last_digits", "CREDIT_CARD_SECURITY_CODE": "credit_card_security_code", "MAIL_TO": "mail_to"}
+          for name, key in fields.items():
+              value = values[key]
+              if not isinstance(value, str) or "\n" in value or "\r" in value:
+                  raise ValueError("Invalid secret field: " + key)
+              value = value.replace("\\", "\\\\").replace("\"", "\\\"")
+              print(name + "=\"" + value + "\"")
+          ' <<<"$secret_json"
             echo 'INTEGRATION_MODE=AWS'
             echo 'PERSISTENCE_ENABLED=true'
             echo 'DYNAMODB_TABLE_NAME=${DynamoDbTableName}'
@@ -391,6 +398,7 @@ Resources:
             echo 'CONFIRM_PAYMENT=${ConfirmPayment}'
             echo 'WHATSAPP_ENABLED=true'
             echo 'WHATSAPP_HEADLESS=true'
+            echo 'WHATSAPP_TIMEOUT_SECONDS=60'
             echo 'VALIDATION_CODE_WAIT_TIMEOUT_SECONDS=15'
             echo 'BROWSER_HEADLESS=true'
             echo 'BROWSER_TIMEOUT_SECONDS=20'

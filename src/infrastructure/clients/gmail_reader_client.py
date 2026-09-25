@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 import httpx
+from botocore.config import Config
 
 from application import ValidationCodePort
 from domain import (
@@ -27,7 +28,7 @@ class GmailReaderClient(ValidationCodePort):
 
     def _lambda_client(self) -> Any:
         if self._client is None:
-            self._client = __import__("boto3").client("lambda")
+            self._client = __import__("boto3").client("lambda", config=Config(use_dualstack_endpoint=True))
         return self._client
 
     def _http_client(self) -> httpx.Client:

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import os
 import tempfile
 from urllib.parse import urlsplit
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
 TERMS_OF_USE_URL = "https://www.loteriasonline.caixa.gov.br/silce-web/#/termos-de-uso"
@@ -11,9 +13,13 @@ EXPECTED_HOST = "www.loteriasonline.caixa.gov.br"
 EXPECTED_PATH = "/silce-web/"
 EXPECTED_FRAGMENT = "/termos-de-uso"
 NAVIGATION_SETTLE_MS = 5_000
+PROBE_URL = "https://api.ipify.org/"
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--expect-proxy-failure", action="store_true")
+    args = parser.parse_args()
     proxy_server = os.getenv("BROWSER_PROXY_SERVER")
 
     if not proxy_server:
@@ -30,6 +36,17 @@ def main() -> None:
 
         try:
             page = context.pages[0] if context.pages else context.new_page()
+            if args.expect_proxy_failure:
+                try:
+                    page.goto(PROBE_URL, wait_until="commit", timeout=10_000)
+                except PlaywrightError:
+                    print("Fail-closed do Chromium com túnel desligado: OK")
+                    return
+                raise RuntimeError("O Chromium acessou a Internet após o túnel SOCKS5 ser desligado")
+
+            probe = page.goto(PROBE_URL, wait_until="commit", timeout=15_000)
+            if probe is None or not probe.ok:
+                raise RuntimeError("O proxy SOCKS5 não conseguiu acessar a URL de diagnóstico")
 
             response = page.goto(
                 TERMS_OF_USE_URL,
