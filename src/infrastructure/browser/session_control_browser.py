@@ -253,6 +253,8 @@ class SessionControlBrowserMixin(PlaywrightBrowserBase):
         page = self._require_page()
         self._check_redirected_page(page, self._timeout_ms, session, self._settings.authenticate_path)
         self._raise_if_forbidden(page, session.executed_operation)
+        if self._click(page, self._short_timeout_ms, Selectors.LINK_DEVICE_NO_BUTTON):
+            logger.debug("O botão 'Não' do modal de vincular dispositivo foi clicado")
         self._click(page, self._short_timeout_ms, Selectors.RECEIVE_CODE_BUTTON)
 
     def submit_validation_code(self, session: AutomationSession, code: str) -> None:
