@@ -1,5 +1,7 @@
 # Migração do `loto-bot` para AWS Free Tier com Chromium e proxy SOCKS5 local
 
+Este procedimento usa PowerShell no Windows. Para executar a migração a partir de Linux com Bash, veja a [versão Linux](AWS_FREE_TIER_MIGRATION_STEP_BY_STEP_LINUX.md).
+
 Este guia descreve a arquitetura vigente do `loto-bot` e deve ser usado junto com o [`template.yaml`](../template.yaml). A integração não utiliza API Gateway nem chave de API.
 
 ## 1. Arquitetura
@@ -69,7 +71,6 @@ $KeyName = $StackName
 $KeyFile = Join-Path $HOME ".ssh\$KeyName.pem"
 $KnownHostsFile = Join-Path $HOME ".ssh\$KeyName-known-hosts"
 $SshOptions = @(
-  "-6",
   "-i", $KeyFile,
   "-o", "StrictHostKeyChecking=accept-new",
   "-o", "UserKnownHostsFile=$KnownHostsFile",
@@ -600,7 +601,7 @@ Confirme que a role limita `lambda:InvokeFunction` aos dois ARNs, `secretsmanage
 Os comandos abaixo não passam CPF, senha, CVV ou tokens pela linha de comando. Esses valores devem continuar somente no Secrets Manager e em `/etc/loto-bot.env`. Antes de testar o fluxo de apostas, confirme que o pagamento está desabilitado:
 
 ```powershell
-ssh @SshOptions "$RemoteUser@$InstanceIpv6" "grep '^CONFIRM_PAYMENT=' /etc/loto-bot.env"
+ssh @SshOptions "$RemoteUser@$InstanceIpv6" "sudo grep '^CONFIRM_PAYMENT=' /etc/loto-bot.env"
 ```
 
 O resultado deve ser `CONFIRM_PAYMENT=false`. Não execute o endpoint de aposta se o valor estiver diferente.
@@ -637,7 +638,6 @@ Inicie o túnel reverso SSH em segundo plano:
 
 ```powershell
 $TunnelArguments = @(
-  "-6",
   "-i", $KeyFile,
   "-N", "-T",
   "-o", "ExitOnForwardFailure=yes",
@@ -1055,7 +1055,6 @@ ativo após a negociação inicial:
 
 ```powershell
 $TunnelArguments = @(
-  "-6",
   "-i", $KeyFile,
   "-N", "-T",
   "-o", "ExitOnForwardFailure=yes",

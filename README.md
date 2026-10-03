@@ -200,11 +200,24 @@ python -m pip install -e ".[dev]"
 python -m playwright install chromium
 ```
 
+No Linux (Bash):
+
+```bash
+git clone <url-do-repositorio>
+cd loto-bot
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m playwright install chromium
+```
+
 ### Configuração local
 
 ```powershell
 Copy-Item .env.example .env
 ```
+
+No Linux: `cp .env.example .env`.
 
 Preencha os placeholders apenas no ambiente local. Para uma primeira execução segura, mantenha:
 
@@ -469,6 +482,10 @@ O Ruff usa Python alvo `py312`, largura de 120 caracteres e regras para erros, i
 | OpenAPI JSON | <http://localhost:8000/openapi.json> |
 | Arquitetura | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Desenvolvimento | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| Migração AWS a partir do Windows | [AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md) |
+| Migração AWS a partir do Linux | [AWS_FREE_TIER_MIGRATION_STEP_BY_STEP_LINUX.md](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP_LINUX.md) |
+
+Os scripts AWS para Linux ficam em [`scripts/`](scripts/) com sufixo `.sh` e opções `--profile`, `--region` e `--help`. Há comandos para criar e excluir a tabela DynamoDB, validar o endpoint CloudFormation e iniciar/limpar testes SOCKS5 descartáveis. A exclusão da tabela exige `--force`; os testes EC2 exigem o comando de limpeza correspondente. As versões PowerShell `.ps1` permanecem para Windows.
 
 ## Monitoramento e Observabilidade
 
