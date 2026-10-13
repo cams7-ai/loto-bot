@@ -461,6 +461,8 @@ Resources:
           systemctl enable --now loto-bot
           nginx -t
           systemctl enable --now nginx
+          # Package installation may already have started nginx with its default site.
+          systemctl reload nginx
 
           for attempt in {1..20}; do
             if curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8000/health; then
