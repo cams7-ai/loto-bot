@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from application import (
+    BetRepositoryPort,
     CheckBetDrawsUseCase,
     GetPlacedBetUseCase,
     ListPlacedBetsUseCase,
@@ -17,7 +19,9 @@ from domain import AutomationSession, PaymentAuthorization
 from infrastructure.browser import PlaywrightBrowserAutomation
 from infrastructure.clients import GmailReaderClient, MailSenderClient, NotificationGateway, WhatsAppNotifyClient
 from infrastructure.config import Settings, get_settings
-from infrastructure.database import BeanieBetRepository, MongoDatabase
+from infrastructure.database import BeanieBetRepository, DynamoDbBetRepository, MongoDatabase
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -41,8 +45,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
     whatsapp = WhatsAppNotifyClient(resolved_settings)
     notifier = NotificationGateway(whatsapp=whatsapp, mail=mail, whatsapp_enabled=resolved_settings.whatsapp_enabled)
     session_control = SessionControlUseCase(session=session, browser=browser, validation_codes=gmail, notifier=notifier)
-    database = MongoDatabase(uri=resolved_settings.mongodb_uri, database_name=resolved_settings.mongodb_database)
-    bet_repository = BeanieBetRepository(database=database)
+    bet_repository = _build_bet_repository(resolved_settings)
     list_placed_bets = ListPlacedBetsUseCase(repository=bet_repository)
     list_portal_bets = ListPortalBetsUseCase(session=session, browser=browser)
     get_placed_bet = GetPlacedBetUseCase(repository=bet_repository)
@@ -51,7 +54,7 @@ def build_container(settings: Settings | None = None) -> AppContainer:
             repository=bet_repository,
             selected_lottery_modality=resolved_settings.selected_lottery_modality,
         )
-        if resolved_settings.mongodb_enabled
+        if resolved_settings.persistence_enabled
         else None
     )
     run_bet_flow = RunBetFlowUseCase(
@@ -78,6 +81,16 @@ def build_container(settings: Settings | None = None) -> AppContainer:
         get_placed_bet=get_placed_bet,
         check_bet_draws=check_bet_draws,
     )
+
+
+def _build_bet_repository(resolved_settings: Settings) -> BetRepositoryPort:
+    if resolved_settings.integration_mode == "AWS":
+        logger.info("Configurando persistência DynamoDB para ambiente AWS")
+        return DynamoDbBetRepository(table_name=resolved_settings.dynamodb_table_name)
+
+    logger.info("Configurando persistência MongoDB para ambiente LOCAL")
+    database = MongoDatabase(uri=resolved_settings.mongodb_uri, database_name=resolved_settings.mongodb_database)
+    return BeanieBetRepository(database=database)
 
 
 container = build_container()

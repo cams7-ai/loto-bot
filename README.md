@@ -31,7 +31,7 @@
 
 ## Visão Geral
 
-O LotoBot centraliza a automação do portal Loterias Online CAIXA atrás de uma API HTTP. O projeto usa Python 3.12, FastAPI e Playwright, com MongoDB opcional para o histórico de apostas.
+O LotoBot centraliza a automação do portal Loterias Online CAIXA atrás de uma API HTTP. O projeto usa Python 3.12, FastAPI e Playwright, com persistência opcional em MongoDB (LOCAL) ou DynamoDB (AWS).
 
 ### Principais características
 
@@ -54,7 +54,7 @@ flowchart LR
     API --> APP[Casos de uso]
     APP -->|BrowserPort| PW[Playwright]
     PW --> CAIXA[Portal Loterias CAIXA]
-    APP -->|BetRepositoryPort| MDB[(MongoDB)]
+    APP -->|BetRepositoryPort| MDB[(MongoDB LOCAL / DynamoDB AWS)]
     APP -->|ValidationCodePort| GMAIL[Gmail Reader]
     APP -->|NotificationPort| WA[WhatsApp Notify]
     APP -->|Fallback| MAIL[Mail Sender]
@@ -66,6 +66,17 @@ flowchart LR
 ```
 
 ## Arquitetura
+
+### Persistência
+
+O backend é escolhido exclusivamente por `INTEGRATION_MODE`; `PERSISTENCE_ENABLED` controla apenas se novas apostas serão persistidas.
+
+| `INTEGRATION_MODE` | Banco | Adapter |
+|---|---|---|
+| `LOCAL` | MongoDB | `BeanieBetRepository` |
+| `AWS` | DynamoDB | `DynamoDbBetRepository` |
+
+No ambiente AWS, a tabela usa `bet_id` (String) como partition key e possui ciclo de vida independente da stack SAM.
 
 O projeto segue **Clean Architecture**, com dependências direcionadas para o domínio e contratos definidos por portas.
 
@@ -189,17 +200,30 @@ python -m pip install -e ".[dev]"
 python -m playwright install chromium
 ```
 
+No Linux (Bash):
+
+```bash
+git clone <url-do-repositorio>
+cd loto-bot
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m playwright install chromium
+```
+
 ### Configuração local
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
+No Linux: `cp .env.example .env`.
+
 Preencha os placeholders apenas no ambiente local. Para uma primeira execução segura, mantenha:
 
 ```env
 CONFIRM_PAYMENT=false
-MONGODB_ENABLED=false
+PERSISTENCE_ENABLED=false
 ```
 
 ### Execução
@@ -401,11 +425,15 @@ As configurações são carregadas do ambiente e do arquivo `.env` por `pydantic
 | `BROWSER_PROFILE_DIR` | Perfil persistente do Chromium | `.lotobot-profile` |
 | `BROWSER_HEADLESS` | Chromium sem interface | `true` |
 | `BROWSER_TIMEOUT_SECONDS` | Timeout padrão do navegador | `5` |
-| `MONGODB_ENABLED` | Habilita persistência | `false` |
+| `PERSISTENCE_ENABLED` | Habilita persistência, independentemente do backend | `true` |
+| `DYNAMODB_TABLE_NAME` | Tabela de apostas usada em AWS | `loto-bot-bets` |
 | `MONGODB_URI` | URI do MongoDB | `mongodb://localhost:27017` |
 | `MONGODB_DATABASE` | Banco da aplicação | `loto_bot` |
-| `GMAIL_READER_URL` | Serviço do código de validação | `http://localhost:8001` |
-| `MAIL_SENDER_URL` | Serviço de e-mail | `http://localhost:8002` |
+| `INTEGRATION_MODE` | Transporte de Gmail Reader e Mail Sender: `LOCAL` ou `AWS` | `LOCAL` |
+| `GMAIL_READER_URL` | API HTTP usada em `LOCAL` | `http://localhost:8001` |
+| `MAIL_SENDER_URL` | API HTTP usada em `LOCAL` | `http://localhost:8002` |
+| `GMAIL_READER_FUNCTION_NAME` | Nome ou ARN da Lambda usado em `AWS` | `gmail-reader` |
+| `MAIL_SENDER_FUNCTION_NAME` | Nome ou ARN da Lambda usado em `AWS` | `mail-sender` |
 | `WHATSAPP_NOTIFY_URL` | Serviço de WhatsApp | `http://localhost:8003` |
 | `WHATSAPP_ENABLED` | Habilita o WhatsApp | `false` |
 | `MAIL_TO` | Destinatário do fallback | Placeholder |
@@ -415,12 +443,16 @@ Consulte [.env.example](.env.example) para a lista completa.
 Para habilitar o histórico:
 
 ```env
-MONGODB_ENABLED=true
+PERSISTENCE_ENABLED=true
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DATABASE=loto_bot
 ```
 
 `BROWSER_PROFILE_DIR` é criado automaticamente. Caminhos relativos são resolvidos a partir da raiz do projeto. Booleanos aceitam `true/false`, `yes/no`, `sim/não` e `1/0`.
+
+Com `INTEGRATION_MODE=LOCAL`, o Gmail Reader e o Mail Sender são acessados por HTTP nas URLs configuradas. Com `INTEGRATION_MODE=AWS`, essas URLs são ignoradas e o SDK AWS invoca diretamente as funções indicadas por `GMAIL_READER_FUNCTION_NAME` e `MAIL_SENDER_FUNCTION_NAME`.
+
+Na EC2, os clientes Lambda usam o endpoint regional dual stack sobre IPv6. O endpoint privado Lambda da stack pode ser desativado com `UseLambdaVpcEndpoint=false` depois de validar as duas invocações e o fluxo completo na instância atualizada. O endpoint CloudFormation compartilhado permanece necessário para o sinal de bootstrap. A API da aplicação não possui entrada pública na porta 443; o acesso operacional usa SSH IPv6 restrito. Consulte [o procedimento AWS](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md) para a ordem de atualização e reversão.
 
 ## Testes e Qualidade
 
@@ -450,6 +482,10 @@ O Ruff usa Python alvo `py312`, largura de 120 caracteres e regras para erros, i
 | OpenAPI JSON | <http://localhost:8000/openapi.json> |
 | Arquitetura | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Desenvolvimento | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| Migração AWS a partir do Windows | [AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP.md) |
+| Migração AWS a partir do Linux | [AWS_FREE_TIER_MIGRATION_STEP_BY_STEP_LINUX.md](docs/AWS_FREE_TIER_MIGRATION_STEP_BY_STEP_LINUX.md) |
+
+Os scripts AWS para Linux ficam em [`scripts/`](scripts/) com sufixo `.sh` e opções `--profile`, `--region` e `--help`. Há comandos para criar e excluir a tabela DynamoDB, validar o endpoint CloudFormation e iniciar/limpar testes SOCKS5 descartáveis. A exclusão da tabela exige `--force`; os testes EC2 exigem o comando de limpeza correspondente. As versões PowerShell `.ps1` permanecem para Windows.
 
 ## Monitoramento e Observabilidade
 
@@ -549,13 +585,13 @@ Esse é o comportamento seguro quando `CONFIRM_PAYMENT=false`. Somente altere a 
 <details>
 <summary>Histórico indisponível</summary>
 
-Verifique se o MongoDB está acessível e se `MONGODB_ENABLED`, `MONGODB_URI` e `MONGODB_DATABASE` estão consistentes.
+Em `LOCAL`, verifique se o MongoDB está acessível e se `PERSISTENCE_ENABLED`, `MONGODB_URI` e `MONGODB_DATABASE` estão consistentes. Em `AWS`, verifique `DYNAMODB_TABLE_NAME` e as permissões IAM.
 </details>
 
 <details>
 <summary>Falha no código de validação ou nas notificações</summary>
 
-Confirme se os serviços estão ativos nas URLs definidas por `GMAIL_READER_URL`, `WHATSAPP_NOTIFY_URL` e `MAIL_SENDER_URL`.
+Confirme `WHATSAPP_NOTIFY_URL` e, conforme `INTEGRATION_MODE`, verifique as APIs em `GMAIL_READER_URL`/`MAIL_SENDER_URL` (`LOCAL`) ou as permissões e funções em `GMAIL_READER_FUNCTION_NAME`/`MAIL_SENDER_FUNCTION_NAME` (`AWS`).
 </details>
 
 <details>

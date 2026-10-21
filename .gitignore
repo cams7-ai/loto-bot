@@ -41,3 +41,11 @@ desktop.ini
 
 artefatos/
 db/
+scripts/socks5-ipv4-aws-state.json
+scripts/browser-socks5-ipv4-aws-state.json
+scripts/browser-socks5-ipv6-aws-state.json
+application-secret.json
+
+# AWS SAM
+.aws-sam/
+samconfig.toml

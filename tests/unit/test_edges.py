@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from io import BytesIO
 from pathlib import Path
 
 import httpx
@@ -103,13 +105,16 @@ def test_parse_portal_lottery_modality_accepts_catalog_names_and_all():
 
 
 def test_clients_error_edges():
-    settings = Settings(GMAIL_READER_URL="http://gmail", MAIL_SENDER_URL="http://mail")
-    empty_gmail = GmailReaderClient(
-        settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(200, {"code": ""})))
-    )
-    failing_mail = MailSenderClient(
-        settings, httpx.Client(transport=httpx.MockTransport(lambda request: response(500, {"error": {}})))
-    )
+    class LambdaClient:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def invoke(self, **kwargs):
+            return {"Payload": BytesIO(json.dumps(self.payload).encode())}
+
+    settings = Settings(INTEGRATION_MODE="AWS", GMAIL_READER_FUNCTION_NAME="gmail", MAIL_SENDER_FUNCTION_NAME="mail")
+    empty_gmail = GmailReaderClient(settings, LambdaClient({"statusCode": 200, "body": '{"code":""}'}))
+    failing_mail = MailSenderClient(settings, LambdaClient({"statusCode": 500, "body": "{}"}))
 
     try:
         empty_gmail.get_validation_code(Operation.REQUEST_VALIDATION_CODE)
@@ -678,3 +683,17 @@ def test_playwright_browser_confirms_purchase_after_payment_page_redirect():
 
     assert clicks[0] == ("url", ".*/pagamento.*", 5000)
     assert clicks[-1] == {}
+
+
+def test_browser_proxy_settings():
+    settings = Settings(
+        BROWSER_PROXY_SERVER="socks5://127.0.0.1:1080",
+    )
+
+    assert settings.browser_proxy_server == "socks5://127.0.0.1:1080"
+
+
+def test_browser_proxy_settings_default():
+    settings = Settings(_env_file=None)
+
+    assert settings.browser_proxy_server is None

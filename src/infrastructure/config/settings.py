@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,8 +33,11 @@ class Settings(BaseSettings):
         default="/auth/realms/internet/protocol/openid-connect/auth", alias="OPENID_CONNECT_AUTH_PATH"
     )
 
+    integration_mode: Literal["LOCAL", "AWS"] = Field(default="LOCAL", alias="INTEGRATION_MODE")
     gmail_reader_url: str = Field(default="http://localhost:8001", alias="GMAIL_READER_URL")
     mail_sender_url: str = Field(default="http://localhost:8002", alias="MAIL_SENDER_URL")
+    gmail_reader_function_name: str = Field(default="gmail-reader", alias="GMAIL_READER_FUNCTION_NAME")
+    mail_sender_function_name: str = Field(default="mail-sender", alias="MAIL_SENDER_FUNCTION_NAME")
     whatsapp_notify_url: str = Field(default="http://localhost:8003", alias="WHATSAPP_NOTIFY_URL")
 
     validation_code_wait_timeout_seconds: int = Field(default=30, alias="VALIDATION_CODE_WAIT_TIMEOUT_SECONDS")
@@ -54,9 +58,10 @@ class Settings(BaseSettings):
     credit_card_last_digits: str = Field(default="<ULTIMOS_4_DIGITOS_DO_CARTAO>", alias="CREDIT_CARD_LAST_DIGITS")
     credit_card_security_code: str = Field(default="<CVV>", alias="CREDIT_CARD_SECURITY_CODE")
     confirm_payment: bool = Field(default=False, alias="CONFIRM_PAYMENT")
-    mongodb_enabled: bool = Field(default=False, alias="MONGODB_ENABLED")
+    persistence_enabled: bool = Field(default=True, alias="PERSISTENCE_ENABLED")
     mongodb_uri: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URI")
     mongodb_database: str = Field(default="loto_bot", alias="MONGODB_DATABASE")
+    dynamodb_table_name: str = Field(default="loto-bot-bets", alias="DYNAMODB_TABLE_NAME")
     bet_processing_path: str = Field(default="/processamento", alias="BET_PROCESSING_PATH")
     bet_tracking_path: str = Field(default="/acompanhamento/{purchase_number}", alias="BET_TRACKING_PATH")
     bet_purchase_path: str = Field(default="/compras/{purchase_number}", alias="BET_PURCHASE_PATH")
@@ -65,13 +70,14 @@ class Settings(BaseSettings):
     browser_profile_dir: Path = Field(default=Path(".lotobot-profile"), alias="BROWSER_PROFILE_DIR")
     browser_headless: bool = Field(default=True, alias="BROWSER_HEADLESS")
     browser_timeout_seconds: int = Field(default=5, alias="BROWSER_TIMEOUT_SECONDS")
+    browser_proxy_server: str | None = Field(default=None, alias="BROWSER_PROXY_SERVER")
     validation_code_lookup_lead_seconds: int = Field(default=1, alias="VALIDATION_CODE_LOOKUP_LEAD_SECONDS")
 
     @field_validator(
         "whatsapp_headless",
         "whatsapp_enabled",
         "confirm_payment",
-        "mongodb_enabled",
+        "persistence_enabled",
         "browser_headless",
         mode="before",
     )

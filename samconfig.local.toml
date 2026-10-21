@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.validate.parameters]
+lint = true
+
+[default.deploy.parameters]
+stack_name = "loto-bot"
+resolve_s3 = true
+s3_prefix = "loto-bot"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+profile = "<perfil-aws>"
+parameter_overrides = "VpcId=\"<loto-bot-vpc-id>\" SubnetId=\"<loto-bot-subnet-id>\" AmiId=\"<ami-id>\" InstanceType=\"t3.micro\" UseLambdaVpcEndpoint=\"true\" KeyName=\"loto-bot\" AllowedSshIpv6Cidr=\"<ipv6-publico-local>/128\" ArtifactBucket=\"<artifact-bucket>\" ArtifactKey=\"<artifact-key>\" ArtifactSha256=\"<artifact-sha256>\" ApplicationSecretArn=\"<application-secret-arn>\" GmailReaderFunctionArn=\"<gmail-reader-function-arn>\" MailSenderFunctionArn=\"<mail-sender-function-arn>\" WhatsAppNotifyUrl=\"<whatsapp-notify-private-url>\" IntegrationSecurityGroupId=\"<loto-bot-integration-security-group-id>\" DynamoDbTableName=\"<dynamodb-table-name>\" ConfirmPayment=\"false\" RootVolumeSize=20"

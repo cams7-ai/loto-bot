@@ -18,6 +18,7 @@ class ErrorMessage(StrEnum):
     INVALID_CPF = "O CPF é inválido"
     INVALID_PASSWORD = "A senha é inválida"
     LOTTERY_MODALITY_NOT_FOUND = "A modalidade de loteria '{modality}' não foi encontrada"
+    LOTTERY_MODALITY_SELECTION_FAILED = "Não foi possível selecionar a modalidade de loteria '{modality}'"
     PAYMENT_CONFIRMATION_DISABLED = (
         "A confirmação de pagamento real está desabilitada. "
         "Configure CONFIRM_PAYMENT=true apenas quando desejar executar o pagamento"
