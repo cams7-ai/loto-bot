@@ -98,20 +98,34 @@ chmod 600 "$KEY_FILE"
 sam validate --lint --template-file template.yaml
 ```
 
-Crie `application-secret.json` na raiz do projeto, sem versionar:
+Preencha as cinco variáveis abaixo no arquivo `.env` da raiz do projeto:
 
-```json
-{
-  "bettor_cpf": "<cpf>",
-  "bettor_password": "<senha>",
-  "credit_card_last_digits": "<ultimos-digitos>",
-  "credit_card_security_code": "<codigo-seguranca>",
-  "mail_to": "<destinatario>"
-}
+```dotenv
+BETTOR_CPF='<cpf>'
+BETTOR_PASSWORD='<senha>'
+CREDIT_CARD_LAST_DIGITS='<ultimos-digitos>'
+CREDIT_CARD_SECURITY_CODE='<codigo-seguranca>'
+MAIL_TO='<destinatario>'
 ```
 
+O script usa `python-dotenv`, que já faz parte das dependências do projeto, e prefere o Python de `.venv` quando disponível. Se as dependências ainda não estiverem instaladas, prepare o ambiente:
+
 ```bash
-chmod 600 application-secret.json
+python3 -m venv .venv
+.venv/bin/python -m pip install 'python-dotenv>=1.0.1'
+```
+
+Execute passando `APPLICATION_SECRET_PATH`, definida na seção 1, para criar ou sobrescrever `application-secret.json`:
+
+```bash
+./scripts/create-application-secret.sh "$APPLICATION_SECRET_PATH"
+```
+
+O parâmetro é obrigatório e aceita um caminho com ou sem o prefixo `file://`. Caminhos relativos são resolvidos a partir do diretório atual; execute o comando na raiz do projeto, como os demais comandos deste guia. O diretório de destino deve existir.
+
+O script lê diretamente o `.env`, sem executar seu conteúdo nem expandir referências a variáveis. Mantém as chaves `bettor_cpf`, `bettor_password`, `credit_card_last_digits`, `credit_card_security_code` e `mail_to`, com valores em formato de string, indentação de dois espaços e permissão `600`. O conteúdo anterior é substituído integralmente. Se o `.env` não existir, alguma das cinco variáveis estiver ausente ou vazia, ou houver quebras de linha nos valores, o arquivo existente é preservado. `.env` e `application-secret.json` estão ignorados pelo Git.
+
+```bash
 APPLICATION_SECRET_ARN="$(aws secretsmanager create-secret --name "$OAUTH_SECRET_NAME" --secret-string "$APPLICATION_SECRET_PATH" --query ARN --output text "${AWS_ARGS[@]}")"
 ```
 
