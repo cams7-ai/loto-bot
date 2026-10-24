@@ -42,11 +42,11 @@ class SessionControlUseCase(OperationExecutor):
 
         self._browser.start(self._session)
         self._session.mark_open()
-        self._notifier.start_whatsapp_session(self._session)
-        logger.info(
-            "Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation)
-        )
         try:
+            self._notifier.start_whatsapp_session(self._session)
+            logger.info(
+                "Sessão de navegador iniciada", extra=Operation.executed_operation(self._session.executed_operation)
+            )
             if self._authenticate():
                 self._execute(Operation.SHOPPING_CART, self._browser.clear_shopping_cart)
                 logger.info(
@@ -113,7 +113,7 @@ class SessionControlUseCase(OperationExecutor):
         return self.status()
 
     def _close(self) -> None:
-        close_if_open(self._session, self._browser, self._notifier, None, True)
+        close_if_open(self._session, self._browser, self._notifier)
 
     def status(self) -> SessionStatusResult:
         return SessionStatusResult(

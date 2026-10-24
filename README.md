@@ -497,6 +497,10 @@ Os scripts AWS para Linux ficam em [`scripts/`](scripts/) com sufixo `.sh` e op�
 - Eventos registram operação, processo e thread.
 - Dados sensíveis devem permanecer mascarados.
 - Falhas operacionais geram tentativa de notificação.
+- Se `/api/v1/sessions/start` falhar após abrir o WhatsApp, a notificação de erro é tentada antes do encerramento
+  das sessões. O encerramento do WhatsApp independe do sucesso da notificação ou do fallback para e-mail.
+  Falhas de notificação ou limpeza são registradas sem substituir o erro original da abertura.
+  Se a API do WhatsApp estiver indisponível, o encerramento remoto não pode ser garantido.
 
 Exemplo de probes:
 

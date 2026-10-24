@@ -34,7 +34,7 @@ class SessionFailureHandler:
             extra=Operation.executed_operation(operation),
         )
 
-        notification_sent = notifier.notify_failure(session.whatsapp_enabled, exc)
+        cls._notify_failure(session, notifier, exc)
 
         cls._handle_session_after_failure(
             session=session,
@@ -43,7 +43,6 @@ class SessionFailureHandler:
             operation=operation,
             error_message=str(exc),
             close=close,
-            notification_sent=notification_sent,
         )
 
         raise exc
@@ -67,7 +66,7 @@ class SessionFailureHandler:
 
         error = AutomationError(ErrorMessage.OPERATION_CANNOT_BE_COMPLETED, operation=operation)
 
-        notification_sent = notifier.notify_failure(session.whatsapp_enabled, error)
+        cls._notify_failure(session, notifier, error)
 
         cls._handle_session_after_failure(
             session=session,
@@ -76,7 +75,6 @@ class SessionFailureHandler:
             operation=operation,
             error_message=error_message,
             close=close,
-            notification_sent=notification_sent,
         )
 
         raise error from exc
@@ -90,16 +88,15 @@ class SessionFailureHandler:
         operation: Operation,
         error_message: str,
         close: bool,
-        notification_sent: bool,
     ) -> None:
         if close:
-            cls.close_if_open(
-                session=session,
-                browser=browser,
-                notifier=notifier,
-                operation=operation,
-                notification_sent=notification_sent,
-            )
+            try:
+                cls.close_if_open(session, browser, notifier, operation)
+            except Exception:
+                logger.error(
+                    "Falha ao encerrar sessões após erro de automação",
+                    extra=Operation.executed_operation(operation),
+                )
             return
 
         cls._failed(
@@ -115,23 +112,37 @@ class SessionFailureHandler:
         browser: BrowserAutomationPort,
         notifier: NotificationPort,
         operation: Operation | None = None,
-        notification_sent: bool = False,
     ) -> None:
-        if session.status != AutomationStatus.CLOSED:
-            browser.stop()
+        try:
+            if session.status != AutomationStatus.CLOSED:
+                try:
+                    browser.stop()
+                finally:
+                    notifier.stop_whatsapp_session(session)
+        finally:
+            session.mark_closed(operation)
 
-            if notification_sent:
-                notifier.stop_whatsapp_session(session)
+            log_message = "Fechando sessão de navegador aberta"
+            log_extra = Operation.executed_operation(session.executed_operation)
 
-        session.mark_closed(operation)
+            if operation is None:
+                logger.info(log_message, extra=log_extra)
+            else:
+                logger.error(log_message, extra=log_extra)
 
-        log_message = "Fechando sessão de navegador aberta"
-        log_extra = Operation.executed_operation(session.executed_operation)
-
-        if operation is None:
-            logger.info(log_message, extra=log_extra)
-        else:
-            logger.error(log_message, extra=log_extra)
+    @staticmethod
+    def _notify_failure(
+        session: AutomationSession,
+        notifier: NotificationPort,
+        error: AutomationError,
+    ) -> None:
+        try:
+            notifier.notify_failure(session.whatsapp_enabled, error)
+        except Exception:
+            logger.error(
+                "Falha ao enviar notificação de erro da automação",
+                extra=Operation.executed_operation(error.operation),
+            )
 
     @classmethod
     def _failed(

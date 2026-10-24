@@ -296,7 +296,7 @@ def test_session_control_closes_session_when_authentication_fails_unexpectedly(m
     assert notifier.stopped is True
 
 
-def test_session_control_keeps_whatsapp_session_when_failure_notification_has_no_response(monkeypatch):
+def test_session_control_closes_whatsapp_session_when_failure_notification_has_no_response(monkeypatch):
     session = AutomationSession()
     browser = AuthenticationErrorBrowser(AutomationError("falha", operation=Operation.ACCESS_LOTTERY_PORTAL))
     notifier = FakeNotifier(failure_response=None)
@@ -313,7 +313,7 @@ def test_session_control_keeps_whatsapp_session_when_failure_notification_has_no
     assert session.status.value == "Fechada"
     assert browser.open is False
     assert browser.calls[-1] == "stop"
-    assert notifier.stopped is False
+    assert notifier.stopped is True
 
 
 def test_session_control_does_not_read_code_for_invalid_cpf(monkeypatch):

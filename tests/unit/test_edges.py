@@ -246,11 +246,13 @@ def test_notification_gateway_whatsapp_exception_and_mail_error():
     session.executed_operation = Operation.UNKNOWN_OPERATION
     gateway = NotificationGateway(WhatsApp(), Mail())
 
-    with pytest.raises(UnboundLocalError):
+    assert (
         gateway.notify_failure(
             session.whatsapp_enabled,
             AutomationError("Mensagem de falha", operation=Operation.UNKNOWN_OPERATION),
         )
+        is False
+    )
 
 
 def test_settings_selectors_and_logging(monkeypatch):

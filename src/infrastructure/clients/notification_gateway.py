@@ -90,8 +90,10 @@ class NotificationGateway(NotificationPort):
                 if response == WhatsAppMessageStatus.SENT.value:
                     logger.info("Notificação enviada pelo WhatsApp", extra=Operation.executed_operation(operation))
                     return True
-            except Exception as exc:
-                logger.warning("Falha ao enviar WhatsApp: %s", exc, extra=Operation.executed_operation(operation))
+            except Exception as notification_error:
+                logger.warning(
+                    "Falha ao enviar WhatsApp: %s", notification_error, extra=Operation.executed_operation(operation)
+                )
 
         self._send_mail_fallback(exc)
         return False
